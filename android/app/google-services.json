@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "810900868541",
+    "project_id": "wellness-app-17f47",
+    "storage_bucket": "wellness-app-17f47.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:810900868541:android:027a083397fbff75a4d6d4",
+        "android_client_info": {
+          "package_name": "com.islington.wellness_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "810900868541-57eukvl9rif6nrvu0mgms8k7kuk11m7l.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.islington.wellness_app",
+            "certificate_hash": "5ceb676542d4ce16afd862f1966413fe9d2e98d4"
+          }
+        },
+        {
+          "client_id": "810900868541-tour7r72pjun5b5810hg9d302vqstl3v.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJtJ5WJfdPxro_kfIaFiWwLKPyvfgD6cU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "810900868541-tour7r72pjun5b5810hg9d302vqstl3v.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
