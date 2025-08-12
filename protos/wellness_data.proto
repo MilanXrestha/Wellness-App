@@ -1,0 +1,124 @@
+// File: libs/protos/wellness_data.proto
+syntax = "proto3";
+
+package wellness;
+
+// CategoryModel represents a category of wellness tips or quotes.
+message CategoryModel {
+    string categoryId = 1;
+    string categoryName = 2;
+    string imageUrl = 3;
+    repeated string preferenceIds = 4;
+    optional string categoryDescription = 5;
+    string createdAt = 6; // ISO 8601 string
+}
+
+// FavoriteModel represents a user's favorited tip.
+message FavoriteModel {
+    string id = 1;
+    string userId = 2;
+    string tipId = 3;
+    optional string createdAt = 4; // ISO 8601 string
+}
+
+// NotificationModel represents a notification sent to a user.
+message NotificationModel {
+    string id = 1;
+    string userId = 2;
+    string title = 3;
+    string body = 4;
+    string type = 5;
+    bool isRead = 6;
+    map<string, string> payload = 7; // Simplified as string key-value pairs
+    optional string timestamp = 8; // ISO 8601 string
+}
+
+// PreferenceModel represents a user's preference or interest.
+message PreferenceModel {
+    string preferenceId = 1;
+    string preferenceName = 2;
+    string preferenceIcon = 3;
+    string preferenceDescription = 4;
+    bool isSvg = 5;
+}
+
+// ReminderModel represents a scheduled reminder for a user.
+message ReminderModel {
+    string id = 1;
+    string userId = 2;
+    string type = 3;
+    string categoryId = 4;
+    string frequency = 5;
+    string time = 6; // HH:mm format
+    optional int32 dayOfWeek = 7;
+    optional string createdAt = 8; // ISO 8601 string
+    optional int32 notificationId = 9;
+}
+
+// SubscriptionModel represents a user's subscription details.
+message SubscriptionModel {
+    string userId = 1;
+    string planId = 2;
+    string status = 3;
+    optional string startDate = 4; // ISO 8601 string
+    optional string endDate = 5; // ISO 8601 string
+    optional string createdAt = 6; // ISO 8601 string
+    optional string updatedAt = 7; // ISO 8601 string
+    string paymentMethod = 8;
+    optional string lastTransactionId = 9;
+    bool isAutoRenew = 10;
+}
+
+message TransactionModel {
+    string id = 1;
+    string userId = 2;
+    string subscriptionId = 3;
+    string paymentProviderTransactionId = 4;
+    string paymentProvider = 5;
+    double amount = 6;
+    string currency = 7;
+    string status = 8;
+    string planId = 9;
+    optional string createdAt = 10; // ISO 8601 string
+}
+
+// TipModel represents a wellness tip or quote.
+message TipModel {
+    string tipsId = 1;
+    string tipsTitle = 2;
+    string tipsDescription = 3;
+    string tipsType = 4;
+    string tipsAuthor = 5;
+    optional string authorIcon = 6;
+    repeated string preferenceIds = 7;
+    string categoryId = 8;
+    optional string createdAt = 9; // ISO 8601 string
+    bool isFeatured = 10;
+    bool isPremium = 11;
+}
+
+// UserModel represents a user's profile information.
+message UserModel {
+    string userId = 1;
+    string userEmail = 2;
+    string userName = 3;
+    string userRole = 4;
+    bool preferenceCompleted = 5;
+    string createdAt = 6; // ISO 8601 string
+    optional string photoURL = 7;
+    optional string fcmToken = 8;
+}
+
+// UserPreferenceEntry represents a single preference selected by a user.
+message UserPreferenceEntry {
+    string preferenceId = 1;
+    optional string selectedAt = 2; // ISO 8601 string
+    // Note: PreferenceModel is not included as a nested message to avoid circular dependencies
+}
+
+// UserPreferenceModel represents a collection of user preferences.
+message UserPreferenceModel {
+    string userId = 1;
+    repeated UserPreferenceEntry preferences = 2;
+    optional string updatedAt = 3; // ISO 8601 string
+}

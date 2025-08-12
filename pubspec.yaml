@@ -1,97 +1,120 @@
 name: wellness_app
 description: "A new Flutter project."
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: 'none' # Prevents publishing to pub.dev
 
 version: 1.0.0+1
 
 environment:
   sdk: ^3.8.1
 
-# Dependencies specify other packages that your package needs in order to work.
-# To automatically upgrade your package dependencies to the latest versions
-# consider running `flutter pub upgrade --major-versions`. Alternatively,
-# dependencies can be manually updated by changing the version numbers below to
-# the latest version available on pub.dev. To see which dependencies have newer
-# versions available, run `flutter pub outdated`.
 dependencies:
+  # Flutter SDK and core packages
   flutter:
     sdk: flutter
 
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
-  cupertino_icons: ^1.0.8
+  # Esewa SDK
+  esewa_flutter_sdk:
+    path: ./esewa_flutter_sdk
 
-  cached_network_image: ^3.4.1
-  flutter_screenutil: ^5.9.3
-  flutter_svg: ^2.1.0
-  google_fonts: ^6.1.0
-  dio: ^5.8.0+1
+  # Localization support
+  flutter_localizations:
+    sdk: flutter            # Flutter's built-in localization support
+  intl: ^0.20.2             # Internationalization & localization utilities
 
-  # Firebase Integration
-  #  firebase_core: ^3.15.1
-  #  firebase_auth: ^5.6.2
-  #  google_sign_in: ^6.2.2
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  google_sign_in: ^6.2.2
+  # UI & Design
+  cupertino_icons: ^1.0.8            # iOS-style icons
+  flutter_screenutil: ^5.9.3         # Responsive UI utilities
+  flutter_svg: ^2.1.0                # SVG image rendering support
+  google_fonts: ^6.1.0               # Access to Google Fonts
+  lottie: ^3.3.1                     # Lottie animations
+  flutter_animate: ^4.5.0
+  dotted_border: ^2.1.0              # Custom dotted borders
+  font_awesome_flutter: ^10.7.0      # FontAwesome icons
 
-  # Font Awesome Icons
-  font_awesome_flutter: ^10.7.0
+  flutter_staggered_grid_view: ^0.7.0
+  carousel_slider: ^5.1.1
+  animate_do: ^3.3.4
+  shimmer: ^3.0.0
+  flip_card: ^0.5.0
+  collection: ^1.18.0
 
-  shared_preferences: ^2.2.3
+  # Media & Interaction
+  flutter_tts: ^4.2.3                # Text to speech
+  share_plus: ^10.0.2                # Content sharing
+  uuid: ^4.5.1
 
-  # Pick images from gallery or camera
-  image_picker: ^1.0.5
+  # Networking
+  dio: ^5.8.0+1                      # Advanced HTTP client
+  http: ^1.2.0                       # Basic HTTP requests
 
-  dotted_border: ^2.1.0
+  # Firebase & Authentication
+  firebase_core: ^3.7.0              # Core Firebase initialization
+  firebase_auth: ^5.3.1              # Firebase Authentication
+  google_sign_in: ^6.2.2             # Google Sign-In integration
+  cloud_firestore: ^5.4.4            # Firestore database
+  firebase_messaging: ^15.2.9        # Push notifications
+  cloud_functions: ^5.6.1            # Cloud Functions
+
+  timeago: ^3.7.1                    # Human-friendly timestamps
+
+  protobuf: ^4.1.1
+  lru_cache: ^0.0.2
+  flutter_cache_manager: ^3.4.1
+
+
+  # Storage & Local Persistence
+  shared_preferences: ^2.2.3         # Simple key-value storage
+  sqflite: ^2.3.2                    # SQLite local database
+  path: ^1.9.0                       # Path utilities for file/database handling
+  connectivity_plus: ^6.1.4         # Check network connectivity (Wi-Fi, mobile, offline, etc.)
+
+  # Media & Pickers
+  cached_network_image: ^3.4.1       # Efficient image caching/loading
+  crop_image: ^1.0.16                # Image cropping
+  image_picker: ^1.1.2               # Image picker (camera/gallery)
+  cloudinary_public: ^0.23.1         # Cloudinary image uploads
+  permission_handler: ^12.0.1        # Permissions management
+  flutter_local_notifications: ^19.4.0 # Local notifications
+  timezone: ^0.10.1
+
+  # State management & Reactive programming
+  provider: ^6.1.2
+  rxdart: ^0.28.0
+
+  # Useful dev utilities
+  url_launcher: ^6.3.0
+  path_provider: ^2.1.5
+  package_info_plus: ^8.0.2
+
 
 dev_dependencies:
   flutter_test:
-    sdk: flutter
+    sdk: flutter                    # Flutter's testing framework
 
-  # The "flutter_lints" package below contains a set of recommended lints to
-  # encourage good coding practices. The lint set provided by the package is
-  # activated in the `analysis_options.yaml` file located at the root of your
-  # package. See that file for information about deactivating specific lint
-  # rules and activating additional ones.
+  # Linting and code quality tools
   flutter_lints: ^5.0.0
+
+  # Tools for app icon and splash screen generation
   flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.1
 
-# For information on the generic Dart part of this file, see the
-# following page: https://dart.dev/tools/pub/pubspec
 
-# The following section is specific to Flutter packages.
+  # Testing & mocking
+  mockito: ^5.4.4
+
 flutter:
-
-  # The following line ensures that the Material Icons font is
-  # included with your application, so that you can use the icons in
-  # the material Icons class.
   uses-material-design: true
+  generate: true                   # Enables Flutter gen-l10n tool
 
+  # Assets used in the app
   assets:
-    - assets/images/svg/ic_google.svg
-    - assets/images/svg/ic_mail.svg
-    - assets/images/svg/ic_lock.svg
-    - assets/images/svg/ic_hide.svg
-    - assets/images/svg/ic_show.svg
-    - assets/images/svg/ic_user.svg
-    - assets/images/svg/ic_volume_up.svg
-    - assets/images/svg/ic_swipe_up.svg
-    - assets/images/svg/ic_heart.svg
-    - assets/images/svg/ic_collection.svg
-    - assets/images/svg/ic_content_pref.svg
-    - assets/images/svg/ic_theme.svg
-    - assets/images/svg/ic_password.svg
-    - assets/images/svg/ic_exit.svg
-    - assets/images/svg/ic_bell.svg
-    - assets/images/svg/ic_sun.svg
-    - assets/images/svg/ic_star.svg
-    - assets/images/svg/ic_heart_filled.svg
-    - assets/images/svg/ic_users.svg
+    - assets/icons/                   # Icon assets
+    - assets/images/
+    - assets/icons/png/               # PNG icons
+    - assets/icons/svg/               # SVG icons
+    - assets/animations/              # Lottie animation files
 
-
+  # Custom fonts
   fonts:
     - family: Poppins
       fonts:
@@ -106,7 +129,20 @@ flutter:
         - asset: assets/fonts/PlayfairDisplay-Italic.ttf
           weight: 700
 
-flutter_icons:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Regular.ttf
+        - asset: assets/fonts/Nunito-Bold.ttf
+        - asset: assets/fonts/Nunito-Italic.ttf
+          weight: 700
+
+flutter_native_splash:
+  # Splash screen configuration for light and dark mode
+  color: "#FFF8E1"                # Light mode background color
+  color_dark: "#1E1E1E"           # Dark mode background color
+  image: assets/icons/png/wellness_logo.png
+  ios_content_mode: center        # Center splash image on iOS
+  android_gravity: center         # Center splash image on Android
+  fullscreen: true                # Force fullscreen splash screen
   android: true
   ios: true
-  image_path: "assets/images/png/Wellbeing.png"
