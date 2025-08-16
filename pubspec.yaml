@@ -58,7 +58,6 @@ dependencies:
   timeago: ^3.7.1                    # Human-friendly timestamps
 
   protobuf: ^4.1.1
-  lru_cache: ^0.0.2
   flutter_cache_manager: ^3.4.1
 
 
@@ -67,6 +66,7 @@ dependencies:
   sqflite: ^2.3.2                    # SQLite local database
   path: ^1.9.0                       # Path utilities for file/database handling
   connectivity_plus: ^6.1.4         # Check network connectivity (Wi-Fi, mobile, offline, etc.)
+  synchronized: ^3.4.0
 
   # Media & Pickers
   cached_network_image: ^3.4.1       # Efficient image caching/loading

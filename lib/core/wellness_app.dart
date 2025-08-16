@@ -19,12 +19,14 @@ class WellnessApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Ensure NotificationService is initialized
+    NotificationService.instance.initLocalNotifications();
+
     return MultiProvider(
       providers: [
         Provider<AuthService>(create: (_) => AuthService()),
         Provider<DataRepository>(create: (_) => DataRepository.instance),
         Provider<DatabaseHelper>(create: (_) => DatabaseHelper.instance),
-
         ChangeNotifierProvider<FavoritesProvider>(create: (_) => FavoritesProvider()),
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),

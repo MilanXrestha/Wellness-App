@@ -932,14 +932,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.3.1"
-  lru_cache:
-    dependency: "direct main"
-    description:
-      name: lru_cache
-      sha256: de0e2bf54077bae2fe4c5dcf339f7587e9f4c275190f79b7bbb2362290d40135
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.0.2"
   matcher:
     dependency: transitive
     description:
@@ -1426,7 +1418,7 @@ packages:
     source: hosted
     version: "1.4.1"
   synchronized:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: synchronized
       sha256: c254ade258ec8282947a0acbbc90b9575b4f19673533ee46f2f6e9b3aeefd7c0
