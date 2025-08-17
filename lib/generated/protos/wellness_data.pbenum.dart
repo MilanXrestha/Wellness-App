@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from wellness_data.proto.
+// Generated from protos/wellness_data.proto.
 
 // @dart = 3.3
 

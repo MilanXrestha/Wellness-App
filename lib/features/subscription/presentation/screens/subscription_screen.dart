@@ -330,7 +330,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         setState(() => _isSubscribing = false);
         CustomBottomSheet.show(
           context: context,
-          message: 'Sorry to see you go! Your subscription has been cancelled. You will retain premium access until ${DateFormat('MMM dd, yyyy').format(subscription.endDate!)}.',
+          message: 'Sorry to see you go! Your subscription has been cancelled.',
           isSuccess: true,
           onOkPressed: () => setState(() {}),
         );
@@ -353,9 +353,10 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       bool isDarkMode,
       bool isActive,
       String? currentPlanId,
+      bool isSubscriptionActive,
       ) {
-    final isCurrentPlan = plan['planId'] == currentPlanId;
-    final isUpgrade = currentPlanId != null && _getPlanTier(plan['planId']) > _getPlanTier(currentPlanId);
+    final isCurrentPlan = isSubscriptionActive && plan['planId'] == currentPlanId;
+    final isUpgrade = currentPlanId != null && isSubscriptionActive && _getPlanTier(plan['planId']) > _getPlanTier(currentPlanId);
     final savings = isUpgrade ? _getUpgradeSavings(currentPlanId, plan['planId']) : 0.0;
     final buttonText = isCurrentPlan ? 'Current Plan' : (isUpgrade ? 'Upgrade Now' : 'Subscribe Now');
     final buttonEnabled = !isCurrentPlan;
@@ -629,15 +630,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         }
 
                         final subscription = snapshot.data;
-                        final hasSubscription = subscription != null && subscription.status == 'active';
-                        final currentPlanId = subscription?.planId;
-                        // Set tier to 0 if no active subscription or cancelled
-                        final currentTier = subscription != null && subscription.status == 'active'
+                        final isSubscriptionActive = subscription != null && subscription.status == 'active';
+                        final currentPlanId = isSubscriptionActive ? subscription.planId : null;
+                        // Set tier to 0 if no active subscription
+                        final currentTier = isSubscriptionActive
                             ? _getPlanTier(currentPlanId!)
                             : 0;
 
                         // Show all plans if no active subscription
-                        final visiblePlans = hasSubscription
+                        final visiblePlans = isSubscriptionActive
                             ? _plans.where((p) => _getPlanTier(p['planId']) >= currentTier).toList()
                             : List.from(_plans); // Show all plans when no active subscription
 
@@ -647,7 +648,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                             FadeInDown(
                               duration: const Duration(milliseconds: 600),
                               child: Text(
-                                hasSubscription ? 'Your Subscription' : 'Unlock All Premium Content',
+                                isSubscriptionActive ? 'Your Subscription' : 'Unlock All Premium Content',
                                 style: theme.textTheme.headlineMedium?.copyWith(
                                   color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                   fontSize: 28.sp,
@@ -657,7 +658,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                               ),
                             ),
                             SizedBox(height: 6.h),
-                            if (!hasSubscription)
+                            if (!isSubscriptionActive)
                               FadeInDown(
                                 duration: const Duration(milliseconds: 800),
                                 child: Text(
@@ -670,7 +671,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 ),
                               ),
                             SizedBox(height: 16.h),
-                            if (hasSubscription) ...[
+                            if (subscription != null) ...[
                               FadeInUp(
                                 duration: const Duration(milliseconds: 600),
                                 child: Container(
@@ -701,7 +702,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Current Plan',
+                                        isSubscriptionActive ? 'Current Plan' : 'Subscription Details',
                                         style: theme.textTheme.titleMedium?.copyWith(
                                           color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                           fontSize: 18.sp,
@@ -720,14 +721,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                       ),
                                       if (subscription.endDate != null)
                                         Text(
-                                          'Ends on ${DateFormat('MMM dd, yyyy').format(subscription.endDate!)}',
+                                          isSubscriptionActive
+                                              ? 'Ends on ${DateFormat('MMM dd, yyyy').format(subscription.endDate!)}'
+                                              : 'Cancelled on ${DateFormat('MMM dd, yyyy').format(subscription.updatedAt!)}',
                                           style: theme.textTheme.bodySmall?.copyWith(
                                             color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                                             fontSize: 14.sp,
                                             fontFamily: 'Poppins',
                                           ),
                                         ),
-                                      if (subscription.status == 'active') ...[
+                                      if (isSubscriptionActive) ...[
                                         SizedBox(height: 12.h),
                                         ElevatedButton(
                                           onPressed: _isSubscribing
@@ -785,6 +788,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                     isDarkMode,
                                     _currentIndex.value == index,
                                     currentPlanId,
+                                    isSubscriptionActive,
                                   );
                                 },
                               ),

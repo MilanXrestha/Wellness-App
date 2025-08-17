@@ -58,7 +58,6 @@ dependencies:
   timeago: ^3.7.1                    # Human-friendly timestamps
 
   protobuf: ^4.1.1
-  lru_cache: ^0.0.2
   flutter_cache_manager: ^3.4.1
 
 
@@ -67,6 +66,7 @@ dependencies:
   sqflite: ^2.3.2                    # SQLite local database
   path: ^1.9.0                       # Path utilities for file/database handling
   connectivity_plus: ^6.1.4         # Check network connectivity (Wi-Fi, mobile, offline, etc.)
+  synchronized: ^3.4.0
 
   # Media & Pickers
   cached_network_image: ^3.4.1       # Efficient image caching/loading
@@ -76,6 +76,10 @@ dependencies:
   permission_handler: ^12.0.1        # Permissions management
   flutter_local_notifications: ^19.4.0 # Local notifications
   timezone: ^0.10.1
+  fl_chart: ^1.0.0
+  file_picker: ^10.3.1
+  just_audio: ^0.10.4
+  better_player_plus: ^1.0.8
 
   # State management & Reactive programming
   provider: ^6.1.2

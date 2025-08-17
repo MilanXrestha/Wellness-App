@@ -663,6 +663,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No data available'**
   String get noDataAvailable;
+
+  /// No description provided for @premiumAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium Audio'**
+  String get premiumAudio;
+
+  /// No description provided for @premiumContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium Content'**
+  String get premiumContent;
+
+  /// No description provided for @subscribeToUnlockAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe now to unlock this inspiring audio content!'**
+  String get subscribeToUnlockAudio;
+
+  /// No description provided for @unlockPremiumAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock this premium audio to inspire your day!'**
+  String get unlockPremiumAudio;
+
+  /// No description provided for @errorLoadingAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Error loading audio. Please try again.'**
+  String get errorLoadingAudio;
+
+  /// No description provided for @viewDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'View Details'**
+  String get viewDetails;
+
+  /// No description provided for @subscribe.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe'**
+  String get subscribe;
+
+  /// No description provided for @pleaseLogIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Please log in to add to favorites.'**
+  String get pleaseLogIn;
+
+  /// No description provided for @unlockPremiumBenefits.
+  ///
+  /// In en, this message translates to:
+  /// **'Unlock exclusive benefits with a premium subscription!'**
+  String get unlockPremiumBenefits;
+
+  /// No description provided for @premiumAudioAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Access to premium audio tracks'**
+  String get premiumAudioAccess;
+
+  /// No description provided for @exclusiveContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclusive wellness content'**
+  String get exclusiveContent;
+
+  /// No description provided for @offlineAccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline access to content'**
+  String get offlineAccess;
+
+  /// No description provided for @subscribeNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Subscribe Now'**
+  String get subscribeNow;
+
+  /// No description provided for @premium.
+  ///
+  /// In en, this message translates to:
+  /// **'Premium'**
+  String get premium;
+
+  /// No description provided for @playlist.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist'**
+  String get playlist;
+
+  /// No description provided for @tracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Tracks'**
+  String get tracks;
 }
 
 class _AppLocalizationsDelegate

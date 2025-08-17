@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -26,6 +27,9 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   log('Firebase initialized successfully');
 
+  // Initialize NotificationService
+  await NotificationService.instance.initLocalNotifications();
+
   // Register background handler
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessagingHandler);
 
@@ -46,8 +50,13 @@ void main() async {
     }
   });
 
-  // Handle initial notification
+  // Handle initial and opened notifications
   await NotificationService.instance.handleInitialNotification();
+  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+    log("Notification opened from FCM: title=${message.notification?.title}, data=${message.data}");
+    await NotificationService.instance.showNotification(message: message);
+    await NotificationService.instance.onClickToNotification(json.encode(message.data));
+  });
 
   // Test FCM token update
   await fcmServices.testFcmTokenUpdate();

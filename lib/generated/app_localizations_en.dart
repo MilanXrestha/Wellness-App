@@ -305,4 +305,55 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noDataAvailable => 'No data available';
+
+  @override
+  String get premiumAudio => 'Premium Audio';
+
+  @override
+  String get premiumContent => 'Premium Content';
+
+  @override
+  String get subscribeToUnlockAudio =>
+      'Subscribe now to unlock this inspiring audio content!';
+
+  @override
+  String get unlockPremiumAudio =>
+      'Unlock this premium audio to inspire your day!';
+
+  @override
+  String get errorLoadingAudio => 'Error loading audio. Please try again.';
+
+  @override
+  String get viewDetails => 'View Details';
+
+  @override
+  String get subscribe => 'Subscribe';
+
+  @override
+  String get pleaseLogIn => 'Please log in to add to favorites.';
+
+  @override
+  String get unlockPremiumBenefits =>
+      'Unlock exclusive benefits with a premium subscription!';
+
+  @override
+  String get premiumAudioAccess => 'Access to premium audio tracks';
+
+  @override
+  String get exclusiveContent => 'Exclusive wellness content';
+
+  @override
+  String get offlineAccess => 'Offline access to content';
+
+  @override
+  String get subscribeNow => 'Subscribe Now';
+
+  @override
+  String get premium => 'Premium';
+
+  @override
+  String get playlist => 'Playlist';
+
+  @override
+  String get tracks => 'Tracks';
 }

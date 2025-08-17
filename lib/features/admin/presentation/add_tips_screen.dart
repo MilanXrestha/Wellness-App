@@ -1,18 +1,21 @@
 import 'dart:io';
 
+import 'package:animate_do/animate_do.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:wellness_app/features/categories/data/models/category_model.dart';
-import 'package:wellness_app/features/preferences/data/models/preference_model.dart';
+
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/resources/strings.dart';
 import 'package:wellness_app/common/widgets/custom_bottom_sheet.dart';
 import 'package:dotted_border/dotted_border.dart';
-
-import '../../tips/data/models/tips_model.dart';
+import 'package:wellness_app/features/categories/data/models/category_model.dart';
+import 'package:wellness_app/features/preferences/data/models/preference_model.dart';
+import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 
 class AddTipScreen extends StatefulWidget {
   const AddTipScreen({super.key});
@@ -21,13 +24,25 @@ class AddTipScreen extends StatefulWidget {
   State<AddTipScreen> createState() => _AddTipScreenState();
 }
 
-class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMixin {
+class _AddTipScreenState extends State<AddTipScreen>
+    with TickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _authorController = TextEditingController();
-  final TextEditingController _authorIconUrlController = TextEditingController();
-  final CloudinaryPublic _cloudinary = CloudinaryPublic('dczb26ev1', 'Wellness_App', cache: true);
+  final TextEditingController _authorIconUrlController =
+  TextEditingController();
+  final TextEditingController _videoUrlController = TextEditingController();
+  final TextEditingController _audioUrlController = TextEditingController();
+  final TextEditingController _imageUrlController = TextEditingController();
+  final TextEditingController _thumbnailUrlController = TextEditingController();
+  final TextEditingController _mediaDurationController =
+  TextEditingController();
+  final CloudinaryPublic _cloudinary = CloudinaryPublic(
+    'dczb26ev1',
+    'Wellness_App',
+    cache: true,
+  );
   final ImagePicker _picker = ImagePicker();
   final List<String> tipsTypes = [
     'quote',
@@ -47,6 +62,14 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
   XFile? _pickedAuthorIcon;
   String? _uploadedAuthorIconUrl;
   bool _useAuthorIconUpload = false;
+  XFile? _pickedVideo;
+  PlatformFile? _pickedAudio;
+  XFile? _pickedImage;
+  XFile? _pickedThumbnail;
+  bool _useVideoUpload = false;
+  bool _useAudioUpload = false;
+  bool _useImageUpload = false;
+  bool _useThumbnailUpload = false;
   bool _isFeatured = false;
   bool _isPremium = false;
   final Map<String, CategoryModel> _categoryCache = {};
@@ -62,11 +85,14 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
     _saveButtonController = AnimationController(
       duration: const Duration(milliseconds: 400),
       vsync: this,
-    )..forward();
+    )
+      ..forward();
     _loadData();
-    // Check if editing an existing tip
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments;
+      final args = ModalRoute
+          .of(context)
+          ?.settings
+          .arguments;
       if (args is TipModel) {
         setState(() {
           _tip = args;
@@ -74,12 +100,19 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
           _descriptionController.text = args.tipsDescription;
           _authorController.text = args.tipsAuthor;
           _authorIconUrlController.text = args.authorIcon ?? '';
-          _selectedType = tipsTypes.contains(args.tipsType) ? args.tipsType : null;
+          _selectedType = tipsTypes.contains(args.tipsType)
+              ? args.tipsType
+              : null;
           _selectedCategoryId = args.categoryId;
           _selectedPreferenceIds.addAll(args.preferenceIds);
           _isFeatured = args.isFeatured;
           _isPremium = args.isPremium;
           _useAuthorIconUpload = false;
+          _videoUrlController.text = args.videoUrl ?? '';
+          _audioUrlController.text = args.audioUrl ?? '';
+          _imageUrlController.text = args.imageUrl ?? '';
+          _thumbnailUrlController.text = args.thumbnailUrl ?? '';
+          _mediaDurationController.text = args.mediaDuration ?? '';
         });
       }
     });
@@ -91,6 +124,11 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
     _descriptionController.dispose();
     _authorController.dispose();
     _authorIconUrlController.dispose();
+    _videoUrlController.dispose();
+    _audioUrlController.dispose();
+    _imageUrlController.dispose();
+    _thumbnailUrlController.dispose();
+    _mediaDurationController.dispose();
     _saveButtonController.dispose();
     super.dispose();
   }
@@ -99,30 +137,29 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
   Future<void> _loadData() async {
     try {
       final categorySnapshot = await _firestore.collection('categories').get();
-      final preferenceSnapshot = await _firestore.collection('preferences').get();
-
-      // Load categories with duplicate detection
+      final preferenceSnapshot = await _firestore
+          .collection('preferences')
+          .get();
       for (var doc in categorySnapshot.docs) {
         if (!_categoryCache.containsKey(doc.id)) {
-          _categoryCache[doc.id] = CategoryModel.fromFirestore(doc.data(), doc.id);
+          _categoryCache[doc.id] = CategoryModel.fromFirestore(
+            doc.data(),
+            doc.id,
+          );
         } else {
           print('Duplicate category ID found: ${doc.id}');
         }
       }
-
-      // Load preferences
       for (var doc in preferenceSnapshot.docs) {
-        _preferenceCache[doc.id] = PreferenceModel.fromFirestore(doc.data(), doc.id);
+        _preferenceCache[doc.id] = PreferenceModel.fromFirestore(
+          doc.data(),
+          doc.id,
+        );
       }
-
-      // Validate _selectedCategoryId
       if (_tip != null && !_categoryCache.containsKey(_selectedCategoryId)) {
         print('Invalid categoryId: $_selectedCategoryId, resetting to null');
         _selectedCategoryId = null;
       }
-
-      // Log category cache for debugging
-      print('Category Cache: ${_categoryCache.keys.toList()}');
       setState(() => _isDataLoaded = true);
     } catch (e) {
       _showError('${AppStrings.error} $e');
@@ -132,33 +169,93 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
   // Shows error message in CustomBottomSheet
   void _showError(String message) {
     if (mounted) {
-      CustomBottomSheet.show(context: context, message: message, isSuccess: false);
+      CustomBottomSheet.show(
+        context: context,
+        message: message,
+        isSuccess: false,
+      );
     }
   }
 
   // Validates form fields
   bool _validateForm() {
-    if (_titleController.text.trim().isEmpty) {
-      _showError('Tip title is required');
-      return false;
-    }
-    if (_titleController.text.trim().length > 500) {
-      _showError('Tip title must be 100 characters or less');
-      return false;
-    }
-    if (_descriptionController.text.trim().length > 500) {
-      _showError('Tip description must be 500 characters or less');
-      return false;
-    }
     if (_selectedType == null) {
       _showError('Tip type is required');
       return false;
     }
-    if (_authorController.text.trim().length > 50) {
+    if (_titleController.text
+        .trim()
+        .isEmpty) {
+      _showError('Tip title is required');
+      return false;
+    }
+    if (_titleController.text
+        .trim()
+        .length > 500) {
+      _showError('Tip title must be 500 characters or less');
+      return false;
+    }
+    if (_descriptionController.text
+        .trim()
+        .length > 500) {
+      _showError('Tip description must be 500 characters or less');
+      return false;
+    }
+    if (_selectedType == 'video') {
+      if ((_useVideoUpload && _pickedVideo == null) ||
+          (!_useVideoUpload && _videoUrlController.text
+              .trim()
+              .isEmpty)) {
+        _showError('Video URL or file is required for video type');
+        return false;
+      }
+      if ((_useThumbnailUpload && _pickedThumbnail == null) ||
+          (!_useThumbnailUpload &&
+              _thumbnailUrlController.text
+                  .trim()
+                  .isEmpty)) {
+        _showError('Thumbnail URL or file is required for video type');
+        return false;
+      }
+      if (_mediaDurationController.text
+          .trim()
+          .isEmpty) {
+        _showError('Media duration is required for video type');
+        return false;
+      }
+    }
+    if (_selectedType == 'audio') {
+      if ((_useAudioUpload && _pickedAudio == null) ||
+          (!_useAudioUpload && _audioUrlController.text
+              .trim()
+              .isEmpty)) {
+        _showError('Audio URL or file is required for audio type');
+        return false;
+      }
+      if (_mediaDurationController.text
+          .trim()
+          .isEmpty) {
+        _showError('Media duration is required for audio type');
+        return false;
+      }
+    }
+    if (_selectedType == 'image') {
+      if ((_useImageUpload && _pickedImage == null) ||
+          (!_useImageUpload && _imageUrlController.text
+              .trim()
+              .isEmpty)) {
+        _showError('Image URL or file is required for image type');
+        return false;
+      }
+    }
+    if (_authorController.text
+        .trim()
+        .length > 50) {
       _showError('Author name must be 50 characters or less');
       return false;
     }
-    if (!_useAuthorIconUpload && _authorIconUrlController.text.trim().toLowerCase().endsWith('.svg')) {
+    if (!_useAuthorIconUpload &&
+        _authorIconUrlController.text.trim().toLowerCase().endsWith('.svg')) {
       _showError('SVG is not supported for author icon');
       return false;
     }
@@ -192,6 +289,62 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
     }
   }
 
+  // Picks a video from device
+  Future<void> _pickVideo() async {
+    try {
+      final pickedFile = await _picker.pickVideo(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _pickedVideo = pickedFile;
+        });
+      }
+    } catch (e) {
+      _showError('Error picking video: $e');
+    }
+  }
+
+  // Picks an audio from device using file_picker
+  Future<void> _pickAudio() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.audio);
+      if (result != null && result.files.single.path != null) {
+        setState(() {
+          _pickedAudio = result.files.single;
+        });
+      }
+    } catch (e) {
+      _showError('Error picking audio: $e');
+    }
+  }
+
+  // Picks an image from device
+  Future<void> _pickImage() async {
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _pickedImage = pickedFile;
+        });
+      }
+    } catch (e) {
+      _showError('Error picking image: $e');
+    }
+  }
+
+  // Picks a thumbnail from device
+  Future<void> _pickThumbnail() async {
+    try {
+      final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+      if (pickedFile != null) {
+        setState(() {
+          _pickedThumbnail = pickedFile;
+        });
+      }
+    } catch (e) {
+      _showError('Error picking thumbnail: $e');
+    }
+  }
+
   // Uploads author icon to Cloudinary
   Future<String?> _uploadAuthorIcon({String? publicId}) async {
     if (_pickedAuthorIcon == null) return null;
@@ -209,18 +362,118 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
     }
   }
 
+  // Uploads video to Cloudinary
+  Future<String?> _uploadVideo({String? publicId}) async {
+    if (_pickedVideo == null) return null;
+    try {
+      final cloudinaryFile = CloudinaryFile.fromFile(
+        _pickedVideo!.path,
+        resourceType: CloudinaryResourceType.Video,
+        folder: 'tips_videos',
+      );
+      final response = await _cloudinary.uploadFile(cloudinaryFile);
+      return response.secureUrl;
+    } catch (e) {
+      _showError('Error uploading video: $e');
+      return null;
+    }
+  }
+
+  // Uploads audio to Cloudinary
+  Future<String?> _uploadAudio({String? publicId}) async {
+    if (_pickedAudio == null || _pickedAudio!.path == null) return null;
+    try {
+      final cloudinaryFile = CloudinaryFile.fromFile(
+        _pickedAudio!.path!,
+        resourceType: CloudinaryResourceType.Video, // Treat audio as video
+        folder: 'tips_audios',
+      );
+      final response = await _cloudinary.uploadFile(cloudinaryFile);
+      return response.secureUrl;
+    } catch (e) {
+      _showError('Error uploading audio: $e');
+      return null;
+    }
+  }
+
+  // Uploads image to Cloudinary
+  Future<String?> _uploadImage({String? publicId}) async {
+    if (_pickedImage == null) return null;
+    try {
+      final cloudinaryFile = CloudinaryFile.fromFile(
+        _pickedImage!.path,
+        resourceType: CloudinaryResourceType.Image,
+        folder: 'tips_wallpaper_images',
+      );
+      final response = await _cloudinary.uploadFile(cloudinaryFile);
+      return response.secureUrl;
+    } catch (e) {
+      _showError('Error uploading image: $e');
+      return null;
+    }
+  }
+
+  // Uploads thumbnail to Cloudinary
+  Future<String?> _uploadThumbnail({String? publicId}) async {
+    if (_pickedThumbnail == null) return null;
+    try {
+      final cloudinaryFile = CloudinaryFile.fromFile(
+        _pickedThumbnail!.path,
+        resourceType: CloudinaryResourceType.Image,
+        folder: 'tips_thumbnails',
+      );
+      final response = await _cloudinary.uploadFile(cloudinaryFile);
+      return response.secureUrl;
+    } catch (e) {
+      _showError('Error uploading thumbnail: $e');
+      return null;
+    }
+  }
+
   // Saves or updates tip
   Future<void> _saveTip() async {
     if (!_validateForm()) return;
     setState(() => _isLoading = true);
-
     try {
       String? authorIconUrl;
       if (_useAuthorIconUpload && _pickedAuthorIcon != null) {
         final publicId = _tip != null ? _tip!.tipsId : null;
         authorIconUrl = await _uploadAuthorIcon(publicId: publicId);
-      } else if (_authorIconUrlController.text.trim().isNotEmpty) {
+      } else if (_authorIconUrlController.text
+          .trim()
+          .isNotEmpty) {
         authorIconUrl = _authorIconUrlController.text.trim();
+      }
+
+      String? videoUrl;
+      String? audioUrl;
+      String? imageUrl;
+      String? thumbnailUrl;
+      String? mediaDuration = _mediaDurationController.text.trim();
+
+      if (_selectedType == 'video') {
+        if (_useVideoUpload) {
+          videoUrl = await _uploadVideo();
+        } else {
+          videoUrl = _videoUrlController.text.trim();
+        }
+        if (_useThumbnailUpload) {
+          thumbnailUrl = await _uploadThumbnail();
+        } else {
+          thumbnailUrl = _thumbnailUrlController.text.trim();
+        }
+      } else if (_selectedType == 'audio') {
+        if (_useAudioUpload) {
+          audioUrl = await _uploadAudio();
+        } else {
+          audioUrl = _audioUrlController.text.trim();
+        }
+      } else if (_selectedType == 'image') {
+        if (_useImageUpload) {
+          imageUrl = await _uploadImage();
+        } else {
+          imageUrl = _imageUrlController.text.trim();
+        }
       }
 
       final tipData = {
@@ -231,13 +484,18 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
         if (authorIconUrl != null) 'authorIcon': authorIconUrl,
         'categoryId': _selectedCategoryId,
         'preferenceIds': _selectedPreferenceIds,
-        'createdAt': _tip == null ? FieldValue.serverTimestamp() : _tip!.createdAt,
+        'createdAt': _tip == null
+            ? FieldValue.serverTimestamp()
+            : _tip!.createdAt,
         'isFeatured': _isFeatured,
         'isPremium': _isPremium,
+        if (videoUrl != null) 'videoUrl': videoUrl,
+        if (audioUrl != null) 'audioUrl': audioUrl,
+        if (imageUrl != null) 'imageUrl': imageUrl,
+        if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+        if (mediaDuration.isNotEmpty) 'mediaDuration': mediaDuration,
       };
-
       if (_tip == null) {
-        // Add new tip
         await _firestore.collection('tips').add(tipData);
         CustomBottomSheet.show(
           context: context,
@@ -247,7 +505,6 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
         await Future.delayed(const Duration(seconds: 2));
         if (mounted) Navigator.pop(context);
       } else {
-        // Update existing tip
         await _firestore.collection('tips').doc(_tip!.tipsId).update(tipData);
         CustomBottomSheet.show(
           context: context,
@@ -268,18 +525,22 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
   Widget _buildAuthorIconPreview() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-
     return Center(
       child: Container(
         padding: EdgeInsets.all(8.w),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primary, width: 2.w),
+          border: Border.all(
+            color: AppColors.primary.withOpacity(0.3),
+            width: 1.w,
+          ),
           borderRadius: BorderRadius.circular(12.r),
           boxShadow: [
             BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 6.r,
-              offset: Offset(2.w, 2.h),
+              color: isDark
+                  ? AppColors.shadow
+                  : AppColors.shadow.withOpacity(0.08),
+              blurRadius: 4.r,
+              offset: Offset(0, 2.h),
             ),
           ],
         ),
@@ -291,11 +552,12 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
             width: 100.w,
             height: 100.h,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(
-              Icons.broken_image,
-              color: AppColors.error,
-              size: 100.sp,
-            ),
+            errorBuilder: (_, __, ___) =>
+                Icon(
+                  Icons.broken_image,
+                  color: AppColors.error,
+                  size: 100.sp,
+                ),
           )
               : _authorIconUrlController.text.isNotEmpty
               ? Image.network(
@@ -303,15 +565,68 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
             width: 100.w,
             height: 100.h,
             fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Icon(
-              Icons.broken_image,
-              color: AppColors.error,
-              size: 100.sp,
-            ),
+            errorBuilder: (_, __, ___) =>
+                Icon(
+                  Icons.broken_image,
+                  color: AppColors.error,
+                  size: 100.sp,
+                ),
           )
               : Icon(
             Icons.image_outlined,
-            color: AppColors.darkTextSecondary,
+            color: isDark
+                ? AppColors.darkTextSecondary
+                : AppColors.lightTextSecondary,
+            size: 100.sp,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Builds media preview (generic for video/audio/image/thumbnail)
+  Widget _buildMediaPreview(String url, bool isImage) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Center(
+      child: Container(
+        padding: EdgeInsets.all(8.w),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: AppColors.primary.withOpacity(0.3),
+            width: 1.w,
+          ),
+          borderRadius: BorderRadius.circular(12.r),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? AppColors.shadow
+                  : AppColors.shadow.withOpacity(0.08),
+              blurRadius: 4.r,
+              offset: Offset(0, 2.h),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8.r),
+          child: isImage && url.isNotEmpty
+              ? Image.network(
+            url,
+            width: 100.w,
+            height: 100.h,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) =>
+                Icon(
+                  Icons.broken_image,
+                  color: AppColors.error,
+                  size: 100.sp,
+                ),
+          )
+              : Icon(
+            Icons.play_circle_outline,
+            color: isDark
+                ? AppColors.darkTextSecondary
+                : AppColors.lightTextSecondary,
             size: 100.sp,
           ),
         ),
@@ -321,74 +636,117 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
 
   // Builds preference chips using customSelectableChip
   List<Widget> _buildPreferenceChips() {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isDark = Theme
+        .of(context)
+        .brightness == Brightness.dark;
     return _preferenceCache.entries.map((entry) {
       final pref = entry.value;
       final isSelected = _selectedPreferenceIds.contains(entry.key);
-      return customSelectableChip(
-        label: pref.preferenceName,
-        selected: isSelected,
-        onTap: () {
-          setState(() {
-            if (isSelected) {
-              _selectedPreferenceIds.remove(entry.key);
-            } else {
-              _selectedPreferenceIds.add(entry.key);
-            }
-          });
-        },
-        isDark: isDark,
+      return FadeInUp(
+        duration: Duration(
+          milliseconds:
+          300 + _preferenceCache.entries.toList().indexOf(entry) * 80,
+        ),
+        child: customSelectableChip(
+          label: pref.preferenceName,
+          selected: isSelected,
+          onTap: () {
+            setState(() {
+              if (isSelected) {
+                _selectedPreferenceIds.remove(entry.key);
+              } else {
+                _selectedPreferenceIds.add(entry.key);
+              }
+            });
+          },
+          isDark: isDark,
+        ),
       );
     }).toList();
   }
 
-  // Custom selectable chip with white check icon on selected
+  // Custom selectable chip with gradient and white check icon on selected
   Widget customSelectableChip({
     required String label,
     required bool selected,
     required VoidCallback onTap,
     required bool isDark,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withOpacity(0.2)
-              : isDark
-              ? AppColors.darkSurface
-              : AppColors.lightSurface,
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(
-            color: selected ? AppColors.primary : Colors.transparent,
-          ),
+    return ScaleTransition(
+      scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+        CurvedAnimation(
+          parent: AnimationController(
+            duration: const Duration(milliseconds: 400),
+            vsync: this,
+          )
+            ..forward(),
+          curve: Curves.easeOut,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: selected
-                    ? AppColors.primary
-                    : isDark
-                    ? AppColors.darkTextPrimary
-                    : AppColors.lightTextPrimary,
-                fontSize: 14.sp,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'Poppins',
-              ),
+      ),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: selected
+                  ? [AppColors.primary, AppColors.primary.withOpacity(0.7)]
+                  : isDark
+                  ? [
+                AppColors.darkSurface,
+                AppColors.darkSurface.withOpacity(0.7),
+              ]
+                  : [AppColors.lightSurface, Colors.grey.shade50],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            if (selected) ...[
-              SizedBox(width: 6.w),
-              Icon(
-                Icons.check,
-                color: Colors.white, // White tick
-                size: 16.sp,
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(
+              color: selected
+                  ? AppColors.primary
+                  : AppColors.primary.withOpacity(0.3),
+              width: 1.w,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDark
+                    ? AppColors.shadow
+                    : AppColors.shadow.withOpacity(0.08),
+                blurRadius: 4.r,
+                offset: Offset(0, 2.h),
               ),
             ],
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: Theme
+                    .of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'Poppins',
+                  color: selected
+                      ? AppColors.lightBackground
+                      : isDark
+                      ? AppColors.darkTextPrimary
+                      : AppColors.lightTextPrimary,
+                ),
+              ),
+              if (selected) ...[
+                SizedBox(width: 6.w),
+                Icon(
+                  Icons.check,
+                  color: AppColors.lightBackground,
+                  size: 14.sp,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -401,359 +759,56 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
 
     if (!_isDataLoaded) {
       return Scaffold(
-        backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+        backgroundColor: isDark
+            ? AppColors.darkBackground
+            : AppColors.lightBackground,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
       );
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new,
-            size: 20.sp,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          _tip == null ? AppStrings.addTipTitle : AppStrings.editTipTitle,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            fontSize: 22.sp,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.save,
-              size: 26.sp,
-              color: AppColors.lightBackground,
-            ),
-            onPressed: _saveTip,
-          ),
-        ],
-      ),
+      backgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground,
       body: SafeArea(
         child: Stack(
           children: [
-            SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Tip Title
-                  Text(
-                    'Tip Title',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+            CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  backgroundColor: isDark
+                      ? AppColors.darkBackground
+                      : AppColors.lightBackground,
+                  elevation: 0,
+                  pinned: true,
+                  floating: false,
+                  snap: false,
+                  title: Text(
+                    _tip == null
+                        ? AppStrings.addTipTitle
+                        : AppStrings.editTipTitle,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 22.sp,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
-                  SizedBox(height: 8.h),
-                  TextField(
-                    controller: _titleController,
-                    decoration: InputDecoration(
-                      hintText: AppStrings.tipsTitleHint,
-                      filled: true,
-                      fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: BorderSide.none,
-                      ),
+                  leading: IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 20.sp,
+                      color: isDark
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
+                    onPressed: () => Navigator.pop(context),
                   ),
-                  SizedBox(height: 16.h),
-                  // Tip Description
-                  Text(
-                    'Tip Description',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  TextField(
-                    controller: _descriptionController,
-                    maxLines: 3,
-                    decoration: InputDecoration(
-                      hintText: AppStrings.tipsDescriptionHint,
-                      filled: true,
-                      fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  // Tip Type
-                  Text(
-                    'Tip Type',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  DropdownButtonFormField<String>(
-                    value: _selectedType,
-                    hint: Text(AppStrings.tipsTypeHint),
-                    items: tipsTypes.map((type) {
-                      return DropdownMenuItem<String>(
-                        value: type,
-                        child: Text(type.capitalize()),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedType = value);
-                    },
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  // Tip Author
-                  Text(
-                    'Tip Author',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  TextField(
-                    controller: _authorController,
-                    decoration: InputDecoration(
-                      hintText: AppStrings.tipsAuthorHint,
-                      filled: true,
-                      fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  // Author Icon
-                  Text(
-                    'Author Icon',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Row(
-                    children: [
-                      customSelectableChip(
-                        label: 'Upload from Device',
-                        selected: _useAuthorIconUpload,
-                        onTap: () {
-                          setState(() {
-                            _useAuthorIconUpload = true;
-                            _authorIconUrlController.clear();
-                          });
-                        },
-                        isDark: isDark,
-                      ),
-                      SizedBox(width: 8.w),
-                      customSelectableChip(
-                        label: 'Enter URL',
-                        selected: !_useAuthorIconUpload,
-                        onTap: () {
-                          setState(() {
-                            _useAuthorIconUpload = false;
-                            _pickedAuthorIcon = null;
-                            _uploadedAuthorIconUrl = null;
-                          });
-                        },
-                        isDark: isDark,
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8.h),
-                  if (_useAuthorIconUpload)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        GestureDetector(
-                          onTap: _pickAuthorIcon,
-                          child: DottedBorder(
-                            color: AppColors.primary,
-                            strokeWidth: 2,
-                            dashPattern: const [8, 4],
-                            borderType: BorderType.RRect,
-                            radius: Radius.circular(12.r),
-                            child: Container(
-                              width: double.infinity,
-                              height: _pickedAuthorIcon == null ? 120.h : 150.h,
-                              decoration: BoxDecoration(
-                                color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                                borderRadius: BorderRadius.circular(12.r),
-                              ),
-                              child: _pickedAuthorIcon == null
-                                  ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.image_outlined, size: 40.sp, color: AppColors.primary),
-                                  SizedBox(height: 8.h),
-                                  Text(
-                                    'Tap to choose icon (PNG or JPEG)',
-                                    style: theme.textTheme.bodyMedium?.copyWith(
-                                      fontSize: 16.sp,
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              )
-                                  : Image.file(
-                                File(_pickedAuthorIcon!.path),
-                                fit: BoxFit.cover,
-                                width: double.infinity,
-                                height: double.infinity,
-                                errorBuilder: (_, __, ___) => Icon(
-                                  Icons.broken_image,
-                                  color: AppColors.error,
-                                  size: 100.sp,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextField(
-                          controller: _authorIconUrlController,
-                          decoration: InputDecoration(
-                            hintText: 'Enter icon URL (PNG or JPEG)',
-                            filled: true,
-                            fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12.r),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                        if (_authorIconUrlController.text.isNotEmpty) ...[
-                          SizedBox(height: 8.h),
-                          _buildAuthorIconPreview(),
-                        ],
-                      ],
-                    ),
-                  SizedBox(height: 16.h),
-                  // Category
-                  Text(
-                    'Category',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  _categoryCache.isEmpty
-                      ? Text(
-                    'No categories available',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 14.sp,
-                      color: AppColors.error,
-                    ),
-                  )
-                      : DropdownButtonFormField<String>(
-                    value: _selectedCategoryId,
-                    hint: Text(AppStrings.categoryHint),
-                    items: _categoryCache.entries.map((entry) {
-                      return DropdownMenuItem<String>(
-                        value: entry.key,
-                        child: Text(entry.value.categoryName),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() => _selectedCategoryId = value);
-                    },
-                    decoration: InputDecoration(
-                      filled: true,
-                      fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12.r),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  // Featured
-                  SwitchListTile(
-                    title: Text(
-                      'Featured',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.sp,
-                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                      ),
-                    ),
-                    value: _isFeatured,
-                    onChanged: (value) {
-                      setState(() => _isFeatured = value);
-                    },
-                    activeColor: AppColors.primary,
-                  ),
-                  // Premium
-                  SwitchListTile(
-                    title: Text(
-                      'Premium',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14.sp,
-                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                      ),
-                    ),
-                    value: _isPremium,
-                    onChanged: (value) {
-                      setState(() => _isPremium = value);
-                    },
-                    activeColor: AppColors.primary,
-                  ),
-                  SizedBox(height: 16.h),
-                  // Preferences
-                  Text(
-                    'Preferences',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Wrap(
-                    spacing: 6.w,
-                    runSpacing: 6.h,
-                    children: _buildPreferenceChips(),
-                  ),
-                  SizedBox(height: 24.h),
-                  // Save Button
-                  Center(
-                    child: ScaleTransition(
+                  actions: [
+                    ScaleTransition(
                       scale: Tween<double>(begin: 0.8, end: 1.0).animate(
                         CurvedAnimation(
                           parent: _saveButtonController,
@@ -763,51 +818,1407 @@ class _AddTipScreenState extends State<AddTipScreen> with TickerProviderStateMix
                       child: GestureDetector(
                         onTap: _saveTip,
                         child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 35.w, vertical: 15.h),
+                          margin: EdgeInsets.only(right: 16.w),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 12.w,
+                            vertical: 8.h,
+                          ),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [AppColors.primary, AppColors.primary.withOpacity(0.6)],
+                              colors: [
+                                AppColors.primary,
+                                AppColors.primary.withOpacity(0.7),
+                              ],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(8.r),
+                            borderRadius: BorderRadius.circular(12.r),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.shadow,
-                                blurRadius: 6.r,
-                                offset: Offset(2.w, 2.h),
+                                color: isDark
+                                    ? AppColors.shadow
+                                    : AppColors.shadow.withOpacity(0.08),
+                                blurRadius: 4.r,
+                                offset: Offset(0, 2.h),
                               ),
                             ],
                           ),
-                          child: Text(
-                            'Save Tip',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 14.sp,
-                              color: AppColors.lightBackground,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              FaIcon(
+                                FontAwesomeIcons.floppyDisk,
+                                size: 14.sp,
+                                color: AppColors.lightBackground,
+                              ),
+                              SizedBox(width: 4.w),
+                              Text(
+                                'Save',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.lightBackground,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
+                  ],
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 12.h,
                   ),
-                ],
-              ),
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 300),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tip Type',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16.sp,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            DropdownButtonFormField<String>(
+                              value: _selectedType,
+                              hint: Text(
+                                AppStrings.tipsTypeHint,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                              items: tipsTypes.map((type) {
+                                return DropdownMenuItem<String>(
+                                  value: type,
+                                  child: Text(
+                                    type.capitalize(),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: isDark
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors.lightTextPrimary,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedType = value;
+                                  // Clear media fields when type changes
+                                  _pickedVideo = null;
+                                  _pickedAudio = null;
+                                  _pickedImage = null;
+                                  _pickedThumbnail = null;
+                                  _videoUrlController.clear();
+                                  _audioUrlController.clear();
+                                  _imageUrlController.clear();
+                                  _thumbnailUrlController.clear();
+                                  _mediaDurationController.clear();
+                                });
+                              },
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: isDark
+                                    ? AppColors.darkSurface
+                                    : AppColors.lightSurface,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  borderSide: BorderSide(
+                                    color: AppColors.primary,
+                                    width: 1.w,
+                                  ),
+                                ),
+                              ),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_selectedType != null) ...[
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 380),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tip Title',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              TextField(
+                                controller: _titleController,
+                                decoration: InputDecoration(
+                                  hintText: AppStrings.tipsTitleHint,
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.darkSurface
+                                      : AppColors.lightSurface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide(
+                                      color: AppColors.primary,
+                                      width: 1.w,
+                                    ),
+                                  ),
+                                ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 460),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tip Description',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              TextField(
+                                controller: _descriptionController,
+                                maxLines: 3,
+                                decoration: InputDecoration(
+                                  hintText: AppStrings.tipsDescriptionHint,
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.darkSurface
+                                      : AppColors.lightSurface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide(
+                                      color: AppColors.primary,
+                                      width: 1.w,
+                                    ),
+                                  ),
+                                ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (_selectedType == 'video') ...[
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 540),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Video Source',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              Row(
+                                children: [
+                                  customSelectableChip(
+                                    label: 'Upload from Device',
+                                    selected: _useVideoUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useVideoUpload = true;
+                                        _videoUrlController.clear();
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  customSelectableChip(
+                                    label: 'Enter URL',
+                                    selected: !_useVideoUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useVideoUpload = false;
+                                        _pickedVideo = null;
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8.h),
+                              if (_useVideoUpload)
+                                GestureDetector(
+                                  onTap: _pickVideo,
+                                  child: DottedBorder(
+                                    color: AppColors.primary,
+                                    strokeWidth: 1.w,
+                                    dashPattern: const [8, 4],
+                                    borderType: BorderType.RRect,
+                                    radius: Radius.circular(12.r),
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: _pickedVideo == null
+                                          ? 120.h
+                                          : 150.h,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isDark
+                                              ? [
+                                            AppColors.darkSurface,
+                                            AppColors.darkSurface
+                                                .withOpacity(0.7),
+                                          ]
+                                              : [
+                                            AppColors.lightSurface,
+                                            Colors.grey.shade50,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? AppColors.shadow
+                                                : AppColors.shadow.withOpacity(
+                                              0.08,
+                                            ),
+                                            blurRadius: 4.r,
+                                            offset: Offset(0, 2.h),
+                                          ),
+                                        ],
+                                      ),
+                                      child: _pickedVideo == null
+                                          ? Column(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.video_library,
+                                            size: 40.sp,
+                                            color: AppColors.primary,
+                                          ),
+                                          SizedBox(height: 8.h),
+                                          Text(
+                                            'Tap to choose video',
+                                            style: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                              fontSize: 14.sp,
+                                              color: isDark
+                                                  ? AppColors
+                                                  .darkTextPrimary
+                                                  : AppColors
+                                                  .lightTextPrimary,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                          : Center(
+                                        child: Icon(
+                                          Icons.video_file,
+                                          size: 100.sp,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                TextField(
+                                  controller: _videoUrlController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter video URL',
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? AppColors.darkSurface
+                                        : AppColors.lightSurface,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.w,
+                                      ),
+                                    ),
+                                  ),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 620),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Thumbnail Source',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              Row(
+                                children: [
+                                  customSelectableChip(
+                                    label: 'Upload from Device',
+                                    selected: _useThumbnailUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useThumbnailUpload = true;
+                                        _thumbnailUrlController.clear();
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  customSelectableChip(
+                                    label: 'Enter URL',
+                                    selected: !_useThumbnailUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useThumbnailUpload = false;
+                                        _pickedThumbnail = null;
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8.h),
+                              if (_useThumbnailUpload)
+                                GestureDetector(
+                                  onTap: _pickThumbnail,
+                                  child: DottedBorder(
+                                    color: AppColors.primary,
+                                    strokeWidth: 1.w,
+                                    dashPattern: const [8, 4],
+                                    borderType: BorderType.RRect,
+                                    radius: Radius.circular(12.r),
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: _pickedThumbnail == null
+                                          ? 120.h
+                                          : 150.h,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isDark
+                                              ? [
+                                            AppColors.darkSurface,
+                                            AppColors.darkSurface
+                                                .withOpacity(0.7),
+                                          ]
+                                              : [
+                                            AppColors.lightSurface,
+                                            Colors.grey.shade50,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? AppColors.shadow
+                                                : AppColors.shadow.withOpacity(
+                                              0.08,
+                                            ),
+                                            blurRadius: 4.r,
+                                            offset: Offset(0, 2.h),
+                                          ),
+                                        ],
+                                      ),
+                                      child: _pickedThumbnail == null
+                                          ? Column(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.image,
+                                            size: 40.sp,
+                                            color: AppColors.primary,
+                                          ),
+                                          SizedBox(height: 8.h),
+                                          Text(
+                                            'Tap to choose thumbnail',
+                                            style: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                              fontSize: 14.sp,
+                                              color: isDark
+                                                  ? AppColors
+                                                  .darkTextPrimary
+                                                  : AppColors
+                                                  .lightTextPrimary,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                          : Image.file(
+                                        File(_pickedThumbnail!.path),
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                TextField(
+                                  controller: _thumbnailUrlController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter thumbnail URL',
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? AppColors.darkSurface
+                                        : AppColors.lightSurface,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.w,
+                                      ),
+                                    ),
+                                  ),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 700),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Media Duration',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              TextField(
+                                controller: _mediaDurationController,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter duration (e.g., 5:30)',
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.darkSurface
+                                      : AppColors.lightSurface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide(
+                                      color: AppColors.primary,
+                                      width: 1.w,
+                                    ),
+                                  ),
+                                ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (_selectedType == 'audio') ...[
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 540),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Audio Source',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              Row(
+                                children: [
+                                  customSelectableChip(
+                                    label: 'Upload from Device',
+                                    selected: _useAudioUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useAudioUpload = true;
+                                        _audioUrlController.clear();
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  customSelectableChip(
+                                    label: 'Enter URL',
+                                    selected: !_useAudioUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useAudioUpload = false;
+                                        _pickedAudio = null;
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8.h),
+                              if (_useAudioUpload)
+                                GestureDetector(
+                                  onTap: _pickAudio,
+                                  child: DottedBorder(
+                                    color: AppColors.primary,
+                                    strokeWidth: 1.w,
+                                    dashPattern: const [8, 4],
+                                    borderType: BorderType.RRect,
+                                    radius: Radius.circular(12.r),
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: _pickedAudio == null
+                                          ? 120.h
+                                          : 150.h,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isDark
+                                              ? [
+                                            AppColors.darkSurface,
+                                            AppColors.darkSurface
+                                                .withOpacity(0.7),
+                                          ]
+                                              : [
+                                            AppColors.lightSurface,
+                                            Colors.grey.shade50,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? AppColors.shadow
+                                                : AppColors.shadow.withOpacity(
+                                              0.08,
+                                            ),
+                                            blurRadius: 4.r,
+                                            offset: Offset(0, 2.h),
+                                          ),
+                                        ],
+                                      ),
+                                      child: _pickedAudio == null
+                                          ? Column(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.audiotrack,
+                                            size: 40.sp,
+                                            color: AppColors.primary,
+                                          ),
+                                          SizedBox(height: 8.h),
+                                          Text(
+                                            'Tap to choose audio',
+                                            style: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                              fontSize: 14.sp,
+                                              color: isDark
+                                                  ? AppColors
+                                                  .darkTextPrimary
+                                                  : AppColors
+                                                  .lightTextPrimary,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                          : Center(
+                                        child: Icon(
+                                          Icons.audio_file,
+                                          size: 100.sp,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                TextField(
+                                  controller: _audioUrlController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter audio URL',
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? AppColors.darkSurface
+                                        : AppColors.lightSurface,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.w,
+                                      ),
+                                    ),
+                                  ),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 620),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Media Duration',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              TextField(
+                                controller: _mediaDurationController,
+                                decoration: InputDecoration(
+                                  hintText: 'Enter duration (e.g., 5:30)',
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.darkSurface
+                                      : AppColors.lightSurface,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderSide: BorderSide(
+                                      color: AppColors.primary,
+                                      width: 1.w,
+                                    ),
+                                  ),
+                                ),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      if (_selectedType == 'image') ...[
+                        SizedBox(height: 16.h),
+                        FadeInUp(
+                          duration: const Duration(milliseconds: 540),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Image Source',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16.sp,
+                                  color: isDark
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                              ),
+                              SizedBox(height: 8.h),
+                              Row(
+                                children: [
+                                  customSelectableChip(
+                                    label: 'Upload from Device',
+                                    selected: _useImageUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useImageUpload = true;
+                                        _imageUrlController.clear();
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  customSelectableChip(
+                                    label: 'Enter URL',
+                                    selected: !_useImageUpload,
+                                    onTap: () {
+                                      setState(() {
+                                        _useImageUpload = false;
+                                        _pickedImage = null;
+                                      });
+                                    },
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8.h),
+                              if (_useImageUpload)
+                                GestureDetector(
+                                  onTap: _pickImage,
+                                  child: DottedBorder(
+                                    color: AppColors.primary,
+                                    strokeWidth: 1.w,
+                                    dashPattern: const [8, 4],
+                                    borderType: BorderType.RRect,
+                                    radius: Radius.circular(12.r),
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: _pickedImage == null
+                                          ? 120.h
+                                          : 150.h,
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: isDark
+                                              ? [
+                                            AppColors.darkSurface,
+                                            AppColors.darkSurface
+                                                .withOpacity(0.7),
+                                          ]
+                                              : [
+                                            AppColors.lightSurface,
+                                            Colors.grey.shade50,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? AppColors.shadow
+                                                : AppColors.shadow.withOpacity(
+                                              0.08,
+                                            ),
+                                            blurRadius: 4.r,
+                                            offset: Offset(0, 2.h),
+                                          ),
+                                        ],
+                                      ),
+                                      child: _pickedImage == null
+                                          ? Column(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.image,
+                                            size: 40.sp,
+                                            color: AppColors.primary,
+                                          ),
+                                          SizedBox(height: 8.h),
+                                          Text(
+                                            'Tap to choose image',
+                                            style: theme
+                                                .textTheme
+                                                .bodyMedium
+                                                ?.copyWith(
+                                              fontSize: 14.sp,
+                                              color: isDark
+                                                  ? AppColors
+                                                  .darkTextPrimary
+                                                  : AppColors
+                                                  .lightTextPrimary,
+                                              fontWeight:
+                                              FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                          : Image.file(
+                                        File(_pickedImage!.path),
+                                        fit: BoxFit.cover,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              else
+                                TextField(
+                                  controller: _imageUrlController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Enter image URL',
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? AppColors.darkSurface
+                                        : AppColors.lightSurface,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      borderSide: BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.w,
+                                      ),
+                                    ),
+                                  ),
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: 16.h),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 780),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Tip Author',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16.sp,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            TextField(
+                              controller: _authorController,
+                              decoration: InputDecoration(
+                                hintText: AppStrings.tipsAuthorHint,
+                                filled: true,
+                                fillColor: isDark
+                                    ? AppColors.darkSurface
+                                    : AppColors.lightSurface,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  borderSide: BorderSide(
+                                    color: AppColors.primary,
+                                    width: 1.w,
+                                  ),
+                                ),
+                              ),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 860),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Author Icon',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16.sp,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            Row(
+                              children: [
+                                customSelectableChip(
+                                  label: 'Upload from Device',
+                                  selected: _useAuthorIconUpload,
+                                  onTap: () {
+                                    setState(() {
+                                      _useAuthorIconUpload = true;
+                                      _authorIconUrlController.clear();
+                                    });
+                                  },
+                                  isDark: isDark,
+                                ),
+                                SizedBox(width: 8.w),
+                                customSelectableChip(
+                                  label: 'Enter URL',
+                                  selected: !_useAuthorIconUpload,
+                                  onTap: () {
+                                    setState(() {
+                                      _useAuthorIconUpload = false;
+                                      _pickedAuthorIcon = null;
+                                      _uploadedAuthorIconUrl = null;
+                                    });
+                                  },
+                                  isDark: isDark,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            if (_useAuthorIconUpload)
+                              GestureDetector(
+                                onTap: _pickAuthorIcon,
+                                child: DottedBorder(
+                                  color: AppColors.primary,
+                                  strokeWidth: 1.w,
+                                  dashPattern: const [8, 4],
+                                  borderType: BorderType.RRect,
+                                  radius: Radius.circular(12.r),
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: _pickedAuthorIcon == null
+                                        ? 120.h
+                                        : 150.h,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: isDark
+                                            ? [
+                                          AppColors.darkSurface,
+                                          AppColors.darkSurface
+                                              .withOpacity(0.7),
+                                        ]
+                                            : [
+                                          AppColors.lightSurface,
+                                          Colors.grey.shade50,
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12.r),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: isDark
+                                              ? AppColors.shadow
+                                              : AppColors.shadow.withOpacity(
+                                            0.08,
+                                          ),
+                                          blurRadius: 4.r,
+                                          offset: Offset(0, 2.h),
+                                        ),
+                                      ],
+                                    ),
+                                    child: _pickedAuthorIcon == null
+                                        ? Column(
+                                      mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.image_outlined,
+                                          size: 40.sp,
+                                          color: AppColors.primary,
+                                        ),
+                                        SizedBox(height: 8.h),
+                                        Text(
+                                          'Tap to choose icon (PNG or JPEG)',
+                                          style: theme
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                            fontSize: 14.sp,
+                                            color: isDark
+                                                ? AppColors
+                                                .darkTextPrimary
+                                                : AppColors
+                                                .lightTextPrimary,
+                                            fontWeight:
+                                            FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    )
+                                        : Image.file(
+                                      File(_pickedAuthorIcon!.path),
+                                      fit: BoxFit.cover,
+                                      width: double.infinity,
+                                      height: double.infinity,
+                                      errorBuilder: (_, __, ___) =>
+                                          Icon(
+                                            Icons.broken_image,
+                                            color: AppColors.error,
+                                            size: 100.sp,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            else
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: _authorIconUrlController,
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter icon URL (PNG or JPEG)',
+                                      filled: true,
+                                      fillColor: isDark
+                                          ? AppColors.darkSurface
+                                          : AppColors.lightSurface,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          12.r,
+                                        ),
+                                        borderSide: BorderSide(
+                                          color: AppColors.primary,
+                                          width: 1.w,
+                                        ),
+                                      ),
+                                    ),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: isDark
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors.lightTextPrimary,
+                                    ),
+                                  ),
+                                  if (_authorIconUrlController
+                                      .text
+                                      .isNotEmpty) ...[
+                                    SizedBox(height: 8.h),
+                                    _buildAuthorIconPreview(),
+                                  ],
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 940),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Category',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16.sp,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            _categoryCache.isEmpty
+                                ? Text(
+                              'No categories available',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontSize: 14.sp,
+                                color: AppColors.error,
+                              ),
+                            )
+                                : DropdownButtonFormField<String>(
+                              value: _selectedCategoryId,
+                              hint: Text(
+                                AppStrings.categoryHint,
+                                style: theme.textTheme.bodyMedium
+                                    ?.copyWith(
+                                  color: isDark
+                                      ? AppColors.darkTextSecondary
+                                      : AppColors.lightTextSecondary,
+                                ),
+                              ),
+                              items: _categoryCache.entries.map((entry) {
+                                return DropdownMenuItem<String>(
+                                  value: entry.key,
+                                  child: Text(
+                                    entry.value.categoryName,
+                                    style: theme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                      color: isDark
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors
+                                          .lightTextPrimary,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(
+                                      () => _selectedCategoryId = value,
+                                );
+                              },
+                              decoration: InputDecoration(
+                                filled: true,
+                                fillColor: isDark
+                                    ? AppColors.darkSurface
+                                    : AppColors.lightSurface,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12.r,
+                                  ),
+                                  borderSide: BorderSide.none,
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(
+                                    12.r,
+                                  ),
+                                  borderSide: BorderSide(
+                                    color: AppColors.primary,
+                                    width: 1.w,
+                                  ),
+                                ),
+                              ),
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 1020),
+                        child: SwitchListTile(
+                          title: Text(
+                            'Featured',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16.sp,
+                              color: isDark
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.lightTextPrimary,
+                            ),
+                          ),
+                          value: _isFeatured,
+                          onChanged: (value) {
+                            setState(() => _isFeatured = value);
+                          },
+                          activeColor: AppColors.primary,
+                          activeTrackColor: AppColors.primary.withOpacity(0.5),
+                        ),
+                      ),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 1100),
+                        child: SwitchListTile(
+                          title: Text(
+                            'Premium',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16.sp,
+                              color: isDark
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.lightTextPrimary,
+                            ),
+                          ),
+                          value: _isPremium,
+                          onChanged: (value) {
+                            setState(() => _isPremium = value);
+                          },
+                          activeColor: AppColors.primary,
+                          activeTrackColor: AppColors.primary.withOpacity(0.5),
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+                      FadeInUp(
+                        duration: const Duration(milliseconds: 1180),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Preferences',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16.sp,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            Wrap(
+                              spacing: 6.w,
+                              runSpacing: 6.h,
+                              children: _buildPreferenceChips(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 24.h),
+                    ]),
+                  ),
+                ),
+              ],
             ),
             if (_isLoading)
               Container(
                 color: AppColors.overlay,
-                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
               ),
           ],
+        ),
+      ),
+      floatingActionButton: FadeInUp(
+        duration: const Duration(milliseconds: 1260),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+            CurvedAnimation(
+              parent: _saveButtonController,
+              curve: Curves.easeOut,
+            ),
+          ),
+          child: FloatingActionButton(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            onPressed: _saveTip,
+            child: Container(
+              padding: EdgeInsets.all(14.w),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: isDark
+                        ? AppColors.shadow
+                        : AppColors.shadow.withOpacity(0.08),
+                    blurRadius: 4.r,
+                    offset: Offset(0, 2.h),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.save,
+                color: AppColors.lightBackground,
+                size: 28.sp,
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 }
 
-// Extension to capitalize strings
 extension StringExtension on String {
-  String capitalize() {
-    return "${this[0].toUpperCase()}${substring(1)}";
-  }
+  String capitalize() =>
+      isEmpty ? this : "${this[0].toUpperCase()}${substring(1)}";
 }

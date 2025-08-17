@@ -4,7 +4,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
-import 'package:wellness_app/core/services/data_repository.dart'; // Add DataRepository import
+import 'package:wellness_app/core/services/data_repository.dart';
 import 'dart:developer';
 
 import '../../../profile/data/user_model.dart';
@@ -13,7 +13,8 @@ import '../../../profile/data/user_model.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final DataRepository _dataRepository = DataRepository.instance; // Initialize DataRepository
+  final DataRepository _dataRepository =
+      DataRepository.instance; // Initialize DataRepository
 
   // Saves user data to Firestore 'users' collection, preserving existing userRole
   Future<void> saveUserData(UserModel userModel) async {
@@ -119,10 +120,11 @@ class AuthService {
     required String name,
   }) async {
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email.trim(),
-        password: password.trim(),
-      );
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(
+            email: email.trim(),
+            password: password.trim(),
+          );
 
       await userCredential.user?.updateDisplayName(name.trim());
 
@@ -137,7 +139,9 @@ class AuthService {
         fcmToken: null,
       );
       await saveUserData(userModel); // Saves to Firestore and local database
-      await cacheUserData(userCredential.user!.uid); // Cache user data in SharedPreferences
+      await cacheUserData(
+        userCredential.user!.uid,
+      ); // Cache user data in SharedPreferences
       log('Signed up user ${userCredential.user!.uid} with email $email');
       return userCredential.user;
     } on FirebaseAuthException catch (e) {
@@ -175,15 +179,21 @@ class AuthService {
         return null;
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      final UserCredential userCredential = await _auth.signInWithCredential(credential);
+      final UserCredential userCredential = await _auth.signInWithCredential(
+        credential,
+      );
 
-      final userDoc = await _firestore.collection('users').doc(userCredential.user!.uid).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
 
       UserModel userModel;
       if (!userDoc.exists) {
@@ -207,13 +217,17 @@ class AuthService {
           userName: googleUser.displayName ?? 'Google User',
           userRole: userDoc.data()!['userRole'] ?? 'user',
           preferenceCompleted: userDoc.data()!['preferenceCompleted'] ?? false,
-          createdAt: (userDoc.data()?['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          createdAt:
+              (userDoc.data()?['createdAt'] as Timestamp?)?.toDate() ??
+              DateTime.now(),
           photoURL: userCredential.user?.photoURL,
           fcmToken: userDoc.data()!['fcmToken'],
         );
         await saveUserData(userModel); // Saves to Firestore and local database
       }
-      await cacheUserData(userCredential.user!.uid); // Cache user data in SharedPreferences
+      await cacheUserData(
+        userCredential.user!.uid,
+      ); // Cache user data in SharedPreferences
       // Update last login timestamp
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(
@@ -226,7 +240,8 @@ class AuthService {
       String errorMessage;
       switch (e.code) {
         case 'account-exists-with-different-credential':
-          errorMessage = 'An account already exists with a different sign-in method.';
+          errorMessage =
+              'An account already exists with a different sign-in method.';
           break;
         case 'invalid-credential':
           errorMessage = 'Invalid Google credentials.';
@@ -254,7 +269,10 @@ class AuthService {
       );
 
       // Fetch or create user model
-      final userDoc = await _firestore.collection('users').doc(userCredential.user!.uid).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
       UserModel userModel;
       if (!userDoc.exists) {
         // Create user model for new user (unlikely for email login, but handle edge case)
@@ -277,14 +295,18 @@ class AuthService {
           userName: userCredential.user?.displayName ?? 'User',
           userRole: userDoc.data()!['userRole'] ?? 'user',
           preferenceCompleted: userDoc.data()!['preferenceCompleted'] ?? false,
-          createdAt: (userDoc.data()?['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+          createdAt:
+              (userDoc.data()?['createdAt'] as Timestamp?)?.toDate() ??
+              DateTime.now(),
           photoURL: userCredential.user?.photoURL,
           fcmToken: userDoc.data()!['fcmToken'],
         );
         await saveUserData(userModel); // Saves to Firestore and local database
       }
 
-      await cacheUserData(userCredential.user!.uid); // Cache user data in SharedPreferences
+      await cacheUserData(
+        userCredential.user!.uid,
+      ); // Cache user data in SharedPreferences
       log('Signed in user ${userCredential.user!.uid} with email $email');
       // Update last login timestamp
       final prefs = await SharedPreferences.getInstance();
@@ -401,7 +423,7 @@ class AuthService {
         throw Exception('Google re-authentication canceled.');
       }
       final GoogleSignInAuthentication googleAuth =
-      await googleUser.authentication;
+          await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
@@ -413,7 +435,7 @@ class AuthService {
       switch (e.code) {
         case 'account-exists-with-different-credential':
           errorMessage =
-          'An account already exists with a different sign-in method.';
+              'An account already exists with a different sign-in method.';
           break;
         case 'invalid-credential':
           errorMessage = 'Invalid Google credentials.';
@@ -500,59 +522,7 @@ class AuthService {
     }
   }
 
-  // Method to update user profile
-  Future<void> updateUserProfile({
-    required String displayName,
-    String? photoURL,
-  }) async {
-    try {
-      final user = _auth.currentUser;
-      if (user == null) {
-        log('No authenticated user found for updateUserProfile');
-        throw Exception('No authenticated user found.');
-      }
-      await user.updateDisplayName(displayName.trim());
-      if (photoURL != null) {
-        await user.updatePhotoURL(photoURL.trim());
-      }
-      // Update Firestore user document
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
-      final userModel = UserModel(
-        userId: user.uid,
-        userEmail: user.email ?? '',
-        userName: displayName.trim(),
-        userRole: userDoc.data()?['userRole'] ?? 'user',
-        preferenceCompleted: userDoc.data()?['preferenceCompleted'] ?? false,
-        createdAt: (userDoc.data()?['createdAt'] is Timestamp)
-            ? (userDoc.data()?['createdAt'] as Timestamp).toDate()
-            : DateTime.tryParse(
-          userDoc.data()?['createdAt']?.toString() ?? '',
-        ) ??
-            DateTime.now(),
-        photoURL: photoURL,
-        fcmToken: userDoc.data()?['fcmToken'],
-      );
-      await saveUserData(userModel); // Saves to Firestore and local database
-      await cacheUserData(user.uid); // Update cache in SharedPreferences
-      log('Updated profile for user ${user.uid}');
-    } on FirebaseAuthException catch (e) {
-      String errorMessage;
-      switch (e.code) {
-        case 'invalid-display-name':
-          errorMessage = 'The display name is not valid.';
-          break;
-        default:
-          errorMessage = 'Failed to update profile: ${e.message}';
-      }
-      log('Profile update error: $errorMessage');
-      throw Exception(errorMessage);
-    } catch (e) {
-      log('Unexpected profile update error: $e');
-      throw Exception('An unexpected error occurred: $e');
-    }
-  }
-
-  // Demotes a user to 'user' role in Firestore
+  // Method to demote a user to 'user' role in Firestore
   Future<void> demoteToUser(String userId) async {
     try {
       await _firestore.collection('users').doc(userId).update({
@@ -563,6 +533,49 @@ class AuthService {
     } catch (e) {
       log('Failed to demote user: $e');
       throw Exception('Failed to demote user: $e');
+    }
+  }
+
+  // Method to delete a user (only callable by admins)
+  Future<void> deleteUser(String userId) async {
+    try {
+      final currentUser = _auth.currentUser;
+      if (currentUser == null) {
+        log('No authenticated user found for deleteUser');
+        throw Exception('No authenticated user found.');
+      }
+      final currentUserDoc = await _firestore
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      if (currentUserDoc.data()?['userRole'] != 'admin') {
+        log('Non-admin user ${currentUser.uid} attempted to delete $userId');
+        throw Exception('Only admins can delete users.');
+      }
+      if (currentUser.uid == userId) {
+        log('User ${currentUser.uid} attempted to delete themselves');
+        throw Exception('Admins cannot delete their own account.');
+      }
+
+      // Note: Firebase Auth user deletion typically requires the user to be signed in
+      // Since this is an admin action, assume server-side deletion via Admin SDK or similar
+      // If Admin SDK is not available, we can only delete Firestore data
+      await _firestore.collection('users').doc(userId).delete();
+      await _firestore.collection('userPreferences').doc(userId).delete();
+      await _firestore.collection('subscriptions').doc(userId).delete();
+
+      // Clear cached data in SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('userRole_$userId');
+      await prefs.remove('preferenceCompleted_$userId');
+      log('User $userId deleted successfully from Firestore and cache');
+
+      // If Admin SDK is available, add user deletion from Firebase Auth here
+      // Example: await admin.auth().deleteUser(userId);
+      // For client-side, we can't delete another user directly without Admin SDK
+    } catch (e) {
+      log('Failed to delete user $userId: $e');
+      throw Exception('Failed to delete user: $e');
     }
   }
 }

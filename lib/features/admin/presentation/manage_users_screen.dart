@@ -4,6 +4,7 @@ import 'package:collection/collection.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/preferences/data/models/preference_model.dart';
@@ -21,7 +22,8 @@ class ManageUsersScreen extends StatefulWidget {
   State<ManageUsersScreen> createState() => _ManageUsersScreenState();
 }
 
-class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProviderStateMixin {
+class _ManageUsersScreenState extends State<ManageUsersScreen>
+    with TickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final TextEditingController _searchController = TextEditingController();
@@ -46,7 +48,10 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
   Future<void> _loadPreferences() async {
     final snapshot = await _firestore.collection('preferences').get();
     for (var doc in snapshot.docs) {
-      _preferenceCache[doc.id] = PreferenceModel.fromFirestore(doc.data(), doc.id);
+      _preferenceCache[doc.id] = PreferenceModel.fromFirestore(
+        doc.data(),
+        doc.id,
+      );
     }
     setState(() {
       _isPrefsLoaded = true;
@@ -60,12 +65,18 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
     });
   }
 
-  Future<void> _changeUserRole(String userId, String userName, bool promote) async {
+  Future<void> _changeUserRole(
+    String userId,
+    String userName,
+    bool promote,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(promote ? AppStrings.promote : AppStrings.demote),
-        content: Text('Are you sure you want to ${promote ? 'promote' : 'demote'} $userName?'),
+        content: Text(
+          'Are you sure you want to ${promote ? 'promote' : 'demote'} $userName?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -74,7 +85,13 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: promote ? AppColors.primary : AppColors.error,
+              backgroundColor: promote
+                  ? AppColors.primary
+                  : Colors.red.shade700,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 2,
             ),
             child: Text(promote ? AppStrings.promote : AppStrings.demote),
           ),
@@ -93,7 +110,62 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
         if (!mounted) return;
         CustomBottomSheet.show(
           context: context,
-          message: '$userName successfully ${promote ? 'promoted' : 'demoted'}.',
+          message:
+              '$userName successfully ${promote ? 'promoted' : 'demoted'}.',
+          isSuccess: true,
+        );
+      } catch (e) {
+        if (!mounted) return;
+        CustomBottomSheet.show(
+          context: context,
+          message: '${AppStrings.error} $e',
+          isSuccess: false,
+        );
+      } finally {
+        _triggerReload();
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<bool?> _showDeleteConfirmationDialog(String userName) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User'),
+        content: Text('Are you sure you want to delete $userName?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(AppStrings.cancel),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              elevation: 2,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteUser(String userId, String userName) async {
+    final confirmed = await _showDeleteConfirmationDialog(userName);
+    if (confirmed == true) {
+      setState(() => _isLoading = true);
+      try {
+        await _authService.deleteUser(userId);
+        await _firestore.collection('users').doc(userId).delete();
+        if (!mounted) return;
+        CustomBottomSheet.show(
+          context: context,
+          message: '$userName successfully deleted.',
           isSuccess: true,
         );
       } catch (e) {
@@ -133,252 +205,412 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
             }
           });
         },
-        child: Container(
-          padding: EdgeInsets.all(12.w),
-          margin: EdgeInsets.only(bottom: 14.h),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: isDark
-                  ? [AppColors.darkSurface.withAlpha(230), AppColors.darkSurface.withAlpha(200)]
-                  : [AppColors.lightSurface.withAlpha(230), AppColors.lightSurface.withAlpha(200)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(
-              color: isSelected ? AppColors.primary : AppColors.primary.withAlpha(77),
-              width: isSelected ? 2.w : 1.w,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 8.r,
-                offset: Offset(0, 4.h),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 24.r,
-                    backgroundColor: AppColors.primary.withAlpha(38),
-                    backgroundImage: photoUrl != null && photoUrl.isNotEmpty ? NetworkImage(photoUrl) : null,
-                    child: photoUrl == null || photoUrl.isEmpty
-                        ? Text(
-                      user.userName.isNotEmpty ? user.userName[0].toUpperCase() : '?',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontSize: 20.sp,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
+        child: StreamBuilder<DocumentSnapshot>(
+          stream: _firestore
+              .collection('subscriptions')
+              .doc(user.userId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            bool isPremium = false;
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final data = snapshot.data!.data() as Map<String, dynamic>?;
+              isPremium = data?['status'] == 'active';
+            }
+
+            return Stack(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  margin: EdgeInsets.only(bottom: 14.h),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: isDark
+                          ? [
+                              AppColors.darkSurface.withAlpha(230),
+                              AppColors.darkSurface.withAlpha(200),
+                            ]
+                          : [Colors.white, Colors.grey.shade50],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16.r),
+                    border: Border.all(
+                      color: isSelected
+                          ? AppColors.primary
+                          : (isDark
+                                ? AppColors.primary.withAlpha(77)
+                                : Colors.grey.shade200),
+                      width: isSelected ? 2.w : 1.w,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark
+                            ? AppColors.shadow
+                            : Colors.grey.withOpacity(0.1),
+                        blurRadius: 6.r,
+                        offset: Offset(0, 4.h),
                       ),
-                    )
-                        : null,
+                    ],
                   ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.userName,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18.sp,
-                            color: AppColors.primary,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            radius: 24.r,
+                            backgroundColor: AppColors.primary.withAlpha(38),
+                            backgroundImage:
+                                photoUrl != null && photoUrl.isNotEmpty
+                                ? NetworkImage(photoUrl)
+                                : null,
+                            child: photoUrl == null || photoUrl.isEmpty
+                                ? Text(
+                                    user.userName.isNotEmpty
+                                        ? user.userName[0].toUpperCase()
+                                        : '?',
+                                    style: theme.textTheme.titleLarge?.copyWith(
+                                      fontSize: 20.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : null,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: 5.h),
-                        Text(
-                          user.userEmail,
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  user.userName,
+                                  style: theme.textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18.sp,
+                                    color: isDark
+                                        ? AppColors.primary
+                                        : Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: 5.h),
+                                Text(
+                                  user.userEmail,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontSize: 15.sp,
+                                    fontFamily: 'Roboto',
+                                    color: isDark
+                                        ? AppColors.darkTextPrimary
+                                        : Colors.black87,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                SizedBox(height: 5.h),
+                                RichText(
+                                  text: TextSpan(
+                                    children: [
+                                      TextSpan(
+                                        text: 'Joined: ',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontSize: 13.sp,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark
+                                                  ? AppColors.darkTextSecondary
+                                                  : Colors.grey.shade600,
+                                            ),
+                                      ),
+                                      TextSpan(
+                                        text: createdAt,
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontSize: 13.sp,
+                                              color: isDark
+                                                  ? AppColors.darkTextSecondary
+                                                  : Colors.grey.shade600,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 18.h),
+                      Padding(
+                        padding: EdgeInsets.only(left: 10.w),
+                        child: Text(
+                          'Preferences:',
                           style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
                             fontSize: 15.sp,
-                            fontFamily: 'Roboto',
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            color: isDark
+                                ? AppColors.darkTextPrimary
+                                : Colors.black87,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 5.h),
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              TextSpan(
-                                text: 'Joined: ',
+                      ),
+                      SizedBox(height: 4.h),
+                      Padding(
+                        padding: EdgeInsets.only(left: 8.w),
+                        child: Wrap(
+                          spacing: 6.w,
+                          runSpacing: 6.h,
+                          children: preferences.map((p) {
+                            return Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8.w,
+                                vertical: 4.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withAlpha(26),
+                                borderRadius: BorderRadius.circular(16.r),
+                              ),
+                              child: Text(
+                                p,
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                  fontSize: 12.sp,
+                                  color: AppColors.primary,
                                 ),
                               ),
-                              TextSpan(
-                                text: createdAt,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontSize: 13.sp,
-                                  color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      SizedBox(height: 10.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.only(left: 10.w),
+                            child: RichText(
+                              text: TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: 'Role: ',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.sp,
+                                      color: isDark
+                                          ? AppColors.darkTextPrimary
+                                          : Colors.black87,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: user.userRole.capitalize(),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14.sp,
+                                      color: user.userRole == 'admin'
+                                          ? AppColors.primary
+                                          : AppColors.accentBlue,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              if (user.userRole != 'admin')
+                                ElevatedButton(
+                                  onPressed: () => _changeUserRole(
+                                    user.userId,
+                                    user.userName,
+                                    true,
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10.w,
+                                      vertical: 4.h,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                    elevation: 2,
+                                  ),
+                                  child: Text(
+                                    AppStrings.promote,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontSize: 12.sp,
+                                      color: AppColors.lightBackground,
+                                    ),
+                                  ),
+                                ),
+                              if (user.userRole == 'admin')
+                                SizedBox(width: 8.w),
+                              if (user.userRole == 'admin')
+                                ElevatedButton(
+                                  onPressed: () => _changeUserRole(
+                                    user.userId,
+                                    user.userName,
+                                    false,
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red.shade700,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10.w,
+                                      vertical: 4.h,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                    elevation: 2,
+                                  ),
+                                  child: Text(
+                                    AppStrings.demote,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      fontSize: 12.sp,
+                                      color: AppColors.lightBackground,
+                                    ),
+                                  ),
+                                ),
+                              if (!isCurrent) SizedBox(width: 8.w),
+                              if (!isCurrent)
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      _deleteUser(user.userId, user.userName),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.error,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10.w,
+                                      vertical: 4.h,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12.r),
+                                    ),
+                                    elevation: 2,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      FaIcon(
+                                        FontAwesomeIcons.trash,
+                                        size: 12.sp,
+                                        color: AppColors.lightBackground,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        'Delete',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              fontSize: 12.sp,
+                                              color: AppColors.lightBackground,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              SizedBox(width: 8.w),
+                              ScaleTransition(
+                                scale: Tween<double>(begin: 0.8, end: 1.0)
+                                    .animate(
+                                      CurvedAnimation(
+                                        parent: AnimationController(
+                                          duration: Duration(
+                                            milliseconds: 400 + index * 80,
+                                          ),
+                                          vsync: this,
+                                        )..forward(),
+                                        curve: Curves.easeOut,
+                                      ),
+                                    ),
+                                child: GestureDetector(
+                                  onTap: () {
+                                    Navigator.pushNamed(
+                                      context,
+                                      RoutesName.sendNotificationScreen,
+                                      arguments: [user.userId],
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.all(6.w),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          AppColors.primary,
+                                          AppColors.primary.withAlpha(153),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.shadow,
+                                          blurRadius: 6.r,
+                                          offset: Offset(2.w, 2.h),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      Icons.notifications,
+                                      size: 26.sp,
+                                      color: isDark
+                                          ? AppColors.lightBackground
+                                          : AppColors.lightBackground,
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              SizedBox(height: 18.h),
-              Padding(
-                padding: EdgeInsets.only(left: 10.w),
-                child: Text(
-                  'Preferences:',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15.sp,
-                    color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
-              SizedBox(height: 4.h),
-              Padding(
-                padding: EdgeInsets.only(left: 8.w),
-                child: Wrap(
-                  spacing: 6.w,
-                  runSpacing: 6.h,
-                  children: preferences.map((p) {
-                    return Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                if (isPremium)
+                  Positioned(
+                    top: 10,
+                    right: 5,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 6.h,
+                      ),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withAlpha(26),
-                        borderRadius: BorderRadius.circular(16.r),
-                      ),
-                      child: Text(
-                        p,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 12.sp,
-                          color: AppColors.primary,
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFD700), Color(0xFFFFA500)],
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              SizedBox(height: 10.h),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.only(left: 10.w),
-                    child: RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: 'Role: ',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14.sp,
-                              color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                            ),
+                        borderRadius: BorderRadius.circular(20.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withOpacity(0.4),
+                            blurRadius: isDark ? 1.r : 4.r,
+                            offset: Offset(0, isDark ? 1.h : 2.h),
                           ),
-                          TextSpan(
-                            text: user.userRole.capitalize(),
-                            style: theme.textTheme.bodyMedium?.copyWith(
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.workspace_premium,
+                            size: 14.sp,
+                            color: Colors.black87,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            'PREMIUM',
+                            style: TextStyle(
+                              fontSize: 10.sp,
                               fontWeight: FontWeight.bold,
-                              fontSize: 14.sp,
-                              color: user.userRole == 'admin' ? AppColors.primary : AppColors.accentBlue,
+                              color: Colors.black87,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      if (user.userRole != 'admin')
-                        ElevatedButton(
-                          onPressed: () => _changeUserRole(user.userId, user.userName, true),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                          ),
-                          child: Text(
-                            AppStrings.promote,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 12.sp,
-                              color: AppColors.lightBackground,
-                            ),
-                          ),
-                        ),
-                      if (user.userRole == 'admin') SizedBox(width: 8.w),
-                      if (user.userRole == 'admin')
-                        ElevatedButton(
-                          onPressed: () => _changeUserRole(user.userId, user.userName, false),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.error,
-                            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                          ),
-                          child: Text(
-                            AppStrings.demote,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              fontSize: 12.sp,
-                              color: AppColors.lightBackground,
-                            ),
-                          ),
-                        ),
-                      SizedBox(width: 8.w),
-                      ScaleTransition(
-                        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: AnimationController(
-                              duration: Duration(milliseconds: 400 + index * 80),
-                              vsync: this,
-                            )..forward(),
-                            curve: Curves.easeOut,
-                          ),
-                        ),
-                        child: GestureDetector(
-                          onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              RoutesName.sendNotificationScreen,
-                              arguments: [user.userId],
-                            );
-                          },
-                          child: Container(
-                            padding: EdgeInsets.all(6.w),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                colors: [AppColors.primary, AppColors.primary.withAlpha(153)],
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.shadow,
-                                  blurRadius: 6.r,
-                                  offset: Offset(2.w, 2.h),
-                                ),
-                              ],
-                            ),
-                            child: Icon(
-                              Icons.notifications,
-                              size: 26.sp,
-                              color: isDark ? AppColors.lightBackground : AppColors.lightBackground,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -405,14 +637,19 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
     }
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: isDark
+          ? theme.scaffoldBackgroundColor
+          : Colors.grey.shade50,
       body: SafeArea(
         child: Stack(
           children: [
             Column(
               children: [
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 16.w,
+                    vertical: 12.h,
+                  ),
                   color: Colors.transparent,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
@@ -421,7 +658,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
                         icon: Icon(
                           Icons.arrow_back_ios_new,
                           size: 20.sp,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : Colors.black87,
                         ),
                         onPressed: () => Navigator.pop(context),
                       ),
@@ -431,7 +670,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 22.sp,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : Colors.black87,
                         ),
                       ),
                       const Spacer(),
@@ -454,7 +695,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
                         icon: Icon(
                           Icons.refresh,
                           size: 22.sp,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          color: isDark
+                              ? AppColors.darkTextPrimary
+                              : Colors.black87,
                         ),
                         onPressed: _triggerReload,
                       ),
@@ -469,22 +712,33 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
                       hintText: AppStrings.searchUsersHint,
                       prefixIcon: Icon(
                         Icons.search,
-                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        color: isDark
+                            ? AppColors.darkTextPrimary
+                            : Colors.grey.shade600,
                       ),
                       suffixIcon: _searchController.text.isNotEmpty
                           ? IconButton(
-                        icon: Icon(
-                          Icons.clear,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                        ),
-                        onPressed: () => _searchController.clear(),
-                      )
+                              icon: Icon(
+                                Icons.clear,
+                                color: isDark
+                                    ? AppColors.darkTextPrimary
+                                    : Colors.grey.shade600,
+                              ),
+                              onPressed: () => _searchController.clear(),
+                            )
                           : null,
                       filled: true,
-                      fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                      fillColor: isDark ? AppColors.darkSurface : Colors.white,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12.r),
                         borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12.r),
+                        borderSide: BorderSide(
+                          color: AppColors.primary,
+                          width: 1.w,
+                        ),
                       ),
                     ),
                   ),
@@ -496,24 +750,53 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
                     stream: _firestore.collection('users').snapshots(),
                     builder: (context, userSnapshot) {
                       if (!userSnapshot.hasData) {
-                        return Center(child: CircularProgressIndicator(color: AppColors.primary));
+                        return Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primary,
+                          ),
+                        );
                       }
 
                       final users = userSnapshot.data!.docs
-                          .map((doc) => UserModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
-                          .where((u) => u.userName.toLowerCase().contains(_searchQuery) || u.userEmail.toLowerCase().contains(_searchQuery))
+                          .map(
+                            (doc) => UserModel.fromFirestore(
+                              doc.data() as Map<String, dynamic>,
+                              doc.id,
+                            ),
+                          )
+                          .where(
+                            (u) =>
+                                u.userName.toLowerCase().contains(
+                                  _searchQuery,
+                                ) ||
+                                u.userEmail.toLowerCase().contains(
+                                  _searchQuery,
+                                ),
+                          )
                           .toList();
 
                       return StreamBuilder<QuerySnapshot>(
-                        stream: _firestore.collection('userPreferences').snapshots(),
+                        stream: _firestore
+                            .collection('userPreferences')
+                            .snapshots(),
                         builder: (context, prefSnapshot) {
                           final Map<String, List<String>> userPrefsMap = {};
                           for (final user in users) {
-                            final doc = prefSnapshot.data?.docs.firstWhereOrNull((d) => d.id == user.userId);
+                            final doc = prefSnapshot.data?.docs
+                                .firstWhereOrNull((d) => d.id == user.userId);
                             if (doc != null) {
-                              final prefModel = UserPreferenceModel.fromFirestore(doc.data() as Map<String, dynamic>, user.userId);
+                              final prefModel =
+                                  UserPreferenceModel.fromFirestore(
+                                    doc.data() as Map<String, dynamic>,
+                                    user.userId,
+                                  );
                               userPrefsMap[user.userId] = prefModel.preferences
-                                  .map((e) => _preferenceCache[e.preferenceId]?.preferenceName ?? '')
+                                  .map(
+                                    (e) =>
+                                        _preferenceCache[e.preferenceId]
+                                            ?.preferenceName ??
+                                        '',
+                                  )
                                   .where((name) => name.isNotEmpty)
                                   .toList();
                             } else {
@@ -522,11 +805,18 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
                           }
 
                           return ListView.builder(
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 12.h,
+                            ),
                             itemCount: users.length,
                             itemBuilder: (context, index) {
                               final user = users[index];
-                              return _buildUserCard(user, userPrefsMap[user.userId] ?? [], index);
+                              return _buildUserCard(
+                                user,
+                                userPrefsMap[user.userId] ?? [],
+                                index,
+                              );
                             },
                           );
                         },
@@ -539,7 +829,9 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
             if (_isLoading)
               Container(
                 color: AppColors.overlay,
-                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.primary),
+                ),
               ),
           ],
         ),
@@ -549,5 +841,6 @@ class _ManageUsersScreenState extends State<ManageUsersScreen> with TickerProvid
 }
 
 extension StringExtension on String {
-  String capitalize() => isEmpty ? this : "${this[0].toUpperCase()}${substring(1)}";
+  String capitalize() =>
+      isEmpty ? this : "${this[0].toUpperCase()}${substring(1)}";
 }

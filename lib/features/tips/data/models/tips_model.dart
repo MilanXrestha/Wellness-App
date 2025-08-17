@@ -1,7 +1,6 @@
 // Tip Model
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:protobuf/protobuf.dart';
 import 'package:wellness_app/generated/protos/wellness_data.pb.dart' as pb;
 
 class TipModel {
@@ -16,6 +15,11 @@ class TipModel {
   final DateTime? createdAt;
   final bool isFeatured;
   final bool isPremium;
+  final String? audioUrl;
+  final String? videoUrl;
+  final String? thumbnailUrl;
+  final String? mediaDuration;
+  final String? imageUrl;
 
   TipModel({
     required this.tipsId,
@@ -29,6 +33,11 @@ class TipModel {
     this.createdAt,
     this.isFeatured = false,
     this.isPremium = false,
+    this.audioUrl,
+    this.videoUrl,
+    this.thumbnailUrl,
+    this.mediaDuration,
+    this.imageUrl,
   });
 
   factory TipModel.fromFirestore(Map<String, dynamic> data, String tipsId) {
@@ -45,6 +54,11 @@ class TipModel {
         createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
         isFeatured: data['isFeatured'] as bool? ?? false,
         isPremium: data['isPremium'] as bool? ?? false,
+        audioUrl: data['audioUrl']?.toString(),
+        videoUrl: data['videoUrl']?.toString(),
+        thumbnailUrl: data['thumbnailUrl']?.toString(),
+        mediaDuration: data['mediaDuration']?.toString(),
+        imageUrl: data['imageUrl']?.toString(),
       );
     } catch (e, stackTrace) {
       print('Error parsing TipModel for tipsId $tipsId: $e');
@@ -66,6 +80,11 @@ class TipModel {
       createdAt: _parseDate(json['createdAt']),
       isFeatured: json['isFeatured'] as bool? ?? false,
       isPremium: json['isPremium'] as bool? ?? false,
+      audioUrl: json['audioUrl'] as String?,
+      videoUrl: json['videoUrl'] as String?,
+      thumbnailUrl: json['thumbnailUrl'] as String?,
+      mediaDuration: json['mediaDuration'] as String?,
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 
@@ -82,6 +101,11 @@ class TipModel {
       createdAt: _parseDate(map['createdAt']),
       isFeatured: (map['isFeatured'] as int? ?? 0) == 1,
       isPremium: (map['isPremium'] as int? ?? 0) == 1,
+      audioUrl: map['audioUrl'] as String?,
+      videoUrl: map['videoUrl'] as String?,
+      thumbnailUrl: map['thumbnailUrl'] as String?,
+      mediaDuration: map['mediaDuration'] as String?,
+      imageUrl: map['imageUrl'] as String?,
     );
   }
 
@@ -111,7 +135,12 @@ class TipModel {
       ..categoryId = categoryId
       ..createdAt = createdAt?.toIso8601String() ?? ''
       ..isFeatured = isFeatured
-      ..isPremium = isPremium;
+      ..isPremium = isPremium
+      ..audioUrl = audioUrl ?? ''
+      ..videoUrl = videoUrl ?? ''
+      ..thumbnailUrl = thumbnailUrl ?? ''
+      ..mediaDuration = mediaDuration ?? ''
+      ..imageUrl = imageUrl ?? '';
     return proto.writeToBuffer();
   }
 
@@ -129,6 +158,11 @@ class TipModel {
       createdAt: proto.hasCreatedAt() ? DateTime.parse(proto.createdAt) : null,
       isFeatured: proto.isFeatured,
       isPremium: proto.isPremium,
+      audioUrl: proto.audioUrl.isNotEmpty ? proto.audioUrl : null,
+      videoUrl: proto.videoUrl.isNotEmpty ? proto.videoUrl : null,
+      thumbnailUrl: proto.thumbnailUrl.isNotEmpty ? proto.thumbnailUrl : null,
+      mediaDuration: proto.mediaDuration.isNotEmpty ? proto.mediaDuration : null,
+      imageUrl: proto.imageUrl.isNotEmpty ? proto.imageUrl : null,
     );
   }
 
@@ -144,6 +178,11 @@ class TipModel {
       if (createdAt != null) 'createdAt': Timestamp.fromDate(createdAt!),
       'isFeatured': isFeatured,
       'isPremium': isPremium,
+      if (audioUrl != null) 'audioUrl': audioUrl,
+      if (videoUrl != null) 'videoUrl': videoUrl,
+      if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+      if (mediaDuration != null) 'mediaDuration': mediaDuration,
+      if (imageUrl != null) 'imageUrl': imageUrl,
     };
   }
 
@@ -160,6 +199,11 @@ class TipModel {
       'createdAt': createdAt?.toIso8601String(),
       'isFeatured': isFeatured,
       'isPremium': isPremium,
+      'audioUrl': audioUrl,
+      'videoUrl': videoUrl,
+      'thumbnailUrl': thumbnailUrl,
+      'mediaDuration': mediaDuration,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -176,6 +220,11 @@ class TipModel {
       'createdAt': createdAt?.toIso8601String(),
       'isFeatured': isFeatured ? 1 : 0,
       'isPremium': isPremium ? 1 : 0,
+      'audioUrl': audioUrl,
+      'videoUrl': videoUrl,
+      'thumbnailUrl': thumbnailUrl,
+      'mediaDuration': mediaDuration,
+      'imageUrl': imageUrl,
     };
   }
 }

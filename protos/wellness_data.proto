@@ -95,6 +95,11 @@ message TipModel {
     optional string createdAt = 9; // ISO 8601 string
     bool isFeatured = 10;
     bool isPremium = 11;
+    optional string audioUrl = 12;
+    optional string videoUrl = 13;
+    optional string thumbnailUrl = 14;
+    optional string mediaDuration = 15;
+    optional string imageUrl = 16;
 }
 
 // UserModel represents a user's profile information.

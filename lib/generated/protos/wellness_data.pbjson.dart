@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from wellness_data.proto.
+// Generated from protos/wellness_data.proto.
 
 // @dart = 3.3
 
@@ -356,10 +356,60 @@ const TipModel$json = {
     },
     {'1': 'isFeatured', '3': 10, '4': 1, '5': 8, '10': 'isFeatured'},
     {'1': 'isPremium', '3': 11, '4': 1, '5': 8, '10': 'isPremium'},
+    {
+      '1': 'audioUrl',
+      '3': 12,
+      '4': 1,
+      '5': 9,
+      '9': 2,
+      '10': 'audioUrl',
+      '17': true
+    },
+    {
+      '1': 'videoUrl',
+      '3': 13,
+      '4': 1,
+      '5': 9,
+      '9': 3,
+      '10': 'videoUrl',
+      '17': true
+    },
+    {
+      '1': 'thumbnailUrl',
+      '3': 14,
+      '4': 1,
+      '5': 9,
+      '9': 4,
+      '10': 'thumbnailUrl',
+      '17': true
+    },
+    {
+      '1': 'mediaDuration',
+      '3': 15,
+      '4': 1,
+      '5': 9,
+      '9': 5,
+      '10': 'mediaDuration',
+      '17': true
+    },
+    {
+      '1': 'imageUrl',
+      '3': 16,
+      '4': 1,
+      '5': 9,
+      '9': 6,
+      '10': 'imageUrl',
+      '17': true
+    },
   ],
   '8': [
     {'1': '_authorIcon'},
     {'1': '_createdAt'},
+    {'1': '_audioUrl'},
+    {'1': '_videoUrl'},
+    {'1': '_thumbnailUrl'},
+    {'1': '_mediaDuration'},
+    {'1': '_imageUrl'},
   ],
 };
 
@@ -371,8 +421,12 @@ final $typed_data.Uint8List tipModelDescriptor = $convert.base64Decode(
     'IjCgphdXRob3JJY29uGAYgASgJSABSCmF1dGhvckljb26IAQESJAoNcHJlZmVyZW5jZUlkcxgH'
     'IAMoCVINcHJlZmVyZW5jZUlkcxIeCgpjYXRlZ29yeUlkGAggASgJUgpjYXRlZ29yeUlkEiEKCW'
     'NyZWF0ZWRBdBgJIAEoCUgBUgljcmVhdGVkQXSIAQESHgoKaXNGZWF0dXJlZBgKIAEoCFIKaXNG'
-    'ZWF0dXJlZBIcCglpc1ByZW1pdW0YCyABKAhSCWlzUHJlbWl1bUINCgtfYXV0aG9ySWNvbkIMCg'
-    'pfY3JlYXRlZEF0');
+    'ZWF0dXJlZBIcCglpc1ByZW1pdW0YCyABKAhSCWlzUHJlbWl1bRIfCghhdWRpb1VybBgMIAEoCU'
+    'gCUghhdWRpb1VybIgBARIfCgh2aWRlb1VybBgNIAEoCUgDUgh2aWRlb1VybIgBARInCgx0aHVt'
+    'Ym5haWxVcmwYDiABKAlIBFIMdGh1bWJuYWlsVXJsiAEBEikKDW1lZGlhRHVyYXRpb24YDyABKA'
+    'lIBVINbWVkaWFEdXJhdGlvbogBARIfCghpbWFnZVVybBgQIAEoCUgGUghpbWFnZVVybIgBAUIN'
+    'CgtfYXV0aG9ySWNvbkIMCgpfY3JlYXRlZEF0QgsKCV9hdWRpb1VybEILCglfdmlkZW9VcmxCDw'
+    'oNX3RodW1ibmFpbFVybEIQCg5fbWVkaWFEdXJhdGlvbkILCglfaW1hZ2VVcmw=');
 
 @$core.Deprecated('Use userModelDescriptor instead')
 const UserModel$json = {

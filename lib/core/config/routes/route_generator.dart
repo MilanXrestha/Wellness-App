@@ -1,10 +1,7 @@
 import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:wellness_app/features/admin/presentation/add_category_screen.dart';
-import 'package:wellness_app/features/admin/presentation/add_health_tips_screen.dart';
 import 'package:wellness_app/features/admin/presentation/add_preference_screen.dart';
-import 'package:wellness_app/features/admin/presentation/add_quote_screen.dart';
-import 'package:wellness_app/features/admin/presentation/add_tips_screen.dart';
 import 'package:wellness_app/features/admin/presentation/manage_categories_screen.dart';
 import 'package:wellness_app/features/admin/presentation/manage_preferences_screen.dart';
 import 'package:wellness_app/features/admin/presentation/manage_tips_screen.dart';
@@ -16,6 +13,7 @@ import 'package:wellness_app/features/auth/presentation/screens/login_screen.dar
 import 'package:wellness_app/features/auth/presentation/screens/sign_up_screen.dart';
 import 'package:wellness_app/features/categories/presentation/screens/category_detail_screen.dart';
 import 'package:wellness_app/features/categories/presentation/screens/category_screen.dart';
+import 'package:wellness_app/features/audioPlayer/presentation/screens/media_player_screen.dart';
 import 'package:wellness_app/features/explore/presentation/screens/explore_screen.dart';
 import 'package:wellness_app/features/favorites/presentation/screens/favorite_screen.dart';
 import 'package:wellness_app/features/profile/presentation/screens/edit_profile_screen.dart';
@@ -34,8 +32,11 @@ import 'package:wellness_app/features/reminders/presentation/screens/reminder_hi
 import 'package:wellness_app/features/reminders/presentation/screens/reminder_screen.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
 
+import '../../../features/admin/presentation/add_tips_screen.dart';
+import '../../../features/admin/presentation/manage_subscriptions_screen.dart';
 import '../../../features/main/presentation/screens/main_screen.dart';
 import '../../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../../features/videoPlayer/presentation/screens/video_player_screen.dart';
 
 class RouteConfig {
   RouteConfig._();
@@ -147,9 +148,10 @@ class RouteConfig {
 
       case RoutesName.userPrefsScreen:
         return MaterialPageRoute(
-          builder: (_) => UserPreferenceScreen(
-            fromProfile: args as bool? ?? false,
-          ),
+          builder: (_) =>
+              UserPreferenceScreen(
+                fromProfile: args as bool? ?? false,
+              ),
           settings: settings,
         );
 
@@ -165,12 +167,14 @@ class RouteConfig {
                     .whereType<TipModel>()
                     .toList();
                 log(
-                  'Warning: featuredTips was List<dynamic>, converted to List<TipModel>: ${featuredTips.map((t) => t.tipsTitle).toList()}',
+                  'Warning: featuredTips was List<dynamic>, converted to List<TipModel>: ${featuredTips
+                      .map((t) => t.tipsTitle).toList()}',
                   name: 'RouteConfig',
                 );
               } else {
                 log(
-                  'Error: featuredTips is invalid type: ${args['featuredTips'].runtimeType}',
+                  'Error: featuredTips is invalid type: ${args['featuredTips']
+                      .runtimeType}',
                   name: 'RouteConfig',
                 );
                 featuredTips = [];
@@ -178,14 +182,15 @@ class RouteConfig {
             }
 
             return MaterialPageRoute(
-              builder: (_) => TipsDetailScreen(
-                tip: args['tip'] as TipModel?,
-                categoryName: args['categoryName']?.toString() ?? '',
-                userId: args['userId']?.toString() ?? '',
-                featuredTips: featuredTips,
-                allHealthTips: args['allHealthTips'] as bool? ?? false,
-                allQuotes: args['allQuotes'] as bool? ?? false,
-              ),
+              builder: (_) =>
+                  TipsDetailScreen(
+                    tip: args['tip'] as TipModel?,
+                    categoryName: args['categoryName']?.toString() ?? '',
+                    userId: args['userId']?.toString() ?? '',
+                    featuredTips: featuredTips,
+                    allHealthTips: args['allHealthTips'] as bool? ?? false,
+                    allQuotes: args['allQuotes'] as bool? ?? false,
+                  ),
               settings: settings,
             );
           } catch (e, stackTrace) {
@@ -225,6 +230,12 @@ class RouteConfig {
           settings: settings,
         );
 
+      case RoutesName.manageSubscriptionScreen:
+        return MaterialPageRoute(
+          builder: (_) => const ManageSubscriptionsScreen(),
+          settings: settings,
+        );
+
       case RoutesName.addPreferenceScreen:
         return MaterialPageRoute(
           builder: (_) => const AddPreferenceScreen(),
@@ -246,18 +257,6 @@ class RouteConfig {
       case RoutesName.addCategoryScreen:
         return MaterialPageRoute(
           builder: (_) => const AddCategoryScreen(),
-          settings: settings,
-        );
-
-      case RoutesName.addQuoteScreen:
-        return MaterialPageRoute(
-          builder: (_) => const AddQuoteScreen(),
-          settings: settings,
-        );
-
-      case RoutesName.addHealthTipsScreen:
-        return MaterialPageRoute(
-          builder: (_) => const AddHealthTipsScreen(),
           settings: settings,
         );
 
@@ -291,6 +290,29 @@ class RouteConfig {
           settings: settings,
         );
 
+      case RoutesName.mediaPlayerScreen:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => MediaPlayerScreen(
+            tip: args['tip'] as TipModel,
+            categoryName: args['categoryName'] as String,
+            featuredTips: args['featuredTips'] as List<TipModel>,
+          ),
+          settings: settings,
+        );
+
+      case RoutesName.videoPlayerScreen:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => VideoPlayerScreen(
+            tip: args['tip'] as TipModel,
+            categoryName: args['categoryName'] as String,
+            featuredTips: args['featuredTips'] as List<TipModel>,
+          ),
+          settings: settings,
+        );
+
+
       default:
         return _errorRoute('No route defined for $screenName');
     }
@@ -298,14 +320,15 @@ class RouteConfig {
 
   static Route<dynamic> _errorRoute(String message) {
     return MaterialPageRoute(
-      builder: (_) => Scaffold(
-        body: Center(
-          child: Text(
-            'Error: $message',
-            style: const TextStyle(fontSize: 18, color: Colors.red),
+      builder: (_) =>
+          Scaffold(
+            body: Center(
+              child: Text(
+                'Error: $message',
+                style: const TextStyle(fontSize: 18, color: Colors.red),
+              ),
+            ),
           ),
-        ),
-      ),
     );
   }
 }

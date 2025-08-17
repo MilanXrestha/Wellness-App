@@ -2,14 +2,15 @@ import 'package:animate_do/animate_do.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:wellness_app/features/categories/data/models/category_model.dart';
 import 'package:wellness_app/features/preferences/data/models/preference_model.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/resources/strings.dart';
 import 'package:wellness_app/common/widgets/custom_alert_dialog.dart';
 import 'package:wellness_app/common/widgets/custom_bottom_sheet.dart';
-import '../../../core/config/routes/route_name.dart';
-import '../../tips/data/models/tips_model.dart';
+import 'package:wellness_app/core/config/routes/route_name.dart';
+import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 
 class ManageTipsScreen extends StatefulWidget {
   const ManageTipsScreen({super.key});
@@ -77,7 +78,7 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
   }
 
   // Deletes a tip with confirmation
-  void _deleteTip(String id, String title) async {
+  Future<void> _deleteTip(String id, String title) async {
     final confirm = await CustomAlertDialog.show(
       context: context,
       message: 'Are you sure you want to delete "$title"?',
@@ -88,7 +89,6 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
       setState(() => _isLoading = true);
       try {
         await _firestore.collection('tips').doc(id).delete();
-        _triggerReload();
         if (!mounted) return;
         CustomBottomSheet.show(
           context: context,
@@ -98,6 +98,7 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
       } catch (e) {
         _showError('${AppStrings.error} $e');
       } finally {
+        _triggerReload();
         setState(() => _isLoading = false);
       }
     }
@@ -110,63 +111,6 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
       RoutesName.addTipsScreen,
       arguments: tip,
     ).then((_) => _triggerReload());
-  }
-
-  // Builds preference chips
-  List<Widget> _buildPreferenceChips(List<String> preferenceIds) {
-    return preferenceIds.map((id) {
-      final pref = _preferenceCache[id] ?? PreferenceModel(
-        preferenceId: id,
-        preferenceName: 'Unknown',
-        preferenceDescription: '',
-        preferenceIcon: '',
-      );
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-        margin: EdgeInsets.only(right: 6.w, bottom: 6.h),
-        decoration: BoxDecoration(
-          color: AppColors.primary.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(16.r),
-          border: Border.all(color: AppColors.primary.withAlpha(77)),
-        ),
-        child: Text(
-          pref.preferenceName,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            fontSize: 12.sp,
-            fontFamily: 'Poppins',
-            color: AppColors.primary,
-          ),
-        ),
-      );
-    }).toList();
-  }
-
-  // Builds category chip
-  Widget _buildCategoryChip(String categoryId) {
-    final category = _categoryCache[categoryId] ?? CategoryModel(
-      categoryId: categoryId,
-      categoryName: 'Unknown',
-      categoryDescription: '',
-      imageUrl: '',
-      preferenceIds: [],
-      createdAt: DateTime.now(),
-    );
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: AppColors.primary.withAlpha(77)),
-      ),
-      child: Text(
-        category.categoryName,
-        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          fontSize: 12.sp,
-          fontFamily: 'Poppins',
-          color: AppColors.primary,
-        ),
-      ),
-    );
   }
 
   // Maps tipsType to an icon
@@ -195,6 +139,89 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
     }
   }
 
+  // Maps tipsType to a badge color
+  Color _getTipTypeColor(String tipsType) {
+    switch (tipsType.toLowerCase()) {
+      case 'quote':
+        return AppColors.accentBlue;
+      case 'tip':
+        return AppColors.primary;
+      case 'video':
+        return Colors.yellow.shade700;
+      case 'audio':
+        return Colors.purple.shade400;
+      case 'exercise':
+        return Colors.green.shade700;
+      case 'article':
+        return Colors.blueGrey.shade400;
+      case 'image':
+        return Colors.orange.shade400;
+      case 'reminder':
+        return Colors.red.shade400;
+      case 'challenge':
+        return Colors.teal.shade400;
+      default:
+        return AppColors.lightTextSecondary;
+    }
+  }
+
+  // Builds preference chips
+  List<Widget> _buildPreferenceChips(List<String> preferenceIds) {
+    return preferenceIds.map((id) {
+      final pref = _preferenceCache[id] ?? PreferenceModel(
+        preferenceId: id,
+        preferenceName: 'Unknown',
+        preferenceDescription: '',
+        preferenceIcon: '',
+      );
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+        margin: EdgeInsets.only(right: 6.w, bottom: 6.h),
+        decoration: BoxDecoration(
+          color: AppColors.primary.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        ),
+        child: Text(
+          pref.preferenceName,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            fontSize: 12.sp,
+            fontFamily: 'Poppins',
+            color: AppColors.primary,
+          ),
+        ),
+      );
+    }).toList();
+  }
+
+  // Builds category chip
+  Widget _buildCategoryChip(String categoryId) {
+    final category = _categoryCache[categoryId] ?? CategoryModel(
+      categoryId: categoryId,
+      categoryName: 'Unknown',
+      categoryDescription: '',
+      imageUrl: '',
+      preferenceIds: [],
+      createdAt: DateTime.now(),
+    );
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+      ),
+      child: Text(
+        category.categoryName,
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          fontSize: 12.sp,
+          fontFamily: 'Poppins',
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+
   // Builds a tip card with details and actions
   Widget _buildTipCard(TipModel tip, int index) {
     final theme = Theme.of(context);
@@ -208,28 +235,21 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: isDark
-                ? [
-              AppColors.darkSurface.withOpacity(0.9),
-              AppColors.darkSurface.withOpacity(0.7),
-            ]
-                : [
-              AppColors.lightSurface.withOpacity(0.95),
-              AppColors.lightSurface.withOpacity(0.85),
-            ],
+                ? [AppColors.darkSurface.withOpacity(0.9), AppColors.darkSurface.withOpacity(0.7)]
+                : [AppColors.lightSurface, Colors.grey.shade50],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          borderRadius: BorderRadius.circular(20.r),
+          borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
             color: AppColors.primary.withOpacity(0.3),
-            width: 1.5.w,
+            width: 1.w,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.shadow.withOpacity(0.2),
-              blurRadius: 10.r,
-              offset: Offset(0, 4.h),
-              spreadRadius: 2.r,
+              color: isDark ? AppColors.shadow : AppColors.shadow.withOpacity(0.08),
+              blurRadius: 4.r,
+              offset: Offset(0, 2.h),
             ),
           ],
         ),
@@ -252,7 +272,7 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.shadow.withOpacity(0.1),
-                    blurRadius: 6.r,
+                    blurRadius: 4.r,
                     offset: Offset(2.w, 2.h),
                   ),
                 ],
@@ -260,7 +280,7 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
               child: Icon(
                 _getTipTypeIcon(tip.tipsType),
                 color: AppColors.primary,
-                size: 40.sp,
+                size: 28.sp,
               ),
             ),
             SizedBox(width: 12.w),
@@ -268,22 +288,43 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    tip.tipsTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18.sp,
-                      color: AppColors.primary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          tip.tipsTitle,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 20.sp,
+                            color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                        decoration: BoxDecoration(
+                          color: _getTipTypeColor(tip.tipsType).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        child: Text(
+                          tip.tipsType.capitalize(),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: _getTipTypeColor(tip.tipsType),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 6.h),
+                  SizedBox(height: 8.h),
                   Text(
                     tip.tipsDescription,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 14.sp,
                       fontFamily: 'Roboto',
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       height: 1.4,
                     ),
                     maxLines: 3,
@@ -299,17 +340,8 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
                         color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                       ),
                     ),
-                    SizedBox(height: 6.h),
+                    SizedBox(height: 8.h),
                   ],
-                  Text(
-                    'Type: ${tip.tipsType.capitalize()}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 13.sp,
-                      fontFamily: 'Poppins',
-                      color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
                   Row(
                     children: [
                       Text(
@@ -341,39 +373,45 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
                       children: _buildPreferenceChips(tip.preferenceIds),
                     ),
                   ],
-                  SizedBox(height: 12.h),
+                  SizedBox(height: 16.h),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      ZoomIn(
-                        duration: Duration(milliseconds: 400 + index * 80),
-                        child: GestureDetector(
-                          onTap: () => _editTip(tip),
+                      ScaleTransition(
+                        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                          CurvedAnimation(
+                            parent: AnimationController(
+                              duration: Duration(milliseconds: 400 + index * 80),
+                              vsync: this,
+                            )..forward(),
+                            curve: Curves.easeOut,
+                          ),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () => _editTip(tip),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                            elevation: 2,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                          ),
                           child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [
-                                  AppColors.primary,
-                                  AppColors.primary.withOpacity(0.7),
-                                ],
+                                colors: [AppColors.primary, AppColors.primary.withOpacity(0.7)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(10.r),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.shadow.withOpacity(0.3),
-                                  blurRadius: 6.r,
-                                  offset: Offset(2.w, 2.h),
-                                ),
-                              ],
+                              borderRadius: BorderRadius.circular(12.r),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.edit_note_rounded,
-                                  size: 24.sp,
+                                FaIcon(
+                                  FontAwesomeIcons.penToSquare,
+                                  size: 12.sp,
                                   color: AppColors.lightBackground,
                                 ),
                                 SizedBox(width: 4.w),
@@ -391,35 +429,41 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
                         ),
                       ),
                       SizedBox(width: 12.w),
-                      ZoomIn(
-                        duration: Duration(milliseconds: 400 + index * 80),
-                        child: GestureDetector(
-                          onTap: () => _deleteTip(tip.tipsId, tip.tipsTitle),
+                      ScaleTransition(
+                        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+                          CurvedAnimation(
+                            parent: AnimationController(
+                              duration: Duration(milliseconds: 400 + index * 80),
+                              vsync: this,
+                            )..forward(),
+                            curve: Curves.easeOut,
+                          ),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () => _deleteTip(tip.tipsId, tip.tipsTitle),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+                            elevation: 2,
+                            backgroundColor: Colors.transparent,
+                            shadowColor: Colors.transparent,
+                          ),
                           child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
-                                colors: [
-                                  AppColors.error,
-                                  AppColors.error.withOpacity(0.7),
-                                ],
+                                colors: [AppColors.error, AppColors.error.withOpacity(0.7)],
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                               ),
-                              borderRadius: BorderRadius.circular(10.r),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.shadow.withOpacity(0.3),
-                                  blurRadius: 6.r,
-                                  offset: Offset(2.w, 2.h),
-                                ),
-                              ],
+                              borderRadius: BorderRadius.circular(12.r),
                             ),
                             child: Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.delete_forever_rounded,
-                                  size: 24.sp,
+                                FaIcon(
+                                  FontAwesomeIcons.trash,
+                                  size: 12.sp,
                                   color: AppColors.lightBackground,
                                 ),
                                 SizedBox(width: 4.w),
@@ -460,110 +504,114 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
     }
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      backgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.lightBackground,
       body: SafeArea(
         child: Stack(
           children: [
-            Column(
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                  decoration: BoxDecoration(
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.shadow.withOpacity(0.1),
-                        blurRadius: 8.r,
-                        offset: Offset(0, 2.h),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    children: [
-                      ZoomIn(
-                        duration: const Duration(milliseconds: 300),
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.arrow_back_ios_new,
-                            size: 22.sp,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: Text(
-                          AppStrings.manageTipsTitle,
-                          style: theme.textTheme.headlineMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 24.sp,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      ZoomIn(
-                        duration: const Duration(milliseconds: 300),
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.refresh,
-                            size: 24.sp,
-                            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
-                          ),
-                          onPressed: _triggerReload,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 12.h),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: AppStrings.searchTipsHint,
-                      prefixIcon: Icon(
-                        Icons.search,
-                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                        size: 24.sp,
-                      ),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                        icon: Icon(
-                          Icons.clear,
-                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                          size: 24.sp,
-                        ),
-                        onPressed: () => _searchController.clear(),
-                      )
-                          : null,
-                      filled: true,
-                      fillColor: isDark
-                          ? AppColors.darkSurface.withOpacity(0.9)
-                          : AppColors.lightSurface.withOpacity(0.9),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16.r),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-                    ),
-                    style: TextStyle(
-                      fontSize: 16.sp,
+            CustomScrollView(
+              slivers: [
+                SliverAppBar(
+                  backgroundColor: isDark
+                      ? AppColors.darkBackground
+                      : AppColors.lightBackground,
+                  elevation: 0,
+                  pinned: true,
+                  floating: false,
+                  snap: false,
+                  title: Text(
+                    AppStrings.manageTipsTitle,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 22.sp,
                       color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                     ),
                   ),
+                  leading: IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 20.sp,
+                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  actions: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.refresh,
+                        size: 22.sp,
+                        color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      ),
+                      onPressed: _triggerReload,
+                    ),
+                  ],
                 ),
-                SizedBox(height: 12.h),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
+                SliverToBoxAdapter(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                    color: isDark ? AppColors.darkBackground : Colors.grey.shade50,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                        borderRadius: BorderRadius.circular(12.r),
+                        boxShadow: isDark
+                            ? []
+                            : [
+                          BoxShadow(
+                            color: AppColors.shadow.withOpacity(0.08),
+                            blurRadius: 4.r,
+                            offset: Offset(0, 2.h),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: AppStrings.searchTipsHint,
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                          ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                            icon: Icon(
+                              Icons.clear,
+                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                            ),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                              : null,
+                          filled: true,
+                          fillColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                            borderSide: BorderSide(color: AppColors.primary, width: 1.w),
+                          ),
+                        ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  sliver: StreamBuilder<QuerySnapshot>(
                     key: ValueKey(_reloadKey),
                     stream: _firestore.collection('tips').snapshots(),
                     builder: (context, snapshot) {
                       if (!snapshot.hasData) {
-                        return Center(
-                          child: CircularProgressIndicator(color: AppColors.primary),
+                        return const SliverToBoxAdapter(
+                          child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
                         );
                       }
 
@@ -576,24 +624,14 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
                       )
                           .toList();
 
-                      return tips.isEmpty
-                          ? Center(
-                        child: Text(
-                          AppStrings.noTipsFound,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontFamily: 'Poppins',
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
-                          ),
+                      return SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                            if (index >= tips.length) return const SizedBox.shrink();
+                            return _buildTipCard(tips[index], index);
+                          },
+                          childCount: tips.length,
                         ),
-                      )
-                          : ListView.builder(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                        itemCount: tips.length,
-                        itemBuilder: (context, index) {
-                          return _buildTipCard(tips[index], index);
-                        },
                       );
                     },
                   ),
@@ -602,14 +640,22 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
             ),
             if (_isLoading)
               Container(
-                color: AppColors.overlay.withOpacity(0.5),
+                color: AppColors.overlay,
                 child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
               ),
           ],
         ),
       ),
-      floatingActionButton: ZoomIn(
-        duration: const Duration(milliseconds: 400),
+      floatingActionButton: ScaleTransition(
+        scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+          CurvedAnimation(
+            parent: AnimationController(
+              duration: const Duration(milliseconds: 400),
+              vsync: this,
+            )..forward(),
+            curve: Curves.easeOut,
+          ),
+        ),
         child: FloatingActionButton(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -625,14 +671,13 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.shadow.withOpacity(0.3),
-                  blurRadius: 10.r,
-                  offset: Offset(0, 4.h),
-                  spreadRadius: 2.r,
+                  color: AppColors.shadow.withOpacity(0.08),
+                  blurRadius: 4.r,
+                  offset: Offset(0, 2.h),
                 ),
               ],
             ),
-            child: Icon(Icons.add, color: AppColors.lightBackground, size: 30.sp),
+            child: Icon(Icons.add, color: AppColors.lightBackground, size: 28.sp),
           ),
         ),
       ),
@@ -640,9 +685,6 @@ class _ManageTipsScreenState extends State<ManageTipsScreen> with TickerProvider
   }
 }
 
-// Extension to capitalize strings
 extension StringExtension on String {
-  String capitalize() {
-    return "${this[0].toUpperCase()}${substring(1)}";
-  }
+  String capitalize() => isEmpty ? this : "${this[0].toUpperCase()}${substring(1)}";
 }

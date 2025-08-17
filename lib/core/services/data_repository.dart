@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:developer';
-import 'package:lru_cache/lru_cache.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:wellness_app/core/constants/app_constants.dart';
+import 'package:wellness_app/core/db/database_helper.dart';
+import 'package:wellness_app/core/services/wellness_cache_service.dart';
 import 'package:wellness_app/features/categories/data/models/category_model.dart';
 import 'package:wellness_app/features/favorites/data/models/favorite_model.dart';
 import 'package:wellness_app/features/notifications/data/models/notification_model.dart';
@@ -13,40 +15,12 @@ import 'package:wellness_app/features/reminders/data/models/reminder_model.dart'
 import 'package:wellness_app/features/subscription/data/models/subscription_model.dart';
 import 'package:wellness_app/features/subscription/data/models/transaction_model.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
-import 'package:wellness_app/core/constants/app_constants.dart';
-import 'package:wellness_app/core/db/database_helper.dart';
-
-class CachedItem<T> {
-  final T data;
-  final DateTime cachedAt;
-  CachedItem(this.data, this.cachedAt);
-}
 
 class DataRepository {
   static final DataRepository instance = DataRepository._internal();
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
-  // LRU caches for different model types
-  LruCache<String, CachedItem<UserModel>> _userCache = LruCache(50);
-  LruCache<String, CachedItem<List<PreferenceModel>>> _preferencesCache = LruCache(10);
-  LruCache<String, CachedItem<PreferenceModel>> _preferenceCache = LruCache(50);
-  LruCache<String, CachedItem<UserPreferenceModel>> _userPreferenceCache = LruCache(50);
-  LruCache<String, CachedItem<List<CategoryModel>>> _categoriesCache = LruCache(20);
-  LruCache<String, CachedItem<CategoryModel>> _categoryCache = LruCache(100);
-  LruCache<String, CachedItem<List<TipModel>>> _tipsCache = LruCache(50);
-  LruCache<String, CachedItem<TipModel>> _tipCache = LruCache(200);
-  LruCache<String, CachedItem<List<FavoriteModel>>> _favoritesCache = LruCache(50);
-  LruCache<String, CachedItem<List<ReminderModel>>> _remindersCache = LruCache(50);
-  LruCache<String, CachedItem<ReminderModel>> _reminderCache = LruCache(100);
-  LruCache<String, CachedItem<List<NotificationModel>>> _notificationsCache = LruCache(50);
-  LruCache<String, CachedItem<SubscriptionModel>> _subscriptionCache = LruCache(50);
-  LruCache<String, CachedItem<List<TransactionModel>>> _transactionsCache = LruCache(50);
-  LruCache<String, CachedItem<Map<String, dynamic>>> _dashboardCache = LruCache(50);
-
-
-  // TTL for dynamic data (e.g., notifications, reminders)
-  static const _ttl = Duration(minutes: 30);
+  final WellnessCacheService _cacheService = WellnessCacheService();
 
   DataRepository._internal();
 
@@ -57,8 +31,37 @@ class DataRepository {
     return isOnline;
   }
 
-  bool _isCacheValid(CachedItem<dynamic>? cachedItem) {
-    return cachedItem != null && DateTime.now().difference(cachedItem.cachedAt) < _ttl;
+  Future<bool> isOnline() async {
+    return await _isOnline();
+  }
+
+  String _sanitizeText(String? text) {
+    if (text == null || text.isEmpty) return '';
+    return text
+        .replaceAll('\u2019', "'") // Right single quotation mark
+        .replaceAll('\u2018', "'") // Left single quotation mark
+        .replaceAll('&apos;', "'") // HTML entity
+        .replaceAll('&#39;', "'"); // HTML entity numeric
+  }
+
+  Map<String, dynamic> _sanitizeMap(Map<String, dynamic> data) {
+    final sanitized = <String, dynamic>{};
+    data.forEach((key, value) {
+      if (value is String) {
+        sanitized[key] = _sanitizeText(value);
+      } else if (value is Map<String, dynamic>) {
+        sanitized[key] = _sanitizeMap(value);
+      } else if (value is List<dynamic>) {
+        sanitized[key] = value.map((e) {
+          if (e is String) return _sanitizeText(e);
+          if (e is Map<String, dynamic>) return _sanitizeMap(e);
+          return e;
+        }).toList();
+      } else {
+        sanitized[key] = value;
+      }
+    });
+    return sanitized;
   }
 
   Future<UserModel?> getUser(String userId) async {
@@ -66,23 +69,34 @@ class DataRepository {
       log('getUser: Invalid userId (empty)');
       return null;
     }
-    final cacheKey = 'user_$userId';
-    final cachedUser = await _userCache.get(cacheKey); // await here
-    if (_isCacheValid(cachedUser)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'users',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('User fetched from cache: $userId');
-      return cachedUser!.data; // safe to use '!' if _isCacheValid checks for null
+      return UserModel.fromJson(_sanitizeMap(cacheData.data));
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final doc = await _firestore
             .collection(AppConstants.usersCollection)
             .doc(userId)
             .get();
         if (doc.exists) {
-          final user = UserModel.fromFirestore(doc.data()!, userId);
+          final sanitizedData = _sanitizeMap(doc.data()!);
+          final user = UserModel.fromFirestore(sanitizedData, userId);
           await _dbHelper.insertUser(user);
-          _userCache.put(cacheKey, CachedItem(user, DateTime.now()));
-          log('User fetched from Firestore and cached: ${user.userId}');
+          await _cacheService.saveDataToCache(
+            endpoint: 'users',
+            param: userId,
+            data: user.toJson(),
+            cacheDuration: const Duration(minutes: 10),
+            isToRefresh: false,
+          );
+          log('User fetched from Firestore: ${user.userId}');
           return user;
         } else {
           log('User $userId not found in Firestore');
@@ -93,10 +107,14 @@ class DataRepository {
     }
     final user = await _dbHelper.getUser(userId);
     if (user != null) {
-      _userCache.put(cacheKey, CachedItem(user, DateTime.now()));
-      log('User fetched from local database and cached: ${user.userId}');
-    } else {
-      log('User $userId not found in local database');
+      await _cacheService.saveDataToCache(
+        endpoint: 'users',
+        param: userId,
+        data: user.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('User fetched from local database: ${user.userId}');
     }
     return user;
   }
@@ -106,16 +124,21 @@ class DataRepository {
       log('updateUser: Invalid userId (empty)');
       return;
     }
-    final cacheKey = 'user_${user.userId}';
     await _dbHelper.insertUser(user);
-    _userCache.put(cacheKey, CachedItem(user, DateTime.now()));
-    _dashboardCache.remove('dashboard_${user.userId}');
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(user.toFirestore());
         await _firestore
             .collection(AppConstants.usersCollection)
             .doc(user.userId)
-            .set(user.toFirestore());
+            .set(sanitizedData);
+        await _cacheService.saveDataToCache(
+          endpoint: 'users',
+          param: user.userId,
+          data: user.toJson(),
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: true,
+        );
         log('User updated in Firestore: ${user.userId}');
       } catch (e) {
         log('Error updating user in Firestore: $e');
@@ -140,49 +163,70 @@ class DataRepository {
       }
     }
     await _dbHelper.deleteUser(userId);
-    _userCache.remove('user_$userId');
-    _dashboardCache.remove('dashboard_$userId');
+    await _cacheService.clearCache();
   }
 
   Future<List<PreferenceModel>> getPreferences() async {
-    const cacheKey = 'all_preferences';
-    final cachedPreferences = await _preferencesCache.get(cacheKey);
-    if (_isCacheValid(cachedPreferences)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'preferences',
+      param: null,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Preferences fetched from cache');
-      return cachedPreferences!.data;
+      return (cacheData.data['preferences'] as List<dynamic>)
+          .map(
+            (e) => PreferenceModel.fromJson(
+              _sanitizeMap(e as Map<String, dynamic>),
+            ),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.preferencesCollection)
             .get();
         final preferences = snapshot.docs
-            .map((doc) => PreferenceModel.fromFirestore(doc.data(), doc.id))
+            .map(
+              (doc) => PreferenceModel.fromFirestore(
+                _sanitizeMap(doc.data()),
+                doc.id,
+              ),
+            )
             .toList();
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var preference in preferences) {
-          batch.insert(
-            'preferences',
-            {'preferenceId': preference.preferenceId, 'data': preference.toProto()},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-          _preferenceCache.put('preference_${preference.preferenceId}', CachedItem(preference, DateTime.now()));
+          batch.insert('preferences', {
+            'preferenceId': preference.preferenceId,
+            'data': preference.toProto(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit();
-        _preferencesCache.put(cacheKey, CachedItem(preferences, DateTime.now()));
-        log('Fetched ${preferences.length} preferences from Firestore and cached');
+        await _cacheService.saveDataToCache(
+          endpoint: 'preferences',
+          param: null,
+          data: {'preferences': preferences.map((e) => e.toJson()).toList()},
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log('Fetched ${preferences.length} preferences from Firestore');
         return preferences;
       } catch (e) {
         log('Error fetching preferences from Firestore: $e');
       }
     }
     final preferences = await _dbHelper.getAllPreferences();
-    for (var preference in preferences) {
-      _preferenceCache.put('preference_${preference.preferenceId}', CachedItem(preference, DateTime.now()));
-    }
-    _preferencesCache.put(cacheKey, CachedItem(preferences, DateTime.now()));
-    log('Fetched ${preferences.length} preferences from local database and cached');
+    await _cacheService.saveDataToCache(
+      endpoint: 'preferences',
+      param: null,
+      data: {'preferences': preferences.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log('Fetched ${preferences.length} preferences from local database');
     return preferences;
   }
 
@@ -191,23 +235,36 @@ class DataRepository {
       log('getPreference: Invalid preferenceId (empty)');
       return null;
     }
-    final cacheKey = 'preference_$preferenceId';
-    final cachedPreference = await _preferenceCache.get(cacheKey);
-    if (_isCacheValid(cachedPreference)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'preferences',
+      param: preferenceId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Preference fetched from cache: $preferenceId');
-      return cachedPreference!.data;
+      return PreferenceModel.fromJson(_sanitizeMap(cacheData.data));
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final doc = await _firestore
             .collection(AppConstants.preferencesCollection)
             .doc(preferenceId)
             .get();
         if (doc.exists) {
-          final preference = PreferenceModel.fromFirestore(doc.data()!, preferenceId);
+          final preference = PreferenceModel.fromFirestore(
+            _sanitizeMap(doc.data()!),
+            preferenceId,
+          );
           await _dbHelper.insertPreference(preference);
-          _preferenceCache.put(cacheKey, CachedItem(preference, DateTime.now()));
-          log('Preference fetched from Firestore and cached: $preferenceId');
+          await _cacheService.saveDataToCache(
+            endpoint: 'preferences',
+            param: preferenceId,
+            data: preference.toJson(),
+            cacheDuration: const Duration(minutes: 10),
+            isToRefresh: false,
+          );
+          log('Preference fetched from Firestore: $preferenceId');
           return preference;
         }
       } catch (e) {
@@ -216,8 +273,14 @@ class DataRepository {
     }
     final preference = await _dbHelper.getPreference(preferenceId);
     if (preference != null) {
-      _preferenceCache.put(cacheKey, CachedItem(preference, DateTime.now()));
-      log('Preference fetched from local database and cached: $preferenceId');
+      await _cacheService.saveDataToCache(
+        endpoint: 'preferences',
+        param: preferenceId,
+        data: preference.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('Preference fetched from local database: $preferenceId');
     }
     return preference;
   }
@@ -227,24 +290,37 @@ class DataRepository {
       log('getUserPreference: Invalid userId (empty)');
       return null;
     }
-    final cacheKey = 'user_preference_$userId';
-    final cachedUserPreference = await _userPreferenceCache.get(cacheKey);
-    if (_isCacheValid(cachedUserPreference)) {
-      log('User preference fetched from cache: $userId');
-      return cachedUserPreference!.data;
-    }
     await getPreferences();
-    if (await _isOnline()) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'user_preferences',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
+      log('User preference fetched from cache: $userId');
+      return UserPreferenceModel.fromJson(_sanitizeMap(cacheData.data));
+    }
+    if (isOnline) {
       try {
         final doc = await _firestore
             .collection(AppConstants.userPreferencesCollection)
             .doc(userId)
             .get();
         if (doc.exists) {
-          final userPreference = UserPreferenceModel.fromFirestore(doc.data()!, userId);
+          final userPreference = UserPreferenceModel.fromFirestore(
+            _sanitizeMap(doc.data()!),
+            userId,
+          );
           await _dbHelper.insertUserPreference(userPreference);
-          _userPreferenceCache.put(cacheKey, CachedItem(userPreference, DateTime.now()));
-          log('User preference fetched from Firestore and cached: $userId');
+          await _cacheService.saveDataToCache(
+            endpoint: 'user_preferences',
+            param: userId,
+            data: userPreference.toJson(),
+            cacheDuration: const Duration(minutes: 10),
+            isToRefresh: false,
+          );
+          log('User preference fetched from Firestore: $userId');
           return userPreference;
         }
       } catch (e) {
@@ -253,8 +329,14 @@ class DataRepository {
     }
     final userPreference = await _dbHelper.getUserPreference(userId);
     if (userPreference != null) {
-      _userPreferenceCache.put(cacheKey, CachedItem(userPreference, DateTime.now()));
-      log('User preference fetched from local database and cached: $userId');
+      await _cacheService.saveDataToCache(
+        endpoint: 'user_preferences',
+        param: userId,
+        data: userPreference.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('User preference fetched from local database: $userId');
     }
     return userPreference;
   }
@@ -264,16 +346,21 @@ class DataRepository {
       log('updateUserPreference: Invalid userId (empty)');
       return;
     }
-    final cacheKey = 'user_preference_${userPreference.userId}';
     await _dbHelper.insertUserPreference(userPreference);
-    _userPreferenceCache.put(cacheKey, CachedItem(userPreference, DateTime.now()));
-    _dashboardCache.remove('dashboard_${userPreference.userId}');
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(userPreference.toFirestore());
         await _firestore
             .collection(AppConstants.userPreferencesCollection)
             .doc(userPreference.userId)
-            .set(userPreference.toFirestore());
+            .set(sanitizedData);
+        await _cacheService.saveDataToCache(
+          endpoint: 'user_preferences',
+          param: userPreference.userId,
+          data: userPreference.toJson(),
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: true,
+        );
         log('User preference updated in Firestore: ${userPreference.userId}');
       } catch (e) {
         log('Error updating user preference in Firestore: $e');
@@ -298,49 +385,67 @@ class DataRepository {
       }
     }
     await _dbHelper.deleteUserPreference(userId);
-    _userPreferenceCache.remove('user_preference_$userId');
-    _dashboardCache.remove('dashboard_$userId');
+    await _cacheService.clearCache();
   }
 
   Future<List<CategoryModel>> getCategories() async {
-    const cacheKey = 'all_categories';
-    final cachedCategories = await _categoriesCache.get(cacheKey);
-    if (_isCacheValid(cachedCategories)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'categories',
+      param: null,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Categories fetched from cache');
-      return cachedCategories!.data;
+      return (cacheData.data['categories'] as List<dynamic>)
+          .map(
+            (e) =>
+                CategoryModel.fromJson(_sanitizeMap(e as Map<String, dynamic>)),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.categoriesCollection)
             .get();
         final categories = snapshot.docs
-            .map((doc) => CategoryModel.fromFirestore(doc.data(), doc.id))
+            .map(
+              (doc) =>
+                  CategoryModel.fromFirestore(_sanitizeMap(doc.data()), doc.id),
+            )
             .toList();
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var category in categories) {
-          batch.insert(
-            'categories',
-            {'categoryId': category.categoryId, 'data': category.toProto()},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-          _categoryCache.put('category_${category.categoryId}', CachedItem(category, DateTime.now()));
+          batch.insert('categories', {
+            'categoryId': category.categoryId,
+            'data': category.toProto(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit();
-        _categoriesCache.put(cacheKey, CachedItem(categories, DateTime.now()));
-        log('Fetched ${categories.length} categories from Firestore and cached');
+        await _cacheService.saveDataToCache(
+          endpoint: 'categories',
+          param: null,
+          data: {'categories': categories.map((e) => e.toJson()).toList()},
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log('Fetched ${categories.length} categories from Firestore');
         return categories;
       } catch (e) {
         log('Error fetching categories from Firestore: $e');
       }
     }
     final categories = await _dbHelper.getAllCategories();
-    for (var category in categories) {
-      _categoryCache.put('category_${category.categoryId}', CachedItem(category, DateTime.now()));
-    }
-    _categoriesCache.put(cacheKey, CachedItem(categories, DateTime.now()));
-    log('Fetched ${categories.length} categories from local database and cached');
+    await _cacheService.saveDataToCache(
+      endpoint: 'categories',
+      param: null,
+      data: {'categories': categories.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log('Fetched ${categories.length} categories from local database');
     return categories;
   }
 
@@ -349,24 +454,36 @@ class DataRepository {
       log('getCategory: Invalid categoryId (empty)');
       return null;
     }
-    final cacheKey = 'category_$categoryId';
-    final cachedCategory = await _categoryCache.get(cacheKey);
-    if (_isCacheValid(cachedCategory)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'categories',
+      param: categoryId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Category fetched from cache: $categoryId');
-      return cachedCategory!.data;
+      return CategoryModel.fromJson(_sanitizeMap(cacheData.data));
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final doc = await _firestore
             .collection(AppConstants.categoriesCollection)
             .doc(categoryId)
             .get();
         if (doc.exists) {
-          final category = CategoryModel.fromFirestore(doc.data()!, categoryId);
+          final category = CategoryModel.fromFirestore(
+            _sanitizeMap(doc.data()!),
+            categoryId,
+          );
           await _dbHelper.insertCategory(category);
-          _categoryCache.put(cacheKey, CachedItem(category, DateTime.now()));
-          _categoriesCache.remove('all_categories');
-          log('Category fetched from Firestore and cached: $categoryId');
+          await _cacheService.saveDataToCache(
+            endpoint: 'categories',
+            param: categoryId,
+            data: category.toJson(),
+            cacheDuration: const Duration(minutes: 10),
+            isToRefresh: false,
+          );
+          log('Category fetched from Firestore: $categoryId');
           return category;
         } else {
           log('Category $categoryId not found in Firestore');
@@ -377,21 +494,35 @@ class DataRepository {
     }
     final category = await _dbHelper.getCategory(categoryId);
     if (category != null) {
-      _categoryCache.put(cacheKey, CachedItem(category, DateTime.now()));
-      _categoriesCache.remove('all_categories');
-      log('Category fetched from local database and cached: $categoryId');
+      await _cacheService.saveDataToCache(
+        endpoint: 'categories',
+        param: categoryId,
+        data: category.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('Category fetched from local database: $categoryId');
     }
     return category;
   }
 
   Future<List<TipModel>> getTips({bool includePremium = false}) async {
-    final cacheKey = includePremium ? 'all_tips_premium' : 'all_tips';
-    final cachedTips = await _tipsCache.get(cacheKey);
-    if (_isCacheValid(cachedTips)) {
-      log('Tips fetched from cache: $cacheKey');
-      return cachedTips!.data;
+    final isOnline = await _isOnline();
+    final cacheKeySuffix = includePremium ? '_premium' : '';
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'tips$cacheKeySuffix',
+      param: null,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
+      log('Tips fetched from cache (includePremium: $includePremium)');
+      return (cacheData.data['tips'] as List<dynamic>)
+          .map(
+            (e) => TipModel.fromJson(_sanitizeMap(e as Map<String, dynamic>)),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final categories = await getCategories();
         final categoryIds = categories.map((c) => c.categoryId).toSet();
@@ -402,47 +533,76 @@ class DataRepository {
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var doc in snapshot.docs) {
-          final tip = TipModel.fromFirestore(doc.data(), doc.id);
-          if ((includePremium || !tip.isPremium) && categoryIds.contains(tip.categoryId)) {
-            batch.insert(
-              'tips',
-              {'tipsId': tip.tipsId, 'categoryId': tip.categoryId, 'data': tip.toProto()},
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-            _tipCache.put('tip_${tip.tipsId}', CachedItem(tip, DateTime.now()));
+          final tip = TipModel.fromFirestore(_sanitizeMap(doc.data()), doc.id);
+          if ((includePremium || !tip.isPremium) &&
+              categoryIds.contains(tip.categoryId)) {
+            batch.insert('tips', {
+              'tipsId': tip.tipsId,
+              'categoryId': tip.categoryId,
+              'data': tip.toProto(),
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
             tips.add(tip);
           }
         }
         await batch.commit();
-        _tipsCache.put(cacheKey, CachedItem(tips, DateTime.now()));
-        log('Fetched ${tips.length} tips from Firestore and cached');
+        await _cacheService.saveDataToCache(
+          endpoint: 'tips$cacheKeySuffix',
+          param: null,
+          data: {'tips': tips.map((e) => e.toJson()).toList()},
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log(
+          'Fetched ${tips.length} tips from Firestore (includePremium: $includePremium)',
+        );
         return tips;
       } catch (e) {
         log('Error fetching tips from Firestore: $e');
       }
     }
     final tips = await _dbHelper.getAllTips();
-    final filteredTips = tips.where((tip) => includePremium || !tip.isPremium).toList();
-    for (var tip in filteredTips) {
-      _tipCache.put('tip_${tip.tipsId}', CachedItem(tip, DateTime.now()));
-    }
-    _tipsCache.put(cacheKey, CachedItem(filteredTips, DateTime.now()));
-    log('Fetched ${filteredTips.length} tips from local database and cached');
+    final filteredTips = tips
+        .where((tip) => includePremium || !tip.isPremium)
+        .toList();
+    await _cacheService.saveDataToCache(
+      endpoint: 'tips$cacheKeySuffix',
+      param: null,
+      data: {'tips': filteredTips.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log(
+      'Fetched ${filteredTips.length} tips from local database (includePremium: $includePremium)',
+    );
     return filteredTips;
   }
 
-  Future<List<TipModel>> getTipsByCategory(String categoryId, {bool includePremium = false}) async {
+  Future<List<TipModel>> getTipsByCategory(
+    String categoryId, {
+    bool includePremium = false,
+  }) async {
     if (categoryId.isEmpty) {
       log('getTipsByCategory: Invalid categoryId (empty)');
       return [];
     }
-    final cacheKey = 'tips_by_category_${categoryId}_premium_$includePremium';
-    final cachedTips = await _tipsCache.get(cacheKey);
-    if (_isCacheValid(cachedTips)) {
-      log('Tips fetched from cache: $cacheKey');
-      return cachedTips!.data;
+    final isOnline = await _isOnline();
+    final cacheKeySuffix = includePremium ? '_premium' : '';
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'tips_by_category$cacheKeySuffix',
+      param: categoryId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
+      log(
+        'Tips fetched from cache for category $categoryId (includePremium: $includePremium)',
+      );
+      return (cacheData.data['tips'] as List<dynamic>)
+          .map(
+            (e) => TipModel.fromJson(_sanitizeMap(e as Map<String, dynamic>)),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final category = await getCategory(categoryId);
         if (category == null) {
@@ -457,32 +617,46 @@ class DataRepository {
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var doc in snapshot.docs) {
-          final tip = TipModel.fromFirestore(doc.data(), doc.id);
+          final tip = TipModel.fromFirestore(_sanitizeMap(doc.data()), doc.id);
           if (includePremium || !tip.isPremium) {
-            batch.insert(
-              'tips',
-              {'tipsId': tip.tipsId, 'categoryId': tip.categoryId, 'data': tip.toProto()},
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-            _tipCache.put('tip_${tip.tipsId}', CachedItem(tip, DateTime.now()));
+            batch.insert('tips', {
+              'tipsId': tip.tipsId,
+              'categoryId': tip.categoryId,
+              'data': tip.toProto(),
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
             tips.add(tip);
           }
         }
         await batch.commit();
-        _tipsCache.put(cacheKey, CachedItem(tips, DateTime.now()));
-        log('Fetched ${tips.length} tips for category $categoryId from Firestore and cached');
+        await _cacheService.saveDataToCache(
+          endpoint: 'tips_by_category$cacheKeySuffix',
+          param: categoryId,
+          data: {'tips': tips.map((e) => e.toJson()).toList()},
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log(
+          'Fetched ${tips.length} tips for category $categoryId from Firestore (includePremium: $includePremium)',
+        );
         return tips;
       } catch (e) {
         log('Error fetching tips by category from Firestore: $e');
       }
     }
     final tips = await _dbHelper.getTipsByCategory(categoryId);
-    final filteredTips = tips.where((tip) => includePremium || !tip.isPremium).toList();
-    for (var tip in filteredTips) {
-      _tipCache.put('tip_${tip.tipsId}', CachedItem(tip, DateTime.now()));
-    }
-    _tipsCache.put(cacheKey, CachedItem(filteredTips, DateTime.now()));
-    log('Fetched ${filteredTips.length} tips for category $categoryId from local database and cached');
+    final filteredTips = tips
+        .where((tip) => includePremium || !tip.isPremium)
+        .toList();
+    await _cacheService.saveDataToCache(
+      endpoint: 'tips_by_category$cacheKeySuffix',
+      param: categoryId,
+      data: {'tips': filteredTips.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log(
+      'Fetched ${filteredTips.length} tips for category $categoryId from local database (includePremium: $includePremium)',
+    );
     return filteredTips;
   }
 
@@ -491,26 +665,34 @@ class DataRepository {
       log('getTip: Invalid tipsId (empty)');
       return null;
     }
-    final cacheKey = 'tip_$tipsId';
-    final cachedTip = await _tipCache.get(cacheKey);
-    if (_isCacheValid(cachedTip)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'tips',
+      param: tipsId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Tip fetched from cache: $tipsId');
-      return cachedTip!.data;
+      return TipModel.fromJson(_sanitizeMap(cacheData.data));
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final doc = await _firestore
             .collection(AppConstants.tipsCollection)
             .doc(tipsId)
             .get();
         if (doc.exists) {
-          final tip = TipModel.fromFirestore(doc.data()!, tipsId);
+          final tip = TipModel.fromFirestore(_sanitizeMap(doc.data()!), tipsId);
           if (await _dbHelper.getCategory(tip.categoryId) != null) {
             await _dbHelper.insertTip(tip);
-            _tipCache.put(cacheKey, CachedItem(tip, DateTime.now()));
-            _tipsCache.remove('all_tips');
-            _tipsCache.remove('all_tips_premium');
-            log('Tip fetched from Firestore and cached: $tipsId');
+            await _cacheService.saveDataToCache(
+              endpoint: 'tips',
+              param: tipsId,
+              data: tip.toJson(),
+              cacheDuration: const Duration(minutes: 10),
+              isToRefresh: false,
+            );
+            log('Tip fetched from Firestore: $tipsId');
             return tip;
           } else {
             log('Category ${tip.categoryId} not found for tip $tipsId');
@@ -522,8 +704,14 @@ class DataRepository {
     }
     final tip = await _dbHelper.getTip(tipsId);
     if (tip != null) {
-      _tipCache.put(cacheKey, CachedItem(tip, DateTime.now()));
-      log('Tip fetched from local database and cached: $tipsId');
+      await _cacheService.saveDataToCache(
+        endpoint: 'tips',
+        param: tipsId,
+        data: tip.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('Tip fetched from local database: $tipsId');
     }
     return tip;
   }
@@ -537,24 +725,32 @@ class DataRepository {
       log('getFavorites: Invalid userId (empty)');
       return [];
     }
-    final cacheKey = 'favorites_$userId';
-    final cachedFavorites = await _favoritesCache.get(cacheKey);
-    if (_isCacheValid(cachedFavorites)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'favorites',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Favorites fetched from cache for userId: $userId');
-      return cachedFavorites!.data;
+      return (cacheData.data['favorites'] as List<dynamic>)
+          .map(
+            (e) =>
+                FavoriteModel.fromJson(_sanitizeMap(e as Map<String, dynamic>)),
+          )
+          .toList();
     }
-    final localFavorites = await _dbHelper.getFavoritesByUser(userId);
-    _favoritesCache.put(cacheKey, CachedItem(localFavorites, DateTime.now()));
-    log('Fetched ${localFavorites.length} favorites from local database and cached for userId: $userId');
-
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.favoriteCollection)
             .where('userId', isEqualTo: userId)
             .get();
         final firestoreFavorites = snapshot.docs
-            .map((doc) => FavoriteModel.fromFirestore(doc.data(), doc.id))
+            .map(
+              (doc) =>
+                  FavoriteModel.fromFirestore(_sanitizeMap(doc.data()), doc.id),
+            )
             .toList();
         final db = await _dbHelper.database;
         final batch = db.batch();
@@ -563,21 +759,43 @@ class DataRepository {
             log('Skipping invalid favorite ${favorite.id} with empty userId');
             continue;
           }
-          batch.insert(
-            'favorites',
-            {'id': favorite.id, 'userId': favorite.userId, 'data': favorite.toProto()},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          batch.insert('favorites', {
+            'id': favorite.id,
+            'userId': favorite.userId,
+            'data': favorite.toProto(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit();
-        _favoritesCache.put(cacheKey, CachedItem(firestoreFavorites, DateTime.now()));
-        _dashboardCache.remove('dashboard_$userId');
-        log('Synced ${firestoreFavorites.length} favorites from Firestore and cached for userId: $userId');
+        await _cacheService.saveDataToCache(
+          endpoint: 'favorites',
+          param: userId,
+          data: {
+            'favorites': firestoreFavorites.map((e) => e.toJson()).toList(),
+          },
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log(
+          'Synced ${firestoreFavorites.length} favorites from Firestore for userId: $userId',
+        );
         return firestoreFavorites;
       } catch (e) {
-        log('Error fetching favorites from Firestore for userId: $userId, error: $e');
+        log(
+          'Error fetching favorites from Firestore for userId: $userId, error: $e',
+        );
       }
     }
+    final localFavorites = await _dbHelper.getFavoritesByUser(userId);
+    await _cacheService.saveDataToCache(
+      endpoint: 'favorites',
+      param: userId,
+      data: {'favorites': localFavorites.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log(
+      'Fetched ${localFavorites.length} favorites from local database for userId: $userId',
+    );
     return localFavorites;
   }
 
@@ -587,17 +805,21 @@ class DataRepository {
       throw Exception('Cannot add favorite with empty userId');
     }
     await _dbHelper.insertFavorite(favorite);
-    final cacheKey = 'favorites_${favorite.userId}';
-    _favoritesCache.remove(cacheKey);
-    _dashboardCache.remove('dashboard_${favorite.userId}');
+    await _cacheService.saveDataToCache(
+      endpoint: 'favorites',
+      param: favorite.userId,
+      data: {},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: true,
+    );
     log('Favorite added to local database: ${favorite.id}');
-
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(favorite.toFirestore());
         await _firestore
             .collection(AppConstants.favoriteCollection)
             .doc(favorite.id)
-            .set(favorite.toFirestore());
+            .set(sanitizedData);
         log('Favorite added to Firestore: ${favorite.id}');
       } catch (e) {
         log('Error adding favorite to Firestore: $e');
@@ -627,13 +849,9 @@ class DataRepository {
         log('Error deleting favorite from Firestore: $e');
       }
     }
-    final favorite = await _dbHelper.getFavorite(id);
     await _dbHelper.deleteFavorite(id);
     await _dbHelper.deletePendingFavorite(id);
-    if (favorite != null) {
-      _favoritesCache.remove('favorites_${favorite.userId}');
-      _dashboardCache.remove('dashboard_${favorite.userId}');
-    }
+    await _cacheService.clearCache();
   }
 
   Future<List<ReminderModel>> getRemindersByUser(String userId) async {
@@ -645,42 +863,69 @@ class DataRepository {
       log('getReminders: Invalid userId (empty)');
       return [];
     }
-    final cacheKey = 'reminders_$userId';
-    final cachedReminders = await _remindersCache.get(cacheKey);
-    if (_isCacheValid(cachedReminders)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'reminders',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Reminders fetched from cache for userId: $userId');
-      return cachedReminders!.data;
+      return (cacheData.data['reminders'] as List<dynamic>)
+          .map(
+            (e) =>
+                ReminderModel.fromJson(_sanitizeMap(e as Map<String, dynamic>)),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.remindersCollection)
             .where('userId', isEqualTo: userId)
             .get();
         final reminders = snapshot.docs
-            .map((doc) => ReminderModel.fromFirestore(doc.data(), doc.id))
+            .map(
+              (doc) =>
+                  ReminderModel.fromFirestore(_sanitizeMap(doc.data()), doc.id),
+            )
             .toList();
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var reminder in reminders) {
-          batch.insert(
-            'reminders',
-            {'id': reminder.id, 'userId': reminder.userId, 'data': reminder.toProto()},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          batch.insert('reminders', {
+            'id': reminder.id,
+            'userId': reminder.userId,
+            'data': reminder.toProto(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit();
-        _remindersCache.put(cacheKey, CachedItem(reminders, DateTime.now()));
-        _dashboardCache.remove('dashboard_$userId');
-        log('Fetched ${reminders.length} reminders from Firestore and cached for userId: $userId');
+        await _cacheService.saveDataToCache(
+          endpoint: 'reminders',
+          param: userId,
+          data: {'reminders': reminders.map((e) => e.toJson()).toList()},
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log(
+          'Fetched ${reminders.length} reminders from Firestore for userId: $userId',
+        );
         return reminders;
       } catch (e) {
         log('Error fetching reminders from Firestore: $e');
       }
     }
     final reminders = await _dbHelper.getRemindersByUser(userId);
-    _remindersCache.put(cacheKey, CachedItem(reminders, DateTime.now()));
-    log('Fetched ${reminders.length} reminders from local database and cached for userId: $userId');
+    await _cacheService.saveDataToCache(
+      endpoint: 'reminders',
+      param: userId,
+      data: {'reminders': reminders.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log(
+      'Fetched ${reminders.length} reminders from local database for userId: $userId',
+    );
     return reminders;
   }
 
@@ -689,22 +934,36 @@ class DataRepository {
       log('getReminderById: Invalid reminderId (empty)');
       return null;
     }
-    final cacheKey = 'reminder_$reminderId';
-    final cachedReminder = await _reminderCache.get(cacheKey);
-    if (_isCacheValid(cachedReminder)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'reminders',
+      param: reminderId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Reminder fetched from cache: $reminderId');
-      return cachedReminder!.data;
+      return ReminderModel.fromJson(_sanitizeMap(cacheData.data));
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
-        final doc = await _firestore.collection(AppConstants.remindersCollection).doc(reminderId).get();
+        final doc = await _firestore
+            .collection(AppConstants.remindersCollection)
+            .doc(reminderId)
+            .get();
         if (doc.exists) {
-          final reminder = ReminderModel.fromFirestore(doc.data()!, doc.id);
+          final reminder = ReminderModel.fromFirestore(
+            _sanitizeMap(doc.data()!),
+            doc.id,
+          );
           await _dbHelper.insertReminder(reminder);
-          _reminderCache.put(cacheKey, CachedItem(reminder, DateTime.now()));
-          _remindersCache.remove('reminders_${reminder.userId}');
-          _dashboardCache.remove('dashboard_${reminder.userId}');
-          log('Reminder fetched from Firestore and cached: $reminderId');
+          await _cacheService.saveDataToCache(
+            endpoint: 'reminders',
+            param: reminderId,
+            data: reminder.toJson(),
+            cacheDuration: const Duration(minutes: 10),
+            isToRefresh: false,
+          );
+          log('Reminder fetched from Firestore: $reminderId');
           return reminder;
         }
       } catch (e) {
@@ -713,8 +972,14 @@ class DataRepository {
     }
     final reminder = await _dbHelper.getReminder(reminderId);
     if (reminder != null) {
-      _reminderCache.put(cacheKey, CachedItem(reminder, DateTime.now()));
-      log('Reminder fetched from local database and cached: $reminderId');
+      await _cacheService.saveDataToCache(
+        endpoint: 'reminders',
+        param: reminderId,
+        data: reminder.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('Reminder fetched from local database: $reminderId');
     }
     return reminder;
   }
@@ -725,17 +990,21 @@ class DataRepository {
       throw Exception('Cannot add reminder with empty userId');
     }
     await _dbHelper.insertReminder(reminder);
-    _remindersCache.remove('reminders_${reminder.userId}');
-    _reminderCache.put('reminder_${reminder.id}', CachedItem(reminder, DateTime.now()));
-    _dashboardCache.remove('dashboard_${reminder.userId}');
+    await _cacheService.saveDataToCache(
+      endpoint: 'reminders',
+      param: reminder.userId,
+      data: {},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: true,
+    );
     log('Reminder added to local database: ${reminder.id}');
-
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(reminder.toFirestore());
         await _firestore
             .collection(AppConstants.remindersCollection)
             .doc(reminder.id)
-            .set(reminder.toFirestore());
+            .set(sanitizedData);
         log('Reminder added to Firestore: ${reminder.id}');
       } catch (e) {
         log('Error adding reminder to Firestore: $e');
@@ -754,17 +1023,21 @@ class DataRepository {
       throw Exception('Cannot update reminder with empty userId');
     }
     await _dbHelper.insertReminder(reminder);
-    _remindersCache.remove('reminders_${reminder.userId}');
-    _reminderCache.put('reminder_${reminder.id}', CachedItem(reminder, DateTime.now()));
-    _dashboardCache.remove('dashboard_${reminder.userId}');
+    await _cacheService.saveDataToCache(
+      endpoint: 'reminders',
+      param: reminder.userId,
+      data: {},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: true,
+    );
     log('Reminder updated in local database: ${reminder.id}');
-
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(reminder.toFirestore());
         await _firestore
             .collection(AppConstants.remindersCollection)
             .doc(reminder.id)
-            .set(reminder.toFirestore());
+            .set(sanitizedData);
         log('Reminder updated in Firestore: ${reminder.id}');
       } catch (e) {
         log('Error updating reminder to Firestore: $e');
@@ -793,28 +1066,36 @@ class DataRepository {
         log('Error deleting reminder from Firestore: $e');
       }
     }
-    final reminder = await _dbHelper.getReminder(id);
     await _dbHelper.deleteReminder(id);
     await _dbHelper.deletePendingReminder(id);
-    if (reminder != null) {
-      _remindersCache.remove('reminders_${reminder.userId}');
-      _reminderCache.remove('reminder_$id');
-      _dashboardCache.remove('dashboard_${reminder.userId}');
-    }
+    await _cacheService.clearCache();
   }
 
-  Future<List<NotificationModel>> getNotifications(String userId, {int limit = 50}) async {
+  Future<List<NotificationModel>> getNotifications(
+    String userId, {
+    int limit = 50,
+  }) async {
     if (userId.isEmpty) {
       log('getNotifications: Invalid userId (empty)');
       return [];
     }
-    final cacheKey = 'notifications_$userId';
-    final cachedNotifications = await _notificationsCache.get(cacheKey);
-    if (_isCacheValid(cachedNotifications)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'notifications',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Notifications fetched from cache for userId: $userId');
-      return cachedNotifications!.data.take(limit).toList();
+      return (cacheData.data['notifications'] as List<dynamic>)
+          .map(
+            (e) => NotificationModel.fromJson(
+              _sanitizeMap(e as Map<String, dynamic>),
+            ),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.notificationsCollection)
@@ -823,29 +1104,51 @@ class DataRepository {
             .limit(limit)
             .get();
         final notifications = snapshot.docs
-            .map((doc) => NotificationModel.fromFirestore(doc.data(), doc.id))
+            .map(
+              (doc) => NotificationModel.fromFirestore(
+                _sanitizeMap(doc.data()),
+                doc.id,
+              ),
+            )
             .toList();
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var notification in notifications) {
-          batch.insert(
-            'notifications',
-            {'id': notification.id, 'userId': notification.userId, 'data': notification.toProto()},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          batch.insert('notifications', {
+            'id': notification.id,
+            'userId': notification.userId,
+            'data': notification.toProto(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit();
-        _notificationsCache.put(cacheKey, CachedItem(notifications, DateTime.now()));
-        _dashboardCache.remove('dashboard_$userId');
-        log('Fetched ${notifications.length} notifications from Firestore and cached for userId: $userId');
+        await _cacheService.saveDataToCache(
+          endpoint: 'notifications',
+          param: userId,
+          data: {
+            'notifications': notifications.map((e) => e.toJson()).toList(),
+          },
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log(
+          'Fetched ${notifications.length} notifications from Firestore for userId: $userId',
+        );
         return notifications;
       } catch (e) {
         log('Error fetching notifications from Firestore: $e');
       }
     }
     final notifications = await _dbHelper.getNotificationsByUser(userId);
-    _notificationsCache.put(cacheKey, CachedItem(notifications, DateTime.now()));
-    log('Fetched ${notifications.length} notifications from SQLite and cached for userId: $userId');
+    await _cacheService.saveDataToCache(
+      endpoint: 'notifications',
+      param: userId,
+      data: {'notifications': notifications.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log(
+      'Fetched ${notifications.length} notifications from SQLite for userId: $userId',
+    );
     return notifications.take(limit).toList();
   }
 
@@ -862,24 +1165,29 @@ class DataRepository {
     final updated = NotificationModel(
       id: notification.id,
       userId: notification.userId,
-      title: notification.title,
-      body: notification.body,
+      title: _sanitizeText(notification.title),
+      body: _sanitizeText(notification.body),
       type: notification.type,
       isRead: true,
-      payload: notification.payload,
+      payload: _sanitizeMap(notification.payload),
       timestamp: notification.timestamp,
     );
     await _dbHelper.insertNotification(updated);
-    _notificationsCache.remove('notifications_${notification.userId}');
-    _dashboardCache.remove('dashboard_${notification.userId}');
+    await _cacheService.saveDataToCache(
+      endpoint: 'notifications',
+      param: notification.userId,
+      data: {},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: true,
+    );
     log('Notification marked as read in local database: $id');
-
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(updated.toFirestore());
         await _firestore
             .collection(AppConstants.notificationsCollection)
             .doc(id)
-            .set(updated.toFirestore());
+            .set(sanitizedData);
         log('Notification updated in Firestore: $id');
       } catch (e) {
         log('Error updating notification in Firestore: $e');
@@ -908,13 +1216,9 @@ class DataRepository {
         log('Error deleting notification from Firestore: $e');
       }
     }
-    final notification = await _dbHelper.getNotification(id);
     await _dbHelper.deleteNotification(id);
     await _dbHelper.deletePendingNotification(id);
-    if (notification != null) {
-      _notificationsCache.remove('notifications_${notification.userId}');
-      _dashboardCache.remove('dashboard_${notification.userId}');
-    }
+    await _cacheService.clearCache();
   }
 
   Future<SubscriptionModel?> getSubscription(String userId) async {
@@ -922,24 +1226,36 @@ class DataRepository {
       log('getSubscription: Invalid userId (empty)');
       return null;
     }
-    final cacheKey = 'subscription_$userId';
-    final cachedSubscription = await _subscriptionCache.get(cacheKey);
-    if (_isCacheValid(cachedSubscription)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'subscriptions',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Subscription fetched from cache: $userId');
-      return cachedSubscription!.data;
+      return SubscriptionModel.fromJson(_sanitizeMap(cacheData.data));
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final doc = await _firestore
             .collection(AppConstants.subscriptionsCollection)
             .doc(userId)
             .get();
         if (doc.exists) {
-          final subscription = SubscriptionModel.fromFirestore(doc.data()!, userId);
+          final subscription = SubscriptionModel.fromFirestore(
+            _sanitizeMap(doc.data()!),
+            userId,
+          );
           await _dbHelper.insertSubscription(subscription);
-          _subscriptionCache.put(cacheKey, CachedItem(subscription, DateTime.now()));
-          _dashboardCache.remove('dashboard_$userId');
-          log('Subscription fetched from Firestore and cached: $userId');
+          await _cacheService.saveDataToCache(
+            endpoint: 'subscriptions',
+            param: userId,
+            data: subscription.toJson(),
+            cacheDuration: const Duration(minutes: 10),
+            isToRefresh: false,
+          );
+          log('Subscription fetched from Firestore: $userId');
           return subscription;
         }
       } catch (e) {
@@ -948,8 +1264,14 @@ class DataRepository {
     }
     final subscription = await _dbHelper.getSubscription(userId);
     if (subscription != null) {
-      _subscriptionCache.put(cacheKey, CachedItem(subscription, DateTime.now()));
-      log('Subscription fetched from local database and cached: $userId');
+      await _cacheService.saveDataToCache(
+        endpoint: 'subscriptions',
+        param: userId,
+        data: subscription.toJson(),
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+      log('Subscription fetched from local database: $userId');
     }
     return subscription;
   }
@@ -960,26 +1282,34 @@ class DataRepository {
       return;
     }
     await _dbHelper.insertSubscription(subscription);
-    final cacheKey = 'subscription_${subscription.userId}';
-    _subscriptionCache.put(cacheKey, CachedItem(subscription, DateTime.now()));
-    _dashboardCache.remove('dashboard_${subscription.userId}');
+    await _cacheService.saveDataToCache(
+      endpoint: 'subscriptions',
+      param: subscription.userId,
+      data: subscription.toJson(),
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: true,
+    );
     log('Subscription updated in local database: ${subscription.userId}');
-
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(subscription.toFirestore());
         await _firestore
             .collection(AppConstants.subscriptionsCollection)
             .doc(subscription.userId)
-            .set(subscription.toFirestore());
+            .set(sanitizedData);
         log('Subscription updated in Firestore: ${subscription.userId}');
       } catch (e) {
         log('Error updating subscription to Firestore: $e');
         await _dbHelper.insertPendingSubscription(subscription);
-        log('Subscription stored in pending_operations: ${subscription.userId}');
+        log(
+          'Subscription stored in pending_operations: ${subscription.userId}',
+        );
       }
     } else {
       await _dbHelper.insertPendingSubscription(subscription);
-      log('Offline: Subscription stored in pending_operations: ${subscription.userId}');
+      log(
+        'Offline: Subscription stored in pending_operations: ${subscription.userId}',
+      );
     }
   }
 
@@ -1001,8 +1331,7 @@ class DataRepository {
     }
     await _dbHelper.deleteSubscription(userId);
     await _dbHelper.deletePendingSubscription(userId);
-    _subscriptionCache.remove('subscription_$userId');
-    _dashboardCache.remove('dashboard_$userId');
+    await _cacheService.clearCache();
   }
 
   Future<List<TransactionModel>> getTransactions(String userId) async {
@@ -1010,42 +1339,72 @@ class DataRepository {
       log('getTransactions: Invalid userId (empty)');
       return [];
     }
-    final cacheKey = 'transactions_$userId';
-    final cachedTransactions = await _transactionsCache.get(cacheKey);
-    if (_isCacheValid(cachedTransactions)) {
+    final isOnline = await _isOnline();
+    final cacheData = await _cacheService.getCacheData(
+      endpoint: 'transactions',
+      param: userId,
+      hasInternet: isOnline,
+    );
+    if (!cacheData.hasCacheExpired) {
       log('Transactions fetched from cache for userId: $userId');
-      return cachedTransactions!.data;
+      return (cacheData.data['transactions'] as List<dynamic>)
+          .map(
+            (e) => TransactionModel.fromJson(
+              _sanitizeMap(e as Map<String, dynamic>),
+            ),
+          )
+          .toList();
     }
-    if (await _isOnline()) {
+    if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.transactionsCollection)
             .where('userId', isEqualTo: userId)
             .get();
         final transactions = snapshot.docs
-            .map((doc) => TransactionModel.fromFirestore(doc.data(), doc.id))
+            .map(
+              (doc) => TransactionModel.fromFirestore(
+                _sanitizeMap(doc.data()),
+                doc.id,
+              ),
+            )
             .toList();
         final db = await _dbHelper.database;
         final batch = db.batch();
         for (var transaction in transactions) {
-          batch.insert(
-            'transactions',
-            {'id': transaction.id, 'userId': transaction.userId, 'data': transaction.toProto()},
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
+          batch.insert('transactions', {
+            'id': transaction.id,
+            'userId': transaction.userId,
+            'data': transaction.toProto(),
+          }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
         await batch.commit();
-        _transactionsCache.put(cacheKey, CachedItem(transactions, DateTime.now()));
-        _dashboardCache.remove('dashboard_$userId');
-        log('Fetched ${transactions.length} transactions from Firestore and cached for userId: $userId');
+        await _cacheService.saveDataToCache(
+          endpoint: 'transactions',
+          param: userId,
+          data: {'transactions': transactions.map((e) => e.toJson()).toList()},
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+        log(
+          'Fetched ${transactions.length} transactions from Firestore for userId: $userId',
+        );
         return transactions;
       } catch (e) {
         log('Error fetching transactions from Firestore: $e');
       }
     }
     final transactions = await _dbHelper.getTransactionsByUser(userId);
-    _transactionsCache.put(cacheKey, CachedItem(transactions, DateTime.now()));
-    log('Fetched ${transactions.length} transactions from local database and cached for userId: $userId');
+    await _cacheService.saveDataToCache(
+      endpoint: 'transactions',
+      param: userId,
+      data: {'transactions': transactions.map((e) => e.toJson()).toList()},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: false,
+    );
+    log(
+      'Fetched ${transactions.length} transactions from local database for userId: $userId',
+    );
     return transactions;
   }
 
@@ -1055,16 +1414,21 @@ class DataRepository {
       throw Exception('Cannot add transaction with empty userId');
     }
     await _dbHelper.insertTransaction(transaction);
-    _transactionsCache.remove('transactions_${transaction.userId}');
-    _dashboardCache.remove('dashboard_${transaction.userId}');
+    await _cacheService.saveDataToCache(
+      endpoint: 'transactions',
+      param: transaction.userId,
+      data: {},
+      cacheDuration: const Duration(minutes: 10),
+      isToRefresh: true,
+    );
     log('Transaction added to local database: ${transaction.id}');
-
     if (await _isOnline()) {
       try {
+        final sanitizedData = _sanitizeMap(transaction.toFirestore());
         await _firestore
             .collection(AppConstants.transactionsCollection)
             .doc(transaction.id)
-            .set(transaction.toFirestore());
+            .set(sanitizedData);
         log('Transaction added to Firestore: ${transaction.id}');
       } catch (e) {
         log('Error adding transaction to Firestore: $e');
@@ -1073,7 +1437,9 @@ class DataRepository {
       }
     } else {
       await _dbHelper.insertPendingTransaction(transaction);
-      log('Offline: Transaction stored in pending_operations: ${transaction.id}');
+      log(
+        'Offline: Transaction stored in pending_operations: ${transaction.id}',
+      );
     }
   }
 
@@ -1093,13 +1459,9 @@ class DataRepository {
         log('Error deleting transaction from Firestore: $e');
       }
     }
-    final transaction = await _dbHelper.getTransaction(id);
     await _dbHelper.deleteTransaction(id);
     await _dbHelper.deletePendingTransaction(id);
-    if (transaction != null) {
-      _transactionsCache.remove('transactions_${transaction.userId}');
-      _dashboardCache.remove('dashboard_${transaction.userId}');
-    }
+    await _cacheService.clearCache();
   }
 
   Future<bool> canAccessPremiumContent(String userId) async {
@@ -1107,16 +1469,10 @@ class DataRepository {
       log('canAccessPremiumContent: Invalid userId (empty)');
       return false;
     }
-    final cacheKey = 'subscription_$userId';
-    final cachedSubscription = await _subscriptionCache.get(cacheKey);
-    SubscriptionModel? subscription;
-    if (_isCacheValid(cachedSubscription)) {
-      subscription = cachedSubscription!.data;
-    } else {
-      subscription = await getSubscription(userId);
-    }
+    final subscription = await getSubscription(userId);
     if (subscription != null) {
-      final canAccess = subscription.status == 'active' &&
+      final canAccess =
+          subscription.status == 'active' &&
           subscription.endDate != null &&
           subscription.endDate!.isAfter(DateTime.now());
       log('Premium access for user $userId: $canAccess');
@@ -1124,6 +1480,212 @@ class DataRepository {
     }
     log('No subscription found for user $userId, premium access denied');
     return false;
+  }
+
+  Future<Map<String, dynamic>> getDashboardData(String userId) async {
+    if (userId.isEmpty) {
+      log('getDashboardData: Invalid userId (empty)', name: 'DataRepository');
+      return _emptyDashboardData();
+    }
+
+    try {
+      final isOnline = await _isOnline();
+      final canAccessPremium = await canAccessPremiumContent(userId);
+
+      // Offline mode: Try cache first, then SQLite
+      if (!isOnline) {
+        final cacheData = await _cacheService.getCacheData(
+          endpoint: 'dashboard',
+          param: userId,
+          hasInternet: false,
+        );
+        if (!cacheData.hasCacheExpired && cacheData.data.isNotEmpty) {
+          log(
+            'Returning cached dashboard data for user $userId (offline)',
+            name: 'DataRepository',
+          );
+          return _sanitizeMap(cacheData.data);
+        }
+
+        // Fetch from SQLite
+        final results = await Future.wait([
+          _dbHelper.getUser(userId),
+          _dbHelper.getAllPreferences(),
+          _dbHelper.getUserPreference(userId),
+          _dbHelper.getAllCategories(),
+          _dbHelper.getAllTips(),
+          _dbHelper.getNotificationsByUser(userId),
+          _dbHelper.getRemindersByUser(userId),
+          _dbHelper.getFavoritesByUser(userId),
+          _dbHelper.getSubscription(userId),
+          _dbHelper.getTransactionsByUser(userId),
+        ]);
+
+        final UserModel? user = results[0] as UserModel?;
+        final List<PreferenceModel> preferences =
+            results[1] as List<PreferenceModel>;
+        final UserPreferenceModel? userPreference =
+            results[2] as UserPreferenceModel?;
+        final List<CategoryModel> categories =
+            results[3] as List<CategoryModel>;
+        final List<TipModel> tips = results[4] as List<TipModel>;
+        final List<NotificationModel> notifications =
+            results[5] as List<NotificationModel>;
+        final List<ReminderModel> reminders = results[6] as List<ReminderModel>;
+        final List<FavoriteModel> favorites = results[7] as List<FavoriteModel>;
+        final SubscriptionModel? subscription =
+            results[8] as SubscriptionModel?;
+        final List<TransactionModel> transactions =
+            results[9] as List<TransactionModel>;
+
+        final dashboardData = {
+          'user': user?.toJson(),
+          'preferences': preferences.map((e) => e.toJson()).toList(),
+          'userPreference': userPreference?.toJson(),
+          'categories': categories.map((e) => e.toJson()).toList(),
+          'tips': tips.map((e) => e.toJson()).toList(),
+          'notifications': notifications.map((e) => e.toJson()).toList(),
+          'reminders': reminders.map((e) => e.toJson()).toList(),
+          'favorites': favorites.map((e) => e.toJson()).toList(),
+          'subscription': subscription?.toJson(),
+          'transactions': transactions.map((e) => e.toJson()).toList(),
+        };
+
+        await _cacheService.saveDataToCache(
+          endpoint: 'dashboard',
+          param: userId,
+          data: dashboardData,
+          cacheDuration: const Duration(minutes: 10),
+          isToRefresh: false,
+        );
+
+        log(
+          'Fetched dashboard data from SQLite for user $userId: '
+          'user=${user?.userId ?? "null"}, '
+          'tips=${tips.length}, '
+          'categories=${categories.length}, '
+          'preferences=${preferences.length}, '
+          'reminders=${reminders.length}, '
+          'notifications=${notifications.length}, '
+          'favorites=${favorites.length}, '
+          'subscription=${subscription?.userId ?? "null"}, '
+          'transactions=${transactions.length}',
+          name: 'DataRepository',
+        );
+
+        return _sanitizeMap(dashboardData);
+      }
+
+      // Online mode: Try cache first
+      final cacheData = await _cacheService.getCacheData(
+        endpoint: 'dashboard',
+        param: userId,
+        hasInternet: true,
+      );
+      if (!cacheData.hasCacheExpired && cacheData.data.isNotEmpty) {
+        log(
+          'Returning cached dashboard data for user $userId',
+          name: 'DataRepository',
+        );
+        // Trigger background sync
+        syncAllData(userId).catchError((e, stackTrace) {
+          log(
+            'Background sync failed: $e',
+            name: 'DataRepository',
+            stackTrace: stackTrace,
+          );
+        });
+        return _sanitizeMap(cacheData.data);
+      }
+
+      // Fetch fresh data
+      final results = await Future.wait([
+        getUser(userId),
+        getPreferences(),
+        getUserPreference(userId),
+        getCategories(),
+        getTips(includePremium: true), // Always include premium tips
+        getNotifications(userId),
+        getReminders(userId),
+        getFavorites(userId),
+        getSubscription(userId),
+        getTransactions(userId),
+      ]);
+
+      final UserModel? user = results[0] as UserModel?;
+      final List<PreferenceModel> preferences =
+          results[1] as List<PreferenceModel>;
+      final UserPreferenceModel? userPreference =
+          results[2] as UserPreferenceModel?;
+      final List<CategoryModel> categories = results[3] as List<CategoryModel>;
+      final List<TipModel> tips = results[4] as List<TipModel>;
+      final List<NotificationModel> notifications =
+          results[5] as List<NotificationModel>;
+      final List<ReminderModel> reminders = results[6] as List<ReminderModel>;
+      final List<FavoriteModel> favorites = results[7] as List<FavoriteModel>;
+      final SubscriptionModel? subscription = results[8] as SubscriptionModel?;
+      final List<TransactionModel> transactions =
+          results[9] as List<TransactionModel>;
+
+      final dashboardData = {
+        'user': user?.toJson(),
+        'preferences': preferences.map((e) => e.toJson()).toList(),
+        'userPreference': userPreference?.toJson(),
+        'categories': categories.map((e) => e.toJson()).toList(),
+        'tips': tips.map((e) => e.toJson()).toList(),
+        'notifications': notifications.map((e) => e.toJson()).toList(),
+        'reminders': reminders.map((e) => e.toJson()).toList(),
+        'favorites': favorites.map((e) => e.toJson()).toList(),
+        'subscription': subscription?.toJson(),
+        'transactions': transactions.map((e) => e.toJson()).toList(),
+      };
+
+      await _cacheService.saveDataToCache(
+        endpoint: 'dashboard',
+        param: userId,
+        data: dashboardData,
+        cacheDuration: const Duration(minutes: 10),
+        isToRefresh: false,
+      );
+
+      log(
+        'Fetched dashboard data for user $userId: '
+        'user=${user?.userId ?? "null"}, '
+        'tips=${tips.length}, '
+        'categories=${categories.length}, '
+        'preferences=${preferences.length}, '
+        'reminders=${reminders.length}, '
+        'notifications=${notifications.length}, '
+        'favorites=${favorites.length}, '
+        'subscription=${subscription?.userId ?? "null"}, '
+        'transactions=${transactions.length}',
+        name: 'DataRepository',
+      );
+
+      return _sanitizeMap(dashboardData);
+    } catch (e, stackTrace) {
+      log(
+        'Error fetching dashboard data for user $userId: $e',
+        name: 'DataRepository',
+        stackTrace: stackTrace,
+      );
+      return _sanitizeMap(_emptyDashboardData());
+    }
+  }
+
+  Map<String, dynamic> _emptyDashboardData() {
+    return {
+      'user': null,
+      'preferences': <PreferenceModel>[],
+      'userPreference': null,
+      'categories': <CategoryModel>[],
+      'tips': <TipModel>[],
+      'notifications': <NotificationModel>[],
+      'reminders': <ReminderModel>[],
+      'favorites': <FavoriteModel>[],
+      'subscription': null,
+      'transactions': <TransactionModel>[],
+    };
   }
 
   Future<void> syncAllData(String userId) async {
@@ -1146,7 +1708,7 @@ class DataRepository {
           getTransactions(userId),
           syncPendingOperations(),
         ]);
-        log('Data synced and cached for user $userId');
+        log('Data synced for user $userId');
       } catch (e) {
         log('Error syncing data for user $userId: $e');
         await Future.delayed(Duration(seconds: 1));
@@ -1171,133 +1733,77 @@ class DataRepository {
         }
       }
     } else {
-      log('Offline: Skipping Firestore sync, using cached data for user $userId');
+      log(
+        'Offline: Skipping Firestore sync, using local data for user $userId',
+      );
     }
   }
 
   Future<void> syncPendingOperations() async {
     if (await _isOnline()) {
-      final priorities = ['transaction', 'subscription', 'reminder', 'favorite', 'notification'];
-      for (var type in priorities) {
-        switch (type) {
-          case 'transaction':
-            final pendingTransactions = await _dbHelper.getPendingTransactions();
-            log('Found ${pendingTransactions.length} pending transactions to sync');
-            for (var transaction in pendingTransactions) {
-              if (transaction.userId.isEmpty) {
-                log('Skipping sync of pending transaction ${transaction.id} with empty userId');
-                await _dbHelper.deletePendingTransaction(transaction.id);
-                continue;
-              }
-              try {
-                await _firestore
-                    .collection(AppConstants.transactionsCollection)
-                    .doc(transaction.id)
-                    .set(transaction.toFirestore());
-                await _dbHelper.deletePendingTransaction(transaction.id);
-                _transactionsCache.remove('transactions_${transaction.userId}');
-                _dashboardCache.remove('dashboard_${transaction.userId}');
-                log('Synced pending transaction to Firestore: ${transaction.id}');
-              } catch (e) {
-                log('Error syncing pending transaction ${transaction.id}: $e');
-              }
-            }
-            break;
-          case 'subscription':
-            final pendingSubscriptions = await _dbHelper.getPendingSubscriptions();
-            log('Found ${pendingSubscriptions.length} pending subscriptions to sync');
-            for (var subscription in pendingSubscriptions) {
-              if (subscription.userId.isEmpty) {
-                log('Skipping sync of pending subscription ${subscription.userId} with empty userId');
-                await _dbHelper.deletePendingSubscription(subscription.userId);
-                continue;
-              }
-              try {
-                await _firestore
-                    .collection(AppConstants.subscriptionsCollection)
-                    .doc(subscription.userId)
-                    .set(subscription.toFirestore());
-                await _dbHelper.deletePendingSubscription(subscription.userId);
-                _subscriptionCache.remove('subscription_${subscription.userId}');
-                _dashboardCache.remove('dashboard_${subscription.userId}');
-                log('Synced pending subscription to Firestore: ${subscription.userId}');
-              } catch (e) {
-                log('Error syncing pending subscription ${subscription.userId}: $e');
-              }
-            }
-            break;
-          case 'reminder':
-            final pendingReminders = await _dbHelper.getPendingReminders();
-            log('Found ${pendingReminders.length} pending reminders to sync');
-            for (var reminder in pendingReminders) {
-              if (reminder.userId.isEmpty) {
-                log('Skipping sync of pending reminder ${reminder.id} with empty userId');
-                await _dbHelper.deletePendingReminder(reminder.id);
-                continue;
-              }
-              try {
-                await _firestore
-                    .collection(AppConstants.remindersCollection)
-                    .doc(reminder.id)
-                    .set(reminder.toFirestore());
-                await _dbHelper.deletePendingReminder(reminder.id);
-                _remindersCache.remove('reminders_${reminder.userId}');
-                _reminderCache.remove('reminder_${reminder.id}');
-                _dashboardCache.remove('dashboard_${reminder.userId}');
-                log('Synced pending reminder to Firestore: ${reminder.id}');
-              } catch (e) {
-                log('Error syncing pending reminder ${reminder.id}: $e');
-              }
-            }
-            break;
-          case 'favorite':
-            final pendingFavorites = await _dbHelper.getPendingFavorites();
-            log('Found ${pendingFavorites.length} pending favorites to sync');
-            for (var favorite in pendingFavorites) {
-              if (favorite.userId.isEmpty) {
-                log('Skipping sync of pending favorite ${favorite.id} with empty userId');
-                await _dbHelper.deletePendingFavorite(favorite.id);
-                continue;
-              }
-              try {
-                await _firestore
-                    .collection(AppConstants.favoriteCollection)
-                    .doc(favorite.id)
-                    .set(favorite.toFirestore());
-                await _dbHelper.deletePendingFavorite(favorite.id);
-                _favoritesCache.remove('favorites_${favorite.userId}');
-                _dashboardCache.remove('dashboard_${favorite.userId}');
-                log('Synced pending favorite to Firestore: ${favorite.id}');
-              } catch (e) {
-                log('Error syncing pending favorite ${favorite.id}: $e');
-              }
-            }
-            break;
-          case 'notification':
-            final pendingNotifications = await _dbHelper.getPendingNotifications();
-            log('Found ${pendingNotifications.length} pending notifications to sync');
-            for (var notification in pendingNotifications) {
-              if (notification.userId.isEmpty) {
-                log('Skipping sync of pending notification ${notification.id} with empty userId');
-                await _dbHelper.deletePendingNotification(notification.id);
-                continue;
-              }
-              try {
-                await _firestore
-                    .collection(AppConstants.notificationsCollection)
-                    .doc(notification.id)
-                    .set(notification.toFirestore());
-                await _dbHelper.deletePendingNotification(notification.id);
-                _notificationsCache.remove('notifications_${notification.userId}');
-                _dashboardCache.remove('dashboard_${notification.userId}');
-                log('Synced pending notification to Firestore: ${notification.id}');
-              } catch (e) {
-                log('Error syncing pending notification ${notification.id}: $e');
-              }
-            }
-            break;
+      final db = await _dbHelper.database;
+      final batch = _firestore.batch();
+
+      // Process pending favorites
+      final pendingFavorites = await _dbHelper.getPendingFavorites();
+      for (var favorite in pendingFavorites) {
+        batch.set(
+          _firestore
+              .collection(AppConstants.favoriteCollection)
+              .doc(favorite.id),
+          _sanitizeMap(favorite.toFirestore()),
+        );
+      }
+
+      // Process pending reminders
+      final pendingReminders = await _dbHelper.getPendingReminders();
+      for (var reminder in pendingReminders) {
+        batch.set(
+          _firestore
+              .collection(AppConstants.remindersCollection)
+              .doc(reminder.id),
+          _sanitizeMap(reminder.toFirestore()),
+        );
+      }
+
+      // Process pending notifications
+      final pendingNotifications = await _dbHelper.getPendingNotifications();
+      for (var notification in pendingNotifications) {
+        batch.set(
+          _firestore
+              .collection(AppConstants.notificationsCollection)
+              .doc(notification.id),
+          _sanitizeMap(notification.toFirestore()),
+        );
+      }
+
+      // Process pending subscriptions
+      final pendingSubscriptions = await _dbHelper.getPendingSubscriptions();
+      for (var subscription in pendingSubscriptions) {
+        batch.set(
+          _firestore
+              .collection(AppConstants.subscriptionsCollection)
+              .doc(subscription.userId),
+          _sanitizeMap(subscription.toFirestore()),
+        );
+      }
+
+      // Process pending transactions
+      final pendingTransactions = await _dbHelper.getPendingTransactions();
+      for (var transaction in pendingTransactions) {
+        try {
+          await _firestore
+              .collection(AppConstants.transactionsCollection)
+              .doc(transaction.id)
+              .set(transaction.toFirestore());
+          await _dbHelper.deletePendingTransaction(transaction.id);
+          log('Synced pending transaction: ${transaction.id}');
+        } catch (e) {
+          log('Error syncing pending transaction ${transaction.id}: $e');
         }
       }
+
+      log('Completed syncing pending operations');
     } else {
       log('Offline: Skipping pending operations sync');
     }
@@ -1305,118 +1811,7 @@ class DataRepository {
 
   Future<void> clearLocalCache() async {
     await _dbHelper.clearDatabase();
-    _userCache = LruCache(50);
-    _preferencesCache = LruCache(10);
-    _preferenceCache = LruCache(50);
-    _userPreferenceCache = LruCache(50);
-    _categoriesCache = LruCache(20);
-    _categoryCache = LruCache(100);
-    _tipsCache = LruCache(50);
-    _tipCache = LruCache(200);
-    _favoritesCache = LruCache(50);
-    _remindersCache = LruCache(50);
-    _reminderCache = LruCache(100);
-    _notificationsCache = LruCache(50);
-    _subscriptionCache = LruCache(50);
-    _transactionsCache = LruCache(50);
-    _dashboardCache = LruCache(50);
+    await _cacheService.clearCache();
     log('Local cache cleared');
-  }
-
-  Future<Map<String, dynamic>> getDashboardData(String userId) async {
-    if (userId.isEmpty) {
-      log('getDashboardData: Invalid userId (empty)');
-      return {
-        'user': null,
-        'preferences': <PreferenceModel>[],
-        'userPreference': null,
-        'categories': <CategoryModel>[],
-        'tips': <TipModel>[],
-        'notifications': <NotificationModel>[],
-        'reminders': <ReminderModel>[],
-        'favorites': <FavoriteModel>[],
-        'subscription': null,
-        'transactions': <TransactionModel>[],
-      };
-    }
-    final cacheKey = 'dashboard_$userId';
-    final cachedDashboard = await _dashboardCache.get(cacheKey);
-    if (_isCacheValid(cachedDashboard)) {
-      log('Dashboard data fetched from cache for user $userId');
-      return cachedDashboard!.data;
-    }
-    try {
-      final userFuture = getUser(userId);
-      final preferencesFuture = getPreferences();
-      final userPreferenceFuture = getUserPreference(userId);
-      final categoriesFuture = getCategories();
-      final tipsFuture = getTips(includePremium: true);
-      final notificationsFuture = getNotifications(userId);
-      final remindersFuture = getReminders(userId);
-      final favoritesFuture = getFavorites(userId);
-      final subscriptionFuture = getSubscription(userId);
-      final transactionsFuture = getTransactions(userId);
-
-      final results = await Future.wait([
-        userFuture,
-        preferencesFuture,
-        userPreferenceFuture,
-        categoriesFuture,
-        tipsFuture,
-        notificationsFuture,
-        remindersFuture,
-        favoritesFuture,
-        subscriptionFuture,
-        transactionsFuture,
-      ]);
-
-      final data = {
-        'user': results[0] as UserModel?,
-        'preferences': results[1] as List<PreferenceModel>,
-        'userPreference': results[2] as UserPreferenceModel?,
-        'categories': results[3] as List<CategoryModel>,
-        'tips': results[4] as List<TipModel>,
-        'notifications': results[5] as List<NotificationModel>,
-        'reminders': results[6] as List<ReminderModel>,
-        'favorites': results[7] as List<FavoriteModel>,
-        'subscription': results[8] as SubscriptionModel?,
-        'transactions': results[9] as List<TransactionModel>,
-      };
-
-      _dashboardCache.put(cacheKey, CachedItem(data, DateTime.now()));
-      log('Loaded dashboard data and cached for user $userId: '
-          'user=${(data['user'] as UserModel?)?.userId ?? "null"}, '
-          'tips=${(data['tips'] as List<TipModel>).length}, '
-          'categories=${(data['categories'] as List<CategoryModel>).length}, '
-          'preferences=${(data['preferences'] as List<PreferenceModel>).length}, '
-          'reminders=${(data['reminders'] as List<ReminderModel>).length}, '
-          'notifications=${(data['notifications'] as List<NotificationModel>).length}, '
-          'favorites=${(data['favorites'] as List<FavoriteModel>).length}, '
-          'subscription=${(data['subscription'] as SubscriptionModel?)?.userId ?? "null"}, '
-          'transactions=${(data['transactions'] as List<TransactionModel>).length}');
-
-      if (await _isOnline()) {
-        // Trigger background sync
-        syncAllData(userId).catchError((e) {
-          log('Background sync failed for user $userId: $e');
-        });
-      }
-
-      return data;
-    } catch (e) {
-      log('Error fetching dashboard data for user $userId: $e');
-      return {
-        'user': null,
-        'preferences': <PreferenceModel>[],
-        'userPreference': null,
-        'categories': <CategoryModel>[],
-        'tips': <TipModel>[],
-        'notifications': <NotificationModel>[],
-        'reminders': <ReminderModel>[],
-        'favorites': <FavoriteModel>[],
-        'subscription': null,
-        'transactions': <TransactionModel>[],
-      };
-    }
   }
 }

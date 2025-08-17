@@ -35,10 +35,10 @@ class RoutesName {
   static const String managePreferenceScreen = '/manage-preference-screen'; // Manage Preference Screen
   static const String addCategoryScreen = '/add-category-screen';       // Add a new category
   static const String manageCategoryScreen = '/manage-category-screen'; // Manage Category Screen
+  static const String manageSubscriptionScreen = '/manage-subscription-screen'; // Manage Category Screen
   static const String addTipsScreen = '/add-Tips-screen';       // Add a new Tip
   static const String manageTipsScreen = '/manage-Tip-screen';  // Manage Tip Screen
   static const String addQuoteScreen = '/add-quote-screen';     // Add or edit a quote
-  static const String addHealthTipsScreen = '/add-health-tips-screen'; // Add a health tip
 
 
   static const String notificationScreen = '/notification-screen';
@@ -47,4 +47,7 @@ class RoutesName {
   static const String reminderHistoryScreen = '/reminder-history-screen';
 
   static const String sendNotificationScreen = '/send-notification-screen';
+
+  static const String mediaPlayerScreen = '/media-player-screen';
+  static const String videoPlayerScreen = '/video-player-screen';
 }

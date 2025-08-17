@@ -183,18 +183,19 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
   Widget _buildIconPreview() {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final borderColor = isDark ? AppColors.primary : AppColors.lightTextSecondary.withAlpha(153); // Gray border in light mode
 
     return Center(
       child: Container(
         padding: EdgeInsets.all(8.w),
         decoration: BoxDecoration(
-          border: Border.all(color: AppColors.primary, width: 2.w),
+          border: Border.all(color: borderColor, width: 1.w), // Thinner border
           borderRadius: BorderRadius.circular(12.r),
           boxShadow: [
             BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 6.r,
-              offset: Offset(2.w, 2.h),
+              color: AppColors.shadow.withAlpha(50), // Minimal shadow
+              blurRadius: 4.r,
+              offset: Offset(0, 2.h),
             ),
           ],
         ),
@@ -250,7 +251,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
           )
               : Icon(
             Icons.image_outlined,
-            color: AppColors.darkTextSecondary,
+            color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
             size: 100.sp,
           ),
         ),
@@ -264,19 +265,29 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
     required VoidCallback onTap,
     required bool isDark,
   }) {
+    final selectedBgColor = isDark
+        ? AppColors.primary.withOpacity(0.2)
+        : AppColors.lightTextPrimary.withOpacity(0.1); // Subtle gray for selected in light mode
+    final unselectedBgColor = isDark
+        ? AppColors.darkSurface
+        : AppColors.lightSurface;
+    final textColor = isDark
+        ? (selected ? AppColors.primary : AppColors.darkTextPrimary)
+        : (selected ? AppColors.lightTextPrimary : AppColors.lightTextPrimary); // Black text
+    final borderColor = isDark
+        ? (selected ? AppColors.primary : Colors.transparent)
+        : (selected ? AppColors.lightTextPrimary : AppColors.lightTextSecondary); // Black or gray border
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.primary.withOpacity(0.2)
-              : isDark
-              ? AppColors.darkSurface
-              : AppColors.lightSurface,
+          color: selected ? selectedBgColor : unselectedBgColor,
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
-            color: selected ? AppColors.primary : Colors.transparent,
+            color: borderColor,
+            width: 1.w,
           ),
         ),
         child: Row(
@@ -285,9 +296,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
             Text(
               label,
               style: TextStyle(
-                color: selected
-                    ? AppColors.primary
-                    : (isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                color: textColor,
                 fontSize: 14.sp,
                 fontWeight: FontWeight.w600,
                 fontFamily: 'Poppins',
@@ -297,7 +306,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
               SizedBox(width: 6.w),
               Icon(
                 Icons.check,
-                color: Colors.white,
+                color: isDark ? Colors.white : AppColors.lightTextPrimary, // Black check in light mode
                 size: 16.sp,
               ),
             ],
@@ -311,6 +320,19 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary; // Black in light mode
+    final iconColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary; // Black icons in light mode
+    final saveButtonColors = isDark
+        ? [
+      AppColors.primary,
+      AppColors.primary.withOpacity(0.6),
+    ]
+        : [
+      AppColors.lightTextPrimary,
+      AppColors.lightTextPrimary.withOpacity(0.6),
+    ]; // Black gradient in light mode
+    final labelColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary; // Black labels in light mode
+    final dottedColor = isDark ? AppColors.primary : AppColors.lightTextSecondary; // Gray dotted in light mode
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.darkBackground : AppColors.lightBackground,
@@ -322,7 +344,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
           icon: Icon(
             Icons.arrow_back_ios_new,
             size: 20.sp,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
+            color: iconColor, // Black in light mode
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -331,7 +353,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.bold,
             fontSize: 22.sp,
-            color: isDark ? AppColors.darkTextPrimary : AppColors.primary,
+            color: titleColor, // Black in light mode
           ),
         ),
         actions: [
@@ -339,7 +361,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
             icon: Icon(
               Icons.save,
               size: 26.sp,
-              color: AppColors.lightBackground,
+              color: iconColor, // Black in light mode
             ),
             onPressed: _savePreference,
           ),
@@ -358,7 +380,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: labelColor, // Black in light mode
                     ),
                   ),
                   SizedBox(height: 8.h),
@@ -380,7 +402,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: labelColor, // Black in light mode
                     ),
                   ),
                   SizedBox(height: 8.h),
@@ -403,7 +425,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
                       fontSize: 14.sp,
-                      color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: labelColor, // Black in light mode
                     ),
                   ),
                   SizedBox(height: 8.h),
@@ -444,8 +466,8 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                         GestureDetector(
                           onTap: _pickIcon,
                           child: DottedBorder(
-                            color: AppColors.primary,
-                            strokeWidth: 2,
+                            color: dottedColor, // Gray in light mode
+                            strokeWidth: 1, // Thinner for minimalism
                             dashPattern: const [8, 4],
                             borderType: BorderType.RRect,
                             radius: Radius.circular(12.r),
@@ -460,13 +482,13 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                                   ? Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.image_outlined, size: 40.sp, color: AppColors.primary),
+                                  Icon(Icons.image_outlined, size: 40.sp, color: iconColor), // Black icon in light
                                   SizedBox(height: 8.h),
                                   Text(
                                     'Tap to choose icon (PNG or SVG)',
                                     style: theme.textTheme.bodyMedium?.copyWith(
                                       fontSize: 16.sp,
-                                      color: AppColors.primary,
+                                      color: iconColor, // Black text in light
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -537,19 +559,16 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                           padding: EdgeInsets.symmetric(horizontal: 35.w, vertical: 15.h),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [
-                                AppColors.primary,
-                                AppColors.primary.withOpacity(0.6),
-                              ],
+                              colors: saveButtonColors, // Black in light mode
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
                             borderRadius: BorderRadius.circular(8.r),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.shadow,
-                                blurRadius: 6.r,
-                                offset: Offset(2.w, 2.h),
+                                color: AppColors.shadow.withAlpha(50), // Minimal shadow
+                                blurRadius: 4.r,
+                                offset: Offset(0, 2.h),
                               ),
                             ],
                           ),
@@ -557,7 +576,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
                             'Save Preference',
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 14.sp,
-                              color: AppColors.lightBackground,
+                              color: AppColors.lightBackground, // White text
                             ),
                           ),
                         ),
@@ -570,7 +589,7 @@ class _AddPreferenceScreenState extends State<AddPreferenceScreen> with TickerPr
             if (_isLoading)
               Container(
                 color: AppColors.overlay,
-                child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                child: Center(child: CircularProgressIndicator(color: isDark ? AppColors.primary : AppColors.lightTextPrimary)), // Black spinner in light mode if desired
               ),
           ],
         ),

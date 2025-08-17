@@ -1,271 +1,217 @@
 {
   "@@locale": "en",
-
   "onboardingTitle1": "Welcome to Wellness",
   "@onboardingTitle1": {
     "description": "Title for the first onboarding screen"
   },
-
   "onboardingDescription1": "Start a journey that’s all about you — your emotions, your pace, your wellbeing.",
   "@onboardingDescription1": {
     "description": "Description for the first onboarding screen"
   },
-
   "onboardingTitle2": "Explore Features",
   "@onboardingTitle2": {
     "description": "Title for the second onboarding screen"
   },
-
   "onboardingDescription2": "Reflect on your mood, set mindful goals, and discover daily wellness insights.",
   "@onboardingDescription2": {
     "description": "Description for the second onboarding screen"
   },
-
   "onboardingTitle3": "Join the Community",
   "@onboardingTitle3": {
     "description": "Title for the third onboarding screen"
   },
-
   "onboardingDescription3": "Connect, share, and grow with a community that cares.",
   "@onboardingDescription3": {
     "description": "Description for the third onboarding screen"
   },
-
   "onboardingTitle4": "Get Started",
   "@onboardingTitle4": {
     "description": "Title for the fourth onboarding screen"
   },
-
   "onboardingDescription4": "Ready to take control of your wellbeing? Your tools, support, and space to grow are just one tap away.",
   "@onboardingDescription4": {
     "description": "Description for the fourth onboarding screen"
   },
-
   "nextButton": "Next",
   "@nextButton": {
     "description": "Label for the next button in onboarding flow"
   },
-
   "startButton": "Start",
   "@startButton": {
     "description": "Label for the start button to begin using the app"
   },
-
   "skipButton": "Skip",
   "@skipButton": {
     "description": "Label for the skip button to bypass onboarding"
   },
-
   "loginWelcome": "Welcome back!",
   "@loginWelcome": {
     "description": "Greeting message on the login screen"
   },
-
   "loginSubtitle": "Sign in to continue your wellness journey",
   "@loginSubtitle": {
     "description": "Subtitle text on the login screen"
   },
-
   "loginEmailHint": "Enter your email",
   "@loginEmailHint": {
     "description": "Hint text for the email input field"
   },
-
   "loginPasswordHint": "Enter your password",
   "@loginPasswordHint": {
     "description": "Hint text for the password input field"
   },
-
   "emailRequired": "Email is required",
   "@emailRequired": {
     "description": "Error message for empty email field"
   },
-
   "invalidEmail": "Enter a valid email address",
   "@invalidEmail": {
     "description": "Error message for invalid email format"
   },
-
   "passwordRequired": "Password is required",
   "@passwordRequired": {
     "description": "Error message for empty password field"
   },
-
   "invalidPassword": "Password must be at least 8 characters long\nand include uppercase, lowercase, number, and special character",
   "@invalidPassword": {
     "description": "Error message for invalid password format"
   },
-
   "loginRememberMe": "Remember me",
   "@loginRememberMe": {
     "description": "Label for the remember me checkbox"
   },
-
   "loginForgotPassword": "Forgot Password?",
   "@loginForgotPassword": {
     "description": "Label for forgot password link"
   },
-
   "loginButton": "Login",
   "@loginButton": {
     "description": "Label for the login button"
   },
-
   "loginGoogleButton": "Sign in with Google",
   "@loginGoogleButton": {
     "description": "Label for Google sign-in button"
   },
-
   "loginSuccess": "Login successful!",
   "@loginSuccess": {
     "description": "Success message for login"
   },
-
   "googleSignInSuccess": "Google Sign-In successful!",
   "@googleSignInSuccess": {
     "description": "Success message for Google sign-in"
   },
-
   "googleSignInCanceled": "Google Sign-In canceled",
   "@googleSignInCanceled": {
     "description": "Message for canceled Google sign-in"
   },
-
   "loginAdminDashboard": "Admin Dashboard",
   "@loginAdminDashboard": {
     "description": "Label for admin dashboard navigation"
   },
-
   "loginSignUpPrompt": "Don't have an account?",
   "@loginSignUpPrompt": {
     "description": "Prompt to navigate to sign-up screen"
   },
-
   "exitAppTitle": "Exit App",
   "@exitAppTitle": {
     "description": "Title for the exit app confirmation dialog"
   },
-
   "exitAppMessage": "Are you sure you want to exit?",
   "@exitAppMessage": {
     "description": "Message for the exit app confirmation dialog"
   },
-
   "cancel": "Cancel",
   "@cancel": {
     "description": "Button text to cancel dialog"
   },
-
   "exit": "Exit",
   "@exit": {
     "description": "Button text to confirm exit"
   },
-
   "or": "Or Continue with",
   "@or": {
     "description": "Text indicating alternate sign-in options"
   },
-
   "signUpWelcome": "Create an account",
   "@signUpWelcome": {
     "description": "Greeting message on the sign-up screen"
   },
-
   "signUpSubtitle": "Join us to start your wellness journey",
   "@signUpSubtitle": {
     "description": "Subtitle text on the sign-up screen"
   },
-
   "signUpNameHint": "Enter your name",
   "@signUpNameHint": {
     "description": "Hint text for the name input field"
   },
-
   "signUpConfirmPasswordHint": "Confirm your password",
   "@signUpConfirmPasswordHint": {
     "description": "Hint text for the confirm password input field"
   },
-
   "nameRequired": "Name is required",
   "@nameRequired": {
     "description": "Error message for empty name field"
   },
-
   "invalidName": "Name must be at least 2 characters long",
   "@invalidName": {
     "description": "Error message for invalid name format"
   },
-
   "confirmPasswordRequired": "Confirm password is required",
   "@confirmPasswordRequired": {
     "description": "Error message for empty confirm password field"
   },
-
   "passwordsDoNotMatch": "Passwords do not match",
   "@passwordsDoNotMatch": {
     "description": "Error message for non-matching passwords"
   },
-
   "signUpButton": "Sign Up",
   "@signUpButton": {
     "description": "Label for the sign-up button"
   },
-
   "signUpGoogleButton": "Sign up with Google",
   "@signUpGoogleButton": {
     "description": "Label for Google sign-up button"
   },
-
   "signUpSuccess": "Sign-up successful!",
   "@signUpSuccess": {
     "description": "Success message for sign-up"
   },
-
   "signUpHaveAccount": "Already have an account?",
   "@signUpHaveAccount": {
     "description": "Prompt to navigate to login screen"
   },
-
   "signInButton": "Sign In",
   "@signInButton": {
     "description": "Label for the sign-in button"
   },
-
   "signUpLoginLink": "CREATE AN ACCOUNT",
   "@signUpLoginLink": {
     "description": "Link text to navigate to login screen"
   },
-
   "userNotFound": "No user found with this email.",
   "@userNotFound": {
     "description": "Error message when no user is found for a given email"
   },
-
   "wrongPassword": "Incorrect password.",
   "@wrongPassword": {
     "description": "Error message for wrong password entry"
   },
-
   "userDisabled": "This user account has been disabled.",
   "@userDisabled": {
     "description": "Error message when the user account is disabled"
   },
-
   "accountExistsWithDifferentCredential": "An account already exists with a different sign-in method.",
   "@accountExistsWithDifferentCredential": {
     "description": "Error message for account linked with different credentials"
   },
-
   "invalidCredential": "Invalid Google credentials.",
   "@invalidCredential": {
     "description": "Error message for invalid Google authentication credentials"
   },
-
   "genericError": "An unexpected error occurred. Please try again.",
   "@genericError": {
     "description": "Generic error message for unexpected failures"
   },
-
   "hello": "Hello, {name}",
   "@hello": {
     "description": "Greeting with user's first name",
@@ -273,113 +219,91 @@
       "name": {}
     }
   },
-
   "goodMorning": "Good Morning",
   "@goodMorning": {
     "description": "Morning greeting"
   },
-
   "goodAfternoon": "Good Afternoon",
   "@goodAfternoon": {
     "description": "Afternoon greeting"
   },
-
   "goodEvening": "Good Evening",
   "@goodEvening": {
     "description": "Evening greeting"
   },
-
   "goodNight": "Time to unwind",
   "@goodNight": {
     "description": "Night greeting"
   },
-
   "defaultUserName": "Guest",
   "@defaultUserName": {
     "description": "Default name for unauthenticated users"
   },
-
   "featuredQuotes": "Featured Quotes",
   "@featuredQuotes": {
     "description": "Title for featured quotes section"
   },
-
   "setReminder": "Set Reminder",
   "neverMissYourFavoriteQuotes": "Never miss your favorite quotes and tips",
   "@setReminder": {
     "description": "Text for setting a reminder"
   },
-
   "discoverByCategory": "Discover by Category",
   "@discoverByCategory": {
     "description": "Title for category section"
   },
-
   "viewAll": "View All",
   "@viewAll": {
     "description": "Button text to view all items"
   },
-
   "noCategoriesAvailable": "No categories available",
   "@noCategoriesAvailable": {
     "description": "Message when no categories are available"
   },
-
   "tipsRegardingHealth": "Health Tips",
   "@tipsRegardingHealth": {
     "description": "Title for health tips section"
   },
-
   "noHealthTipsAvailable": "No health tips available",
   "@noHealthTipsAvailable": {
     "description": "Message when no health tips are available"
   },
-
   "yourPreferences": "My Preferences",
   "@yourPreferences": {
     "description": "Title for preferences section"
   },
-
   "edit": "Edit",
   "@edit": {
     "description": "Button text to edit preferences"
   },
-
   "noPreferencesAvailable": "No preferences available",
   "@noPreferencesAvailable": {
     "description": "Message when no preferences are available"
   },
-
   "recentlyAddedQuotes": "Recently Added Quotes",
   "@recentlyAddedQuotes": {
     "description": "Title for recently added quotes section"
   },
-
   "noQuotesAvailable": "No quotes available",
   "@noQuotesAvailable": {
     "description": "Message when no quotes are available"
   },
-
   "addReminder": "Add Reminder",
   "@addReminder": {
     "description": "Title for add reminder dialog"
   },
-
   "type": "Type",
   "@type": {
     "description": "Label for reminder type dropdown"
   },
-
   "category": "Category",
   "@category": {
     "description": "Label for category dropdown"
   },
-
   "frequency": "Frequency",
   "@frequency": {
     "description": "Label for frequency dropdown"
   },
-
   "time": "Time: {time}",
   "@time": {
     "description": "Label for selected time",
@@ -387,67 +311,54 @@
       "time": {}
     }
   },
-
   "add": "Add",
   "@add": {
     "description": "Button text to add reminder"
   },
-
   "reminderAddedSuccessfully": "Reminder added successfully",
   "@reminderAddedSuccessfully": {
     "description": "Success message for adding reminder"
   },
-
   "noContentAvailable": "No content available",
   "@noContentAvailable": {
     "description": "Message when no content is available after filtering"
   },
-
   "searchContent": "Search content...",
   "@searchContent": {
     "description": "Hint text for search input"
   },
-
   "search": "Search",
   "@search": {
     "description": "Tooltip for search icon"
   },
-
   "filterContent": "Filter Content",
   "@filterContent": {
     "description": "Tooltip for filter icon"
   },
-
   "filterByType": "Filter by Type",
   "@filterByType": {
     "description": "Title for filter dialog"
   },
-
   "all": "All",
   "@all": {
     "description": "Label for selecting all content types"
   },
-
   "quote": "Quote",
   "@quote": {
     "description": "Label for quote content type"
   },
-
   "healthTips": "Health Tips",
   "@healthTips": {
     "description": "Label for health tips content type"
   },
-
   "clearFilter": "Clear Filter",
   "@clearFilter": {
     "description": "Text for clearing filters"
   },
-
   "explore": "Explore",
   "@explore": {
     "description": "Title for explore screen"
   },
-
   "error": "Error: {message}",
   "@error": {
     "description": "Error message with details",
@@ -455,29 +366,41 @@
       "message": {}
     }
   },
-
   "noRemindersSet": "No reminders have been set yet",
   "@noRemindersSet": {
     "description": "Message when user has not set any reminders"
   },
-
   "noRemindersToday": "No reminders scheduled for today",
   "@noRemindersToday": {
     "description": "Message when there are no reminders for the current day"
   },
-
   "errorLoadingData": "An error occurred while loading data",
   "@errorLoadingData": {
     "description": "Message shown when data fails to load"
   },
-
   "retry": "Retry",
   "@retry": {
     "description": "Button label to retry loading or fetching data"
   },
-
   "noDataAvailable": "No data available",
   "@noDataAvailable": {
     "description": "Fallback message when no content or data is available"
-  }
+  },
+  "premiumAudio": "Premium Audio",
+  "premiumContent": "Premium Content",
+  "subscribeToUnlockAudio": "Subscribe now to unlock this inspiring audio content!",
+  "unlockPremiumAudio": "Unlock this premium audio to inspire your day!",
+  "errorLoadingAudio": "Error loading audio. Please try again.",
+  "viewDetails": "View Details",
+  "subscribe": "Subscribe",
+
+  "pleaseLogIn": "Please log in to add to favorites.",
+  "unlockPremiumBenefits": "Unlock exclusive benefits with a premium subscription!",
+  "premiumAudioAccess": "Access to premium audio tracks",
+  "exclusiveContent": "Exclusive wellness content",
+  "offlineAccess": "Offline access to content",
+  "subscribeNow": "Subscribe Now",
+  "premium": "Premium",
+  "playlist": "Playlist",
+  "tracks": "Tracks"
 }

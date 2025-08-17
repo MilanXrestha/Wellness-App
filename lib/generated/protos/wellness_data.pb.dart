@@ -1,6 +1,6 @@
 // This is a generated file - do not edit.
 //
-// Generated from wellness_data.proto.
+// Generated from protos/wellness_data.proto.
 
 // @dart = 3.3
 
@@ -974,6 +974,11 @@ class TipModel extends $pb.GeneratedMessage {
     $core.String? createdAt,
     $core.bool? isFeatured,
     $core.bool? isPremium,
+    $core.String? audioUrl,
+    $core.String? videoUrl,
+    $core.String? thumbnailUrl,
+    $core.String? mediaDuration,
+    $core.String? imageUrl,
   }) {
     final result = create();
     if (tipsId != null) result.tipsId = tipsId;
@@ -987,6 +992,11 @@ class TipModel extends $pb.GeneratedMessage {
     if (createdAt != null) result.createdAt = createdAt;
     if (isFeatured != null) result.isFeatured = isFeatured;
     if (isPremium != null) result.isPremium = isPremium;
+    if (audioUrl != null) result.audioUrl = audioUrl;
+    if (videoUrl != null) result.videoUrl = videoUrl;
+    if (thumbnailUrl != null) result.thumbnailUrl = thumbnailUrl;
+    if (mediaDuration != null) result.mediaDuration = mediaDuration;
+    if (imageUrl != null) result.imageUrl = imageUrl;
     return result;
   }
 
@@ -1015,6 +1025,12 @@ class TipModel extends $pb.GeneratedMessage {
     ..aOS(9, _omitFieldNames ? '' : 'createdAt', protoName: 'createdAt')
     ..aOB(10, _omitFieldNames ? '' : 'isFeatured', protoName: 'isFeatured')
     ..aOB(11, _omitFieldNames ? '' : 'isPremium', protoName: 'isPremium')
+    ..aOS(12, _omitFieldNames ? '' : 'audioUrl', protoName: 'audioUrl')
+    ..aOS(13, _omitFieldNames ? '' : 'videoUrl', protoName: 'videoUrl')
+    ..aOS(14, _omitFieldNames ? '' : 'thumbnailUrl', protoName: 'thumbnailUrl')
+    ..aOS(15, _omitFieldNames ? '' : 'mediaDuration',
+        protoName: 'mediaDuration')
+    ..aOS(16, _omitFieldNames ? '' : 'imageUrl', protoName: 'imageUrl')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1128,6 +1144,51 @@ class TipModel extends $pb.GeneratedMessage {
   $core.bool hasIsPremium() => $_has(10);
   @$pb.TagNumber(11)
   void clearIsPremium() => $_clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get audioUrl => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set audioUrl($core.String value) => $_setString(11, value);
+  @$pb.TagNumber(12)
+  $core.bool hasAudioUrl() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearAudioUrl() => $_clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.String get videoUrl => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set videoUrl($core.String value) => $_setString(12, value);
+  @$pb.TagNumber(13)
+  $core.bool hasVideoUrl() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearVideoUrl() => $_clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get thumbnailUrl => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set thumbnailUrl($core.String value) => $_setString(13, value);
+  @$pb.TagNumber(14)
+  $core.bool hasThumbnailUrl() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearThumbnailUrl() => $_clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get mediaDuration => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set mediaDuration($core.String value) => $_setString(14, value);
+  @$pb.TagNumber(15)
+  $core.bool hasMediaDuration() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearMediaDuration() => $_clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get imageUrl => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set imageUrl($core.String value) => $_setString(15, value);
+  @$pb.TagNumber(16)
+  $core.bool hasImageUrl() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearImageUrl() => $_clearField(16);
 }
 
 /// UserModel represents a user's profile information.

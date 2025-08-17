@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/features/subscription/data/models/transaction_model.dart';
+import 'package:wellness_app/features/subscription/data/models/subscription_model.dart';
 
 import '../../../../core/services/data_repository.dart';
 
@@ -19,8 +20,11 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   final AuthService _authService = AuthService();
   final DataRepository _dataRepository = DataRepository.instance;
 
-  Widget _buildTransactionCard(TransactionModel transaction, ThemeData theme, bool isDarkMode) {
+  Widget _buildTransactionCard(TransactionModel transaction, ThemeData theme, bool isDarkMode, SubscriptionModel? subscription) {
     final dateFormat = DateFormat('MMM dd, yyyy');
+    final isCancellation = transaction.status == 'cancelled';
+    final subscriptionStatus = subscription != null ? ' (${subscription.status.toUpperCase()})' : '';
+
     return FadeInUp(
       duration: const Duration(milliseconds: 600),
       child: Container(
@@ -50,7 +54,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           color: Colors.transparent,
           child: InkWell(
             borderRadius: BorderRadius.circular(16.r),
-            onTap: () {},  // Add onTap if needed (e.g., view details)
+            onTap: () {}, // Add onTap if needed (e.g., view details)
             child: Padding(
               padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
               child: Row(
@@ -62,9 +66,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
-                      Icons.receipt,
+                      isCancellation ? Icons.cancel : Icons.receipt,
                       size: 20.sp,
-                      color: AppColors.primary,
+                      color: isCancellation ? AppColors.error : AppColors.primary,
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -73,7 +77,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${transaction.planId.toUpperCase()} Plan',
+                          isCancellation
+                              ? 'Subscription Cancelled'
+                              : '${transaction.planId.toUpperCase()} Plan$subscriptionStatus',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                             fontSize: 14.sp,
@@ -83,7 +89,9 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                         ),
                         SizedBox(height: 4.h),
                         Text(
-                          'NPR ${transaction.amount.toStringAsFixed(2)} • ${dateFormat.format(transaction.createdAt ?? DateTime.now())}',
+                          isCancellation
+                              ? 'Cancelled on ${dateFormat.format(transaction.createdAt ?? DateTime.now())}'
+                              : 'NPR ${transaction.amount.toStringAsFixed(2)} • ${dateFormat.format(transaction.createdAt ?? DateTime.now())}',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                             fontSize: 12.sp,
@@ -249,15 +257,29 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                             ),
                           );
                         }
-                        return Column(
-                          children: snapshot.data!.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final transaction = entry.value;
-                            return Padding(
-                              padding: EdgeInsets.only(bottom: 8.h),
-                              child: _buildTransactionCard(transaction, theme, isDarkMode),
+                        return FutureBuilder<SubscriptionModel?>(
+                          future: _dataRepository.getSubscription(userId),
+                          builder: (context, subscriptionSnapshot) {
+                            if (subscriptionSnapshot.connectionState == ConnectionState.waiting) {
+                              return Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 4.w,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                ),
+                              );
+                            }
+                            final subscription = subscriptionSnapshot.data;
+                            return Column(
+                              children: snapshot.data!.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final transaction = entry.value;
+                                return Padding(
+                                  padding: EdgeInsets.only(bottom: 8.h),
+                                  child: _buildTransactionCard(transaction, theme, isDarkMode, subscription),
+                                );
+                              }).toList(),
                             );
-                          }).toList(),
+                          },
                         );
                       },
                     ),

@@ -96,6 +96,22 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final iconColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary;
+    final cardBackgroundColors = isDark
+        ? [
+      AppColors.darkSurface.withAlpha(230),
+      AppColors.darkSurface.withAlpha(200),
+    ]
+        : [
+      AppColors.lightBackground, // Solid white for Apple/Nike clean vibe
+      AppColors.lightBackground,
+    ];
+    final borderColor = isDark
+        ? AppColors.primary.withAlpha(77)
+        : AppColors.lightTextSecondary.withAlpha(77); // Subtle gray border for light mode
+    final titleColor = isDark ? AppColors.primary : AppColors.lightTextPrimary; // Black title in light mode
+    final editButtonColors = isDark
+        ? [AppColors.primary, AppColors.primary.withAlpha(153)]
+        : [AppColors.lightTextPrimary, AppColors.lightTextPrimary.withAlpha(153)]; // Black gradient for edit in light mode
 
     return FadeInUp(
       duration: Duration(milliseconds: 300 + index * 80),
@@ -104,28 +120,20 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
         margin: EdgeInsets.only(bottom: 14.h),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: isDark
-                ? [
-              AppColors.darkSurface.withAlpha(230),
-              AppColors.darkSurface.withAlpha(200),
-            ]
-                : [
-              AppColors.lightSurface.withAlpha(230),
-              AppColors.lightSurface.withAlpha(200),
-            ],
+            colors: cardBackgroundColors,
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(16.r),
           border: Border.all(
-            color: AppColors.primary.withAlpha(77),
+            color: borderColor,
             width: 1.w,
           ),
           boxShadow: [
             BoxShadow(
-              color: AppColors.shadow,
-              blurRadius: 8.r,
-              offset: Offset(0, 4.h),
+              color: AppColors.shadow.withAlpha(50), // Subtle shadow for Apple-like depth
+              blurRadius: 4.r, // Reduced blur for minimalism
+              offset: Offset(0, 2.h), // Subtle offset
             ),
           ],
         ),
@@ -138,20 +146,15 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                 Container(
                   padding: EdgeInsets.all(4.w),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary.withAlpha(51),
-                        AppColors.primary.withAlpha(26),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: isDark
+                        ? AppColors.primary.withAlpha(51)
+                        : AppColors.lightTextSecondary.withAlpha(26), // Subtle gray for light mode icon bg
                     borderRadius: BorderRadius.circular(12.r),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.shadow,
-                        blurRadius: 6.r,
-                        offset: Offset(2.w, 2.h),
+                        color: AppColors.shadow.withAlpha(30), // Minimal shadow
+                        blurRadius: 4.r,
+                        offset: Offset(1.w, 1.h),
                       ),
                     ],
                   ),
@@ -207,7 +210,7 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                         style: theme.textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 18.sp,
-                          color: AppColors.primary,
+                          color: titleColor, // Black in light mode for Nike/Apple vibe
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -252,19 +255,16 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                       ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            AppColors.primary,
-                            AppColors.primary.withAlpha(153),
-                          ],
+                          colors: editButtonColors, // Black in light mode
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(8.r),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.shadow,
-                            blurRadius: 6.r,
-                            offset: Offset(2.w, 2.h),
+                            color: AppColors.shadow.withAlpha(50), // Subtle
+                            blurRadius: 4.r,
+                            offset: Offset(1.w, 1.h),
                           ),
                         ],
                       ),
@@ -311,16 +311,16 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                       ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [AppColors.error, AppColors.error],
+                          colors: [AppColors.error, AppColors.error.withAlpha(153)], // Keep red for delete, as accent
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(8.r),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.shadow,
-                            blurRadius: 6.r,
-                            offset: Offset(2.w, 2.h),
+                            color: AppColors.shadow.withAlpha(50),
+                            blurRadius: 4.r,
+                            offset: Offset(1.w, 1.h),
                           ),
                         ],
                       ),
@@ -356,6 +356,11 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final titleColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary; // Black title in light mode
+    final iconColor = isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary; // Black icons in light mode
+    final fabColors = isDark
+        ? [AppColors.primary, AppColors.primary.withAlpha(153)]
+        : [AppColors.lightTextPrimary, AppColors.lightTextPrimary.withAlpha(153)]; // Black FAB in light mode
 
     return Scaffold(
       backgroundColor: isDark
@@ -379,9 +384,7 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                         icon: Icon(
                           Icons.arrow_back_ios_new,
                           size: 20.sp,
-                          color: isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.primary,
+                          color: iconColor, // Black in light mode
                         ),
                         onPressed: () => Navigator.pop(context),
                       ),
@@ -391,9 +394,7 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                         style: theme.textTheme.headlineMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                           fontSize: 22.sp,
-                          color: isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.primary,
+                          color: titleColor, // Black in light mode
                         ),
                       ),
                       const Spacer(),
@@ -401,9 +402,7 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                         icon: Icon(
                           Icons.refresh,
                           size: 22.sp,
-                          color: isDark
-                              ? AppColors.darkTextPrimary
-                              : AppColors.primary,
+                          color: iconColor, // Black in light mode
                         ),
                         onPressed: _triggerReload,
                       ),
@@ -453,7 +452,7 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
                       if (!snapshot.hasData) {
                         return Center(
                           child: CircularProgressIndicator(
-                            color: AppColors.primary,
+                            color: isDark ? AppColors.primary : AppColors.lightTextPrimary, // Black spinner in light mode if desired, but keep primary for consistency
                           ),
                         );
                       }
@@ -528,16 +527,16 @@ class _ManagePreferencesScreenState extends State<ManagePreferencesScreen>
           padding: EdgeInsets.all(12.w),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.primary.withAlpha(153)],
+              colors: fabColors, // Black in light mode
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: AppColors.shadow,
-                blurRadius: 8.r,
-                offset: Offset(0, 4.h),
+                color: AppColors.shadow.withAlpha(50), // Subtle
+                blurRadius: 4.r,
+                offset: Offset(0, 2.h),
               ),
             ],
           ),
