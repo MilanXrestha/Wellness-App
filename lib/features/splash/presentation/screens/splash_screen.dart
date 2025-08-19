@@ -195,16 +195,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                 children: [
                   SizedBox(height: 80.h),
 
-                  //  logo
-                  isDarkMode
-                      ? Image.asset(
+                  // Logo
+                  Image.asset(
                     'assets/icons/png/wellness_logo.png',
                     height: 120.h,
-                    fit: BoxFit.contain,
-                  )
-                      : Image.asset(
-                    'assets/icons/png/wellness_logo.png',
-                    height: 120.h,  // Reduced size for light mode
                     fit: BoxFit.contain,
                   ),
 
@@ -250,18 +244,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
                   SizedBox(height: 36.h),
 
-                  // Circular progress indicator
-                  CircularProgressIndicator(
-                    strokeWidth: 4.w,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isDarkMode
-                          ? AppColors.primary
-                          : AppColors.lightTextPrimary,
-                    ),
+                  // Lottie animation
+                  Lottie.asset(
+                    'assets/animations/loading_animation.json',
+                    width: 150.w,
+                    height: 150.h,
+                    fit: BoxFit.contain,
                   ),
 
-
-                  SizedBox(height: 150.h),
+                  SizedBox(height: 100.h),
 
                   // App version info
                   Text(

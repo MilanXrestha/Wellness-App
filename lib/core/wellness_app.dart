@@ -8,6 +8,7 @@ import 'package:wellness_app/features/subscription/presentation/providers/premiu
 import 'package:wellness_app/generated/app_localizations.dart';
 import 'package:wellness_app/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
+import '../features/preferences/presentation/provider/user_preference_provider.dart';
 import '../features/profile/providers/user_provider.dart';
 import 'services/data_repository.dart';
 import 'db/database_helper.dart';
@@ -31,6 +32,7 @@ class WellnessApp extends StatelessWidget {
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
         ChangeNotifierProvider<PremiumStatusProvider>(create: (_) => PremiumStatusProvider()),
+        ChangeNotifierProvider<UserPreferenceProvider>(create: (_) => UserPreferenceProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {

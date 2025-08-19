@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/services.dart';
+import 'package:lottie/lottie.dart'; // Added for Lottie animation
+
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/features/auth/domain/auth_validator.dart';
@@ -273,11 +274,11 @@ class _LoginScreenState extends State<LoginScreen> {
               Container(
                 color: AppColors.overlay,
                 child: Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 4.w,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
-                    ),
+                  child: Lottie.asset(
+                    'assets/animations/loading_animation.json',
+                    width: 150.w,
+                    height: 150.h,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
@@ -300,7 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
           l10n.loginWelcome,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontFamily: 'Poppins',
-            color: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+            color: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
             fontWeight: FontWeight.w700,
             fontSize: 28.sp,
           ),
@@ -337,21 +338,30 @@ class _LoginScreenState extends State<LoginScreen> {
             validator: (value) => AuthValidator.validateEmail(value, l10n),
           ),
           SizedBox(height: 16.h),
+
           AuthTextField(
             controller: _passwordController,
             labelText: l10n.loginPasswordHint,
             iconPath: 'assets/icons/svg/ic_lock.svg',
             obscureText: !_isPasswordVisible,
-            suffixIcon: GestureDetector(
+            suffixIconBuilder: (isFocused) => GestureDetector(
               onTap: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
               child: Padding(
                 padding: EdgeInsets.all(12.w),
                 child: SvgPicture.asset(
-                  _isPasswordVisible ? 'assets/icons/svg/ic_hide.svg' : 'assets/icons/svg/ic_show.svg',
+                  _isPasswordVisible
+                      ? 'assets/icons/svg/ic_show.svg'
+                      : 'assets/icons/svg/ic_hide.svg',
                   width: 21.w,
                   height: 21.h,
                   colorFilter: ColorFilter.mode(
-                    Theme.of(context).brightness == Brightness.dark ? AppColors.darkTextPrimary : AppColors.lightSecondary,
+                    isFocused
+                        ? (Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.primary
+                        : AppColors.colorPrimaryLight) // focused → green
+                        : (Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.darkTextPrimary
+                        : AppColors.lightTextHint), // unfocused → gray
                     BlendMode.srcIn,
                   ),
                 ),
@@ -359,6 +369,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             validator: (value) => AuthValidator.validatePassword(value, l10n),
           ),
+
+
+
+
+
           SizedBox(height: 12.h),
           _buildOptions(context),
           SizedBox(height: 20.h),
@@ -390,7 +405,7 @@ class _LoginScreenState extends State<LoginScreen> {
             Checkbox(
               value: _rememberMe,
               onChanged: (value) => setState(() => _rememberMe = value ?? false),
-              activeColor: isDarkMode ? AppColors.primary : AppColors.lightSecondary,
+              activeColor: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
               checkColor: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightBackground,
             ),
             Text(
@@ -414,7 +429,8 @@ class _LoginScreenState extends State<LoginScreen> {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontFamily: 'Poppins',
               fontSize: 14.sp,
-              color: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
             ),
           ),
         ),
@@ -453,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen> {
               fontFamily: 'Poppins',
               fontWeight: FontWeight.w700,
               fontSize: 16.sp,
-              color: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+              color: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
             ),
             textAlign: TextAlign.center,
           ),

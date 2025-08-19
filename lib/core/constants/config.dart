@@ -3,6 +3,6 @@
 class AppConfig {
 
   /// Splash screen duration in milliseconds.
-  static const int splashDuration = 5000; // 5 Seconds
+  static const int splashDuration = 3000; // 3 Seconds
 
 }

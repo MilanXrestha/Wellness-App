@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/services.dart';
+import 'package:lottie/lottie.dart'; // Added for Lottie animation
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/features/auth/domain/auth_validator.dart';
@@ -214,13 +215,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
               Container(
                 color: AppColors.overlay,
                 child: Center(
-                  child: CircularProgressIndicator(
-                    strokeWidth: 4.w,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isDarkMode
-                          ? AppColors.primary
-                          : AppColors.lightTextPrimary,
-                    ),
+                  child: Lottie.asset(
+                    'assets/animations/loading_animation.json',
+                    width: 150.w,
+                    height: 150.h,
+                    fit: BoxFit.contain,
                   ),
                 ),
               ),
@@ -243,7 +242,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           l10n.signUpWelcome,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontFamily: 'Poppins',
-            color: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+            color: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
             fontWeight: FontWeight.w700,
             fontSize: 28.sp,
           ),
@@ -287,26 +286,30 @@ class _SignUpScreenState extends State<SignUpScreen> {
             validator: (value) => AuthValidator.validateEmail(value, l10n),
           ),
           SizedBox(height: 16.h),
+
           AuthTextField(
             controller: _passwordController,
             labelText: l10n.loginPasswordHint,
             iconPath: 'assets/icons/svg/ic_lock.svg',
             obscureText: !_isPasswordVisible,
-            suffixIcon: GestureDetector(
-              onTap: () =>
-                  setState(() => _isPasswordVisible = !_isPasswordVisible),
+            suffixIconBuilder: (isFocused) => GestureDetector(
+              onTap: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
               child: Padding(
                 padding: EdgeInsets.all(12.w),
                 child: SvgPicture.asset(
                   _isPasswordVisible
-                      ? 'assets/icons/svg/ic_hide.svg'
-                      : 'assets/icons/svg/ic_show.svg',
+                      ? 'assets/icons/svg/ic_show.svg'
+                      : 'assets/icons/svg/ic_hide.svg',
                   width: 21.w,
                   height: 21.h,
                   colorFilter: ColorFilter.mode(
-                    Theme.of(context).brightness == Brightness.dark
+                    isFocused
+                        ? (Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.primary
+                        : AppColors.colorPrimaryLight) // green when focused
+                        : (Theme.of(context).brightness == Brightness.dark
                         ? AppColors.darkTextPrimary
-                        : AppColors.lightSecondary,
+                        : AppColors.lightTextHint), // gray when unfocused
                     BlendMode.srcIn,
                   ),
                 ),
@@ -314,13 +317,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
             validator: (value) => AuthValidator.validatePassword(value, l10n),
           ),
+
+
           SizedBox(height: 16.h),
+
           AuthTextField(
             controller: _confirmPasswordController,
             labelText: l10n.signUpConfirmPasswordHint,
             iconPath: 'assets/icons/svg/ic_lock.svg',
             obscureText: !_isConfirmPasswordVisible,
-            suffixIcon: GestureDetector(
+            suffixIconBuilder: (isFocused) => GestureDetector(
               onTap: () => setState(
                     () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible,
               ),
@@ -328,14 +334,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 padding: EdgeInsets.all(12.w),
                 child: SvgPicture.asset(
                   _isConfirmPasswordVisible
-                      ? 'assets/icons/svg/ic_hide.svg'
-                      : 'assets/icons/svg/ic_show.svg',
+                      ? 'assets/icons/svg/ic_show.svg'
+                      : 'assets/icons/svg/ic_hide.svg',
                   width: 21.w,
                   height: 21.h,
                   colorFilter: ColorFilter.mode(
-                    Theme.of(context).brightness == Brightness.dark
+                    isFocused
+                        ? (Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.primary
+                        : AppColors.colorPrimaryLight) // focused → green
+                        : (Theme.of(context).brightness == Brightness.dark
                         ? AppColors.darkTextPrimary
-                        : AppColors.lightSecondary,
+                        : AppColors.lightTextHint), // unfocused → gray
                     BlendMode.srcIn,
                   ),
                 ),
@@ -347,6 +357,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
               l10n,
             ),
           ),
+
+
           SizedBox(height: 12.h),
           _buildOptions(context),
           SizedBox(height: 20.h),
@@ -378,7 +390,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
           onChanged: (value) => setState(() => _rememberMe = value ?? false),
           activeColor: isDarkMode
               ? AppColors.primary
-              : AppColors.lightTextPrimary,
+              : AppColors.colorPrimaryLight,
           checkColor: isDarkMode
               ? AppColors.darkTextPrimary
               : AppColors.lightBackground,
@@ -428,7 +440,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
               fontSize: 16.sp,
               color: isDarkMode
                   ? AppColors.primary
-                  : AppColors.lightTextPrimary,
+                  : AppColors.colorPrimaryLight,
             ),
             textAlign: TextAlign.center,
           ),

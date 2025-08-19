@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -15,7 +14,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../../../core/services/wellness_cache_service.dart';
 import '../../../subscription/presentation/providers/premium_status_provider.dart';
 import '../../providers/user_provider.dart';
@@ -37,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _cacheSize = 'Calculating...';
   SubscriptionModel? _subscription;
   StreamSubscription<DocumentSnapshot>? _subscriptionStream;
+  String _downloadPath = 'Calculating...';
 
   @override
   void initState() {
@@ -45,6 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _calculateCacheSize();
     _loadSubscriptionData();
     _listenToSubscriptionChanges();
+    _calculateDownloadPath();
   }
 
   @override
@@ -55,9 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadSubscriptionData() async {
     try {
-      final userId = _authService
-          .getCurrentUser()
-          ?.uid;
+      final userId = _authService.getCurrentUser()?.uid;
       if (userId != null) {
         final subscription = await _dataRepository.getSubscription(userId);
         if (mounted) {
@@ -77,9 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _listenToSubscriptionChanges() {
-    final userId = _authService
-        .getCurrentUser()
-        ?.uid;
+    final userId = _authService.getCurrentUser()?.uid;
     if (userId != null) {
       _subscriptionStream = FirebaseFirestore.instance
           .collection('subscriptions')
@@ -93,7 +89,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           setState(() {
             _subscription = subscription;
           });
-          // Update premium status
           Provider.of<PremiumStatusProvider>(context, listen: false)
               .updatePremiumStatus();
         }
@@ -148,67 +143,73 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _calculateDownloadPath() async {
+    try {
+      Directory saveDir;
+      if (Platform.isAndroid) {
+        saveDir = Directory('/storage/emulated/0/Pictures/Wellness');
+      } else {
+        saveDir = Directory('${(await getApplicationDocumentsDirectory()).path}/Pictures/Wellness');
+      }
+      if (mounted) {
+        setState(() {
+          _downloadPath = saveDir.path;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _downloadPath = 'Error';
+        });
+        _showSnackBar('Error calculating download path: $e', AppColors.error);
+      }
+    }
+  }
+
   Future<void> _clearCache() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(
-              'Clear Cache',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontSize: 18.sp,
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Text(
-              'Cache size: $_cacheSize\nAre you sure you want to clear the app cache?',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Clear Cache',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontSize: 18.sp,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Cache size: $_cacheSize\nAre you sure you want to clear the app cache?',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontSize: 14.sp,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 14.sp,
                 fontFamily: 'Poppins',
+                color: AppColors.lightTextSecondary,
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(
-                  'Cancel',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontSize: 14.sp,
-                    fontFamily: 'Poppins',
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(
-                  'Clear',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontSize: 14.sp,
-                    fontFamily: 'Poppins',
-                    color: AppColors.error,
-                  ),
-                ),
-              ),
-            ],
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Clear',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 14.sp,
+                fontFamily: 'Poppins',
+                color: AppColors.error,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
     if (confirmed == true && mounted) {
@@ -238,84 +239,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(
-              'Confirm Logout',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontSize: 18.sp,
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Text(
-              'Are you sure you want to logout?',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Confirm Logout',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontSize: 18.sp,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to logout?',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontSize: 14.sp,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 14.sp,
                 fontFamily: 'Poppins',
+                color: AppColors.lightTextSecondary,
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(
-                  'Cancel',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontSize: 14.sp,
-                    fontFamily: 'Poppins',
-                    color: AppColors.lightTextSecondary,
-                  ),
-                ),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(
-                  'Logout',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontSize: 14.sp,
-                    fontFamily: 'Poppins',
-                    color: AppColors.error,
-                  ),
-                ),
-              ),
-            ],
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Logout',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontSize: 14.sp,
+                fontFamily: 'Poppins',
+                color: AppColors.error,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
 
     if (confirmed == true && mounted) {
       try {
-        // Reset premium status before signing out
         Provider.of<PremiumStatusProvider>(context, listen: false)
             .resetPremiumStatus();
-
-        // Clear cache to remove any user-related data
         await WellnessCacheService().clearCache();
-
-        // Perform actual sign-out
         await _authService.signOut();
-
         if (mounted) {
           _showSnackBar('Logged out successfully!', AppColors.primary);
-
-          // Small delay so snackbar shows
           await Future.delayed(const Duration(seconds: 1));
-
           if (mounted) {
             Navigator.pushNamedAndRemoveUntil(
               context,
@@ -327,15 +302,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       } catch (e) {
         if (mounted) {
           _showSnackBar(
-            'Error logging out: ${e.toString().replaceFirst(
-                'Exception: ', '')}',
+            'Error logging out: ${e.toString().replaceFirst('Exception: ', '')}',
             AppColors.error,
           );
         }
       }
     }
   }
-
 
   void _showSnackBar(String message, Color backgroundColor) {
     if (!mounted) return;
@@ -344,11 +317,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       SnackBar(
         content: Text(
           message,
-          style: Theme
-              .of(context)
-              .textTheme
-              .bodyMedium
-              ?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontFamily: 'Poppins',
             color: AppColors.lightBackground,
             fontSize: 14.sp,
@@ -381,49 +350,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showAboutDialog() {
     showDialog(
       context: context,
-      builder: (context) =>
-          AlertDialog(
-            title: Text(
-              'About Wellness App',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(
-                fontSize: 18.sp,
-                fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            content: Text(
-              'Wellness App\nVersion: $_appVersion\n© 2025 Wellness App. All rights reserved.',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(
+      builder: (context) => AlertDialog(
+        title: Text(
+          'About Wellness App',
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            fontSize: 18.sp,
+            fontFamily: 'Poppins',
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Wellness App\nVersion: $_appVersion\n© 2025 Wellness App. All rights reserved.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            fontSize: 14.sp,
+            fontFamily: 'Poppins',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'OK',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontSize: 14.sp,
                 fontFamily: 'Poppins',
+                color: AppColors.primary,
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text(
-                  'OK',
-                  style: Theme
-                      .of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(
-                    fontSize: 14.sp,
-                    fontFamily: 'Poppins',
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
           ),
+        ],
+      ),
     );
   }
 
@@ -442,13 +398,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       margin: EdgeInsets.only(bottom: 12.h),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isDarkMode
-              ? [AppColors.darkSurface, AppColors.darkBackground]
-              : [AppColors.lightSurface, AppColors.lightBackground],
-        ),
+        color: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
         borderRadius: BorderRadius.circular(16.r),
         border: Border.all(
           color: isDarkMode ? AppColors.darkTextHint : AppColors.lightTextHint,
@@ -569,8 +519,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             width: 50.w,
             margin: EdgeInsets.only(top: 4.h),
             decoration: BoxDecoration(
-              color: isDarkMode ? AppColors.primary : AppColors
-                  .lightTextPrimary,
+              color: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
             ),
           ),
         ],
@@ -602,7 +551,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       children: [
         Text(
           value.isEmpty ? 'N/A' : value.toUpperCase(),
-          // Capitalize status and plan
           style: TextStyle(
             fontSize: 16.sp,
             fontWeight: FontWeight.bold,
@@ -615,8 +563,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           label,
           style: TextStyle(
             fontSize: 10.sp,
-            color: isDarkMode ? Colors.white.withOpacity(0.7) : AppColors
-                .lightTextSecondary,
+            color: isDarkMode
+                ? Colors.white.withOpacity(0.7)
+                : AppColors.lightTextSecondary,
             fontFamily: 'Poppins',
           ),
         ),
@@ -669,26 +618,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         child: Container(
                           height: 56.h,
                           decoration: BoxDecoration(
-                            gradient: isDarkMode
-                                ? LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                AppColors.darkSurface,
-                                AppColors.darkBackground
-                              ],
-                            )
-                                : null,
                             color: isDarkMode
-                                ? null
+                                ? AppColors.darkSurface
                                 : AppColors.lightBackground,
                             borderRadius: BorderRadius.circular(24.r),
                             boxShadow: isDarkMode
                                 ? []
                                 : [
                               BoxShadow(
-                                color: AppColors.lightTextPrimary
-                                    .withOpacity(0.2),
+                                color:
+                                AppColors.lightTextPrimary.withOpacity(0.2),
                                 blurRadius: 6.r,
                                 offset: Offset(0, 2.h),
                               ),
@@ -751,19 +690,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Enhanced Profile Card
                           Consumer2<UserProvider, PremiumStatusProvider>(
                             builder:
-                                (context, userProvider, premiumProvider,
-                                child) {
+                                (context, userProvider, premiumProvider, child) {
                               final user = userProvider.user;
                               final userName = user?.displayName ?? 'User';
                               final userEmail = user?.email ?? 'No email';
                               final userPhotoUrl = user?.photoURL;
                               final joinedDate =
                               _formatDate(user?.metadata.creationTime);
-                              final isPremium = premiumProvider
-                                  .canAccessPremium &&
+                              final isPremium = premiumProvider.canAccessPremium &&
                                   _subscription != null &&
                                   _subscription!.status == 'active' &&
                                   (_subscription!.endDate == null ||
@@ -786,19 +722,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   : 'N/A';
 
                               if (isPremium) {
-                                // Premium Profile Card (Transparent background)
                                 return Container(
                                   width: double.infinity,
                                   padding: EdgeInsets.all(24.w),
                                   margin: EdgeInsets.only(bottom: 20.h),
                                   decoration: BoxDecoration(
                                     color: isDarkMode
-                                        ? Colors.transparent
+                                        ? AppColors.darkSurface
                                         : AppColors.lightBackground,
-
-
                                     borderRadius: BorderRadius.circular(20.r),
-                                    border: Border.all( // Added border
+                                    border: Border.all(
                                       color: isDarkMode
                                           ? AppColors.darkTextHint
                                           : AppColors.lightTextHint,
@@ -818,23 +751,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   child: Stack(
                                     children: [
-                                      // Premium background pattern with overflow allowance
                                       Positioned(
                                         left: 0,
                                         right: 0,
                                         top: -50.h,
-                                        // Extended top to allow upper clouds to show without cutoff
                                         bottom: 0,
                                         child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                              20.r),
+                                          borderRadius:
+                                          BorderRadius.circular(20.r),
                                           child: CustomPaint(
                                             painter: PremiumBackgroundPainter(),
                                           ),
                                         ),
                                       ),
-
-                                      // Premium badge in top right, moved up
                                       Positioned(
                                         top: 0,
                                         right: 0,
@@ -852,8 +781,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             BorderRadius.circular(20.r),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.amber
-                                                    .withOpacity(0.4),
+                                                color:
+                                                Colors.amber.withOpacity(0.4),
                                                 blurRadius: 1.r,
                                                 offset: Offset(0, 1.h),
                                               ),
@@ -881,18 +810,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ),
                                         ),
                                       ),
-
-                                      // Main content
                                       Column(
                                         children: [
                                           SizedBox(height: 20.h),
-
-                                          // Profile picture with crown, premium ring, and glitter stars
                                           Stack(
                                             alignment: Alignment.center,
                                             clipBehavior: Clip.none,
                                             children: [
-                                              // Golden ring
                                               Container(
                                                 width: 108.w,
                                                 height: 108.w,
@@ -910,7 +834,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   ),
                                                 ),
                                               ),
-                                              // Profile picture
                                               Container(
                                                 width: 100.w,
                                                 height: 100.w,
@@ -918,8 +841,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   shape: BoxShape.circle,
                                                   color: isDarkMode
                                                       ? AppColors.darkBackground
-                                                      : AppColors
-                                                      .lightBackground,
+                                                      : AppColors.lightBackground,
                                                 ),
                                                 child: Padding(
                                                   padding: EdgeInsets.all(3.w),
@@ -927,8 +849,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     radius: 48.r,
                                                     backgroundColor: isDarkMode
                                                         ? AppColors.darkSurface
-                                                        : AppColors
-                                                        .lightBackground,
+                                                        : AppColors.lightBackground,
                                                     child: userPhotoUrl != null
                                                         ? ClipOval(
                                                       child:
@@ -938,8 +859,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                         width: 96.r,
                                                         height: 96.r,
                                                         fit: BoxFit.cover,
-                                                        placeholder: (context,
-                                                            url) =>
+                                                        placeholder:
+                                                            (context, url) =>
                                                             Center(
                                                               child:
                                                               CircularProgressIndicator(
@@ -985,23 +906,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   ),
                                                 ),
                                               ),
-                                              // Crown on top
                                               Positioned(
                                                 top: -15.h,
                                                 child: FaIcon(
                                                   FontAwesomeIcons.crown,
                                                   size: 24.sp,
-                                                  color:
-                                                  const Color(0xFFFFD700),
+                                                  color: const Color(0xFFFFD700),
                                                 ),
                                               ),
-
                                             ],
                                           ),
-
                                           SizedBox(height: 20.h),
-
-                                          // Name (adaptive color)
                                           Text(
                                             userName,
                                             style: theme.textTheme.headlineSmall
@@ -1017,10 +932,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             overflow: TextOverflow.ellipsis,
                                             textAlign: TextAlign.center,
                                           ),
-
                                           SizedBox(height: 8.h),
-
-                                          // Email (adaptive color)
                                           Text(
                                             userEmail,
                                             style: theme.textTheme.bodyMedium
@@ -1028,57 +940,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               fontSize: 14.sp,
                                               fontFamily: 'Poppins',
                                               color: isDarkMode
-                                                  ? Colors.white.withOpacity(
-                                                  0.8)
-                                                  : AppColors
-                                                  .lightTextSecondary,
+                                                  ? Colors.white.withOpacity(0.8)
+                                                  : AppColors.lightTextSecondary,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
                                             textAlign: TextAlign.center,
                                           ),
-
                                           SizedBox(height: 24.h),
-
-                                          // Premium stats (adaptive colors)
                                           Row(
                                             mainAxisAlignment:
                                             MainAxisAlignment.spaceEvenly,
                                             children: [
                                               _buildPremiumStat(
                                                 'Member Since',
-                                                subscriptionDate
-                                                    .split(' ')
-                                                    .length >=
+                                                subscriptionDate.split(' ').length >=
                                                     3
                                                     ? subscriptionDate
                                                     .split(' ')[2]
-                                                    : subscriptionDate
-                                                    .split(' ')
-                                                    .last,
+                                                    : subscriptionDate.split(' ').last,
                                                 isDarkMode,
                                               ),
                                               Container(
                                                 width: 1.w,
                                                 height: 40.h,
                                                 color: isDarkMode
-                                                    ? Colors.white.withOpacity(
-                                                    0.2)
+                                                    ? Colors.white.withOpacity(0.2)
                                                     : AppColors.lightTextHint
                                                     .withOpacity(0.2),
                                               ),
                                               _buildPremiumStat(
                                                 'Status',
-                                                _subscription?.status ??
-                                                    'N/A',
+                                                _subscription?.status ?? 'N/A',
                                                 isDarkMode,
                                               ),
                                               Container(
                                                 width: 1.w,
                                                 height: 40.h,
                                                 color: isDarkMode
-                                                    ? Colors.white.withOpacity(
-                                                    0.2)
+                                                    ? Colors.white.withOpacity(0.2)
                                                     : AppColors.lightTextHint
                                                     .withOpacity(0.2),
                                               ),
@@ -1086,18 +986,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   'Plan', planName, isDarkMode),
                                             ],
                                           ),
-
                                           SizedBox(height: 20.h),
-
-                                          // Additional premium info (adaptive colors)
                                           Container(
                                             padding: EdgeInsets.symmetric(
-                                                horizontal: 16.w,
-                                                vertical: 12.h),
+                                                horizontal: 16.w, vertical: 12.h),
                                             decoration: BoxDecoration(
                                               color: isDarkMode
-                                                  ? Colors.white.withOpacity(
-                                                  0.1)
+                                                  ? Colors.white.withOpacity(0.1)
                                                   : AppColors.lightSurface
                                                   .withOpacity(0.1),
                                               borderRadius:
@@ -1115,8 +1010,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                 Icon(
                                                   Icons.verified,
                                                   size: 16.sp,
-                                                  color:
-                                                  const Color(0xFFFFD700),
+                                                  color: const Color(0xFFFFD700),
                                                 ),
                                                 SizedBox(width: 8.w),
                                                 Text(
@@ -1124,8 +1018,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   style: TextStyle(
                                                     fontSize: 12.sp,
                                                     fontWeight: FontWeight.w600,
-                                                    color: const Color(
-                                                        0xFFFFD700),
+                                                    color: const Color(0xFFFFD700),
                                                     fontFamily: 'Poppins',
                                                   ),
                                                 ),
@@ -1138,25 +1031,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                 );
                               } else {
-                                // Non-Premium Profile Card
                                 return Container(
                                   width: double.infinity,
                                   padding: EdgeInsets.all(20.w),
                                   margin: EdgeInsets.only(bottom: 20.h),
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                      colors: isDarkMode
-                                          ? [
-                                        AppColors.darkSurface,
-                                        AppColors.darkBackground
-                                      ]
-                                          : [
-                                        AppColors.lightSurface,
-                                        AppColors.lightBackground
-                                      ],
-                                    ),
+                                    color: isDarkMode
+                                        ? AppColors.darkSurface
+                                        : AppColors.lightBackground,
                                     borderRadius: BorderRadius.circular(16.r),
                                     border: Border.all(
                                       color: isDarkMode
@@ -1177,7 +1059,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   ),
                                   child: Column(
                                     children: [
-                                      // Profile picture
                                       CircleAvatar(
                                         radius: 48.r,
                                         backgroundColor: isDarkMode
@@ -1192,8 +1073,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             fit: BoxFit.cover,
                                             placeholder: (context, url) =>
                                                 Center(
-                                                  child:
-                                                  CircularProgressIndicator(
+                                                  child: CircularProgressIndicator(
                                                     color: AppColors.primary,
                                                   ),
                                                 ),
@@ -1203,8 +1083,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                   'assets/icons/svg/ic_user.svg',
                                                   width: 60.sp,
                                                   height: 60.sp,
-                                                  colorFilter:
-                                                  ColorFilter.mode(
+                                                  colorFilter: ColorFilter.mode(
                                                     isDarkMode
                                                         ? AppColors
                                                         .darkTextPrimary
@@ -1221,18 +1100,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           height: 60.sp,
                                           colorFilter: ColorFilter.mode(
                                             isDarkMode
-                                                ? AppColors
-                                                .darkTextPrimary
-                                                : AppColors
-                                                .lightTextPrimary,
+                                                ? AppColors.darkTextPrimary
+                                                : AppColors.lightTextPrimary,
                                             BlendMode.srcIn,
                                           ),
                                         ),
                                       ),
-
                                       SizedBox(height: 16.h),
-
-                                      // Name
                                       Text(
                                         userName,
                                         style: theme.textTheme.headlineSmall
@@ -1248,14 +1122,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
                                       ),
-
                                       SizedBox(height: 8.h),
-
-                                      // Email
                                       Text(
                                         userEmail,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(
+                                        style:
+                                        theme.textTheme.bodyMedium?.copyWith(
                                           fontSize: 14.sp,
                                           fontFamily: 'Poppins',
                                           color: isDarkMode
@@ -1266,14 +1137,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         overflow: TextOverflow.ellipsis,
                                         textAlign: TextAlign.center,
                                       ),
-
                                       SizedBox(height: 8.h),
-
-                                      // Joined date
                                       Text(
                                         'Joined: $joinedDate',
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(
+                                        style:
+                                        theme.textTheme.bodySmall?.copyWith(
                                           fontSize: 12.sp,
                                           fontFamily: 'Poppins',
                                           color: isDarkMode
@@ -1282,17 +1150,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
-
                                       SizedBox(height: 20.h),
-
-                                      // Upgrade button
                                       ElevatedButton.icon(
-                                        onPressed: () =>
-                                            Navigator.pushNamed(
-                                                context,
-                                                RoutesName.subscriptionScreen),
-                                        icon: Icon(Icons.rocket_launch,
-                                            size: 18.sp),
+                                        onPressed: () => Navigator.pushNamed(
+                                            context, RoutesName.subscriptionScreen),
+                                        icon: Icon(Icons.rocket_launch, size: 18.sp),
                                         label: Text(
                                           'Upgrade to Premium',
                                           style: TextStyle(
@@ -1318,49 +1180,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               }
                             },
                           ),
-
                           _buildSectionHeader('Account'),
                           _buildMenuItem(
                             svgIconPath: 'assets/icons/svg/ic_edit_profile.svg',
                             title: 'Edit Profile',
                             description:
                             'Update your name, email, or profile picture',
-                            onTap: () =>
-                                Navigator.pushNamed(
-                                    context, RoutesName.editProfileScreen),
+                            onTap: () => Navigator.pushNamed(
+                                context, RoutesName.editProfileScreen),
                           ),
                           _buildMenuItem(
                             svgIconPath: 'assets/icons/svg/ic_lock.svg',
                             title: 'Change Password',
-                            description:
-                            'Secure your account with a new password',
-                            onTap: () =>
-                                Navigator.pushNamed(
-                                    context, RoutesName.changePasswordScreen),
+                            description: 'Secure your account with a new password',
+                            onTap: () => Navigator.pushNamed(
+                                context, RoutesName.changePasswordScreen),
                           ),
                           _buildMenuItem(
                             svgIconPath: 'assets/icons/svg/ic_heart.svg',
                             title: 'Content Preferences',
                             description: 'Personalize your wellness content',
-                            onTap: () =>
-                                Navigator.pushNamed(
-                                    context, RoutesName.userPrefsScreen,
-                                    arguments: true),
+                            onTap: () => Navigator.pushNamed(
+                                context, RoutesName.userPrefsScreen,
+                                arguments: true),
                           ),
                           _buildMenuItem(
                             svgIconPath: 'assets/icons/svg/ic_exit.svg',
                             title: 'Logout',
                             description: 'Sign out of your account',
                             onTap: _handleLogout,
-                          ),
-                          _buildSectionHeader('Subscription'),
-                          _buildMenuItem(
-                            svgIconPath: 'assets/icons/svg/ic_premium.svg',
-                            title: 'Manage Subscription',
-                            description: 'View and upgrade your plan',
-                            onTap: () =>
-                                Navigator.pushNamed(
-                                    context, RoutesName.subscriptionScreen),
                           ),
                           _buildSectionHeader('Appearance'),
                           _buildMenuItem(
@@ -1373,6 +1221,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onSwitchChanged: (value) {
                               themeProvider.toggleTheme(value);
                             },
+                          ),
+                          _buildSectionHeader('Subscription'),
+                          _buildMenuItem(
+                            svgIconPath: 'assets/icons/svg/ic_premium.svg',
+                            title: 'Manage Subscription',
+                            description: 'View and upgrade your plan',
+                            onTap: () => Navigator.pushNamed(
+                                context, RoutesName.subscriptionScreen),
+                          ),
+                          _buildSectionHeader('Downloads'),
+                          _buildMenuItem(
+                            svgIconPath: 'assets/icons/svg/ic_download.svg',
+                            title: 'Download Location',
+                            description: 'Default path: $_downloadPath',
+                            onTap: () {},
                           ),
                           _buildSectionHeader('Storage'),
                           _buildMenuItem(
@@ -1394,8 +1257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             svgIconPath: 'assets/icons/svg/ic_terms.svg',
                             title: 'Terms and Conditions',
                             description: 'Understand our terms of service',
-                            onTap: () =>
-                                _launchUrl('https://example.com/terms'),
+                            onTap: () => _launchUrl('https://example.com/terms'),
                           ),
                           _buildSectionHeader('About'),
                           _buildMenuItem(
@@ -1419,7 +1281,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// Custom painter for premium background pattern
 class PremiumBackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -1427,15 +1288,8 @@ class PremiumBackgroundPainter extends CustomPainter {
       ..color = Colors.amber.withOpacity(0.03)
       ..style = PaintingStyle.fill;
 
-    // Draw subtle geometric patterns (upper circles moved up further)
     for (int i = 0; i < 4; i++) {
       final offset = i * 80.0;
-      // canvas.drawCircle(
-      //   Offset(size.width - offset, 30), // Moved up more (from -30 to -60)
-      //   50,
-      //   paint,
-      // );
-      // Lower circles unchanged (cloud-like pattern)
       canvas.drawCircle(
         Offset(offset, size.height + 30),
         50,
@@ -1443,7 +1297,6 @@ class PremiumBackgroundPainter extends CustomPainter {
       );
     }
 
-    // Draw diagonal lines pattern
     final linePaint = Paint()
       ..color = Colors.amber.withOpacity(0.02)
       ..strokeWidth = 1

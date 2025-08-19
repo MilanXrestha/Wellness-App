@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -26,25 +25,29 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   CategoryModel? _selectedCategory;
   late AnimationController _animationController;
   late Animation<Offset> _navBarOffset;
-  late ScrollController _scrollController;
-  bool _isNavBarVisible = true;
-  String? _userId;
   late List<Widget> _screens;
+  String? _userId;
+  bool _isNavBarVisible = true;
+  bool _isSearchActive = false;
+
+  void _setNavBarVisibility(bool isVisible) {
+    setState(() {
+      _isSearchActive = !isVisible; // Track search state
+      _isNavBarVisible = isVisible;
+      if (isVisible) {
+        _animationController.reverse();
+      } else {
+        _animationController.forward();
+      }
+    });
+    log('Nav bar visibility set to: $isVisible due to search', name: 'MainScreen');
+  }
 
   @override
   void initState() {
     super.initState();
     final authService = AuthService();
     _userId = authService.getCurrentUser()?.uid;
-
-    _screens = [
-      UserDashboardScreen(
-        onViewAllCategories: _onViewAllCategories,
-      ),
-      const ExploreScreen(),
-      CategoryScreen(selectedCategory: _selectedCategory),
-      const FavoriteScreen(),
-    ];
 
     _animationController = AnimationController(
       vsync: this,
@@ -58,22 +61,21 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       ),
     );
 
-    _scrollController = ScrollController();
-    _scrollController.addListener(_handleScroll);
-  }
-
-  void _handleScroll() {
-    if (_scrollController.position.userScrollDirection == ScrollDirection.reverse) {
-      if (_isNavBarVisible) {
-        _animationController.forward();
-        _isNavBarVisible = false;
-      }
-    } else if (_scrollController.position.userScrollDirection == ScrollDirection.forward) {
-      if (!_isNavBarVisible) {
-        _animationController.reverse();
-        _isNavBarVisible = true;
-      }
-    }
+    _screens = [
+      UserDashboardScreen(
+        onViewAllCategories: _onViewAllCategories,
+      ),
+      ExploreScreen(
+        onSearchActiveChanged: _setNavBarVisibility,
+      ),
+      CategoryScreen(
+        selectedCategory: _selectedCategory,
+        onSearchActiveChanged: _setNavBarVisibility,
+      ),
+      FavoriteScreen(
+        onSearchActiveChanged: _setNavBarVisibility,
+      ),
+    ];
   }
 
   void _onItemTapped(int index) {
@@ -81,12 +83,14 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       _selectedIndex = index;
       if (index == 2) {
         _selectedCategory = null;
-        _screens[2] = CategoryScreen(selectedCategory: _selectedCategory);
+        _screens[2] = CategoryScreen(
+          selectedCategory: _selectedCategory,
+          onSearchActiveChanged: _setNavBarVisibility,
+        );
       }
-      if (!_isNavBarVisible) {
-        _animationController.reverse();
-        _isNavBarVisible = true;
-      }
+      _isNavBarVisible = true;
+      _isSearchActive = false;
+      _animationController.reverse();
     });
     log('Tab switched to index: $index', name: 'MainScreen');
   }
@@ -95,11 +99,13 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     setState(() {
       _selectedIndex = 2;
       _selectedCategory = null;
-      _screens[2] = CategoryScreen(selectedCategory: _selectedCategory);
-      if (!_isNavBarVisible) {
-        _animationController.reverse();
-        _isNavBarVisible = true;
-      }
+      _screens[2] = CategoryScreen(
+        selectedCategory: _selectedCategory,
+        onSearchActiveChanged: _setNavBarVisibility,
+      );
+      _isNavBarVisible = true;
+      _isSearchActive = false;
+      _animationController.reverse();
     });
     log('Navigated to Category tab via View All', name: 'MainScreen');
   }
@@ -108,10 +114,9 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     if (_selectedIndex != 0) {
       setState(() {
         _selectedIndex = 0;
-        if (!_isNavBarVisible) {
-          _animationController.reverse();
-          _isNavBarVisible = true;
-        }
+        _isNavBarVisible = true;
+        _isSearchActive = false;
+        _animationController.reverse();
       });
       return false;
     } else {
@@ -135,32 +140,60 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     });
   }
 
+  // Handle scroll notifications to show/hide nav bar
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (_isSearchActive) {
+      // Ignore scroll events when search is active
+      return false;
+    }
+
+    if (notification is UserScrollNotification) {
+      if (notification.direction == ScrollDirection.reverse && _isNavBarVisible) {
+        setState(() {
+          _isNavBarVisible = false;
+          _animationController.forward();
+        });
+        log('Nav bar hidden due to downward scroll', name: 'MainScreen');
+      } else if (notification.direction == ScrollDirection.forward && !_isNavBarVisible) {
+        setState(() {
+          _isNavBarVisible = true;
+          _animationController.reverse();
+        });
+        log('Nav bar shown due to upward scroll', name: 'MainScreen');
+      }
+    }
+    return false;
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
-    _scrollController.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) { // Corrected parameter type from Context to BuildContext
     if (_userId == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushReplacementNamed(context, RoutesName.loginScreen);
       });
-      return const SizedBox.shrink();
+      return const Center(child: CircularProgressIndicator());
     }
 
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        resizeToAvoidBottomInset: false,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         extendBody: true,
         body: Stack(
           children: [
-            IndexedStack(
-              index: _selectedIndex,
-              children: _screens.asMap().entries.map((entry) => _wrapWithScrollController(entry.value, entry.key)).toList(),
+            NotificationListener<ScrollNotification>(
+              onNotification: _handleScrollNotification,
+              child: IndexedStack(
+                index: _selectedIndex,
+                children: _screens,
+              ),
             ),
             Positioned(
               left: 16.w,
@@ -168,9 +201,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
               bottom: 14.h,
               child: SlideTransition(
                 position: _navBarOffset,
-                child: CustomBottomNavBar(
-                  selectedIndex: _selectedIndex,
-                  onItemTapped: _onItemTapped,
+                child: Visibility(
+                  visible: _isNavBarVisible,
+                  child: CustomBottomNavBar(
+                    selectedIndex: _selectedIndex,
+                    onItemTapped: _onItemTapped,
+                  ),
                 ),
               ),
             ),
@@ -178,23 +214,5 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
         ),
       ),
     );
-  }
-
-  Widget _wrapWithScrollController(Widget screen, int index) {
-    if (index == 0 && screen is UserDashboardScreen) {
-      return NotificationListener<ScrollNotification>(
-        onNotification: (scrollNotification) {
-          if (scrollNotification is ScrollUpdateNotification) {
-            _handleScroll();
-          }
-          return false;
-        },
-        child: SingleChildScrollView(
-          controller: _scrollController,
-          child: screen,
-        ),
-      );
-    }
-    return screen;
   }
 }

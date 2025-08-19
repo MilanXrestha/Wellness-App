@@ -16,6 +16,7 @@ import 'package:wellness_app/features/categories/presentation/screens/category_s
 import 'package:wellness_app/features/audioPlayer/presentation/screens/media_player_screen.dart';
 import 'package:wellness_app/features/explore/presentation/screens/explore_screen.dart';
 import 'package:wellness_app/features/favorites/presentation/screens/favorite_screen.dart';
+import 'package:wellness_app/features/imageViewer/presentation/screens/image_viewer_screen.dart';
 import 'package:wellness_app/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:wellness_app/features/profile/presentation/screens/profile_screen.dart';
 import 'package:wellness_app/features/splash/presentation/screens/splash_screen.dart';
@@ -308,6 +309,17 @@ class RouteConfig {
             tip: args['tip'] as TipModel,
             categoryName: args['categoryName'] as String,
             featuredTips: args['featuredTips'] as List<TipModel>,
+          ),
+          settings: settings,
+        );
+
+      case RoutesName.imageViewerScreen:
+        final args = settings.arguments as Map<String, dynamic>;
+        return MaterialPageRoute(
+          builder: (_) => ImageViewerScreen(
+            tip: args['tip'] as TipModel,
+            imageTips: args['imageTips'] as List<TipModel>,
+            initialIndex: args['initialIndex'] as int,
           ),
           settings: settings,
         );

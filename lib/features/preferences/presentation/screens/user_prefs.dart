@@ -6,17 +6,19 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:provider/provider.dart';
+import 'package:lottie/lottie.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/features/preferences/data/services/preference_service.dart';
+import 'package:wellness_app/features/preferences/data/models/user_preference_model.dart';
 import 'package:flip_card/flip_card.dart';
 import '../../data/models/preference_model.dart';
 import '../../../profile/data/user_model.dart';
-import '../../data/models/user_preference_model.dart';
 import '../../../main/presentation/screens/main_screen.dart';
+import '../provider/user_preference_provider.dart';
 
-/// Widget for displaying the user preference selection screen
 class UserPreferenceScreen extends StatefulWidget {
   final bool fromProfile;
 
@@ -39,6 +41,12 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
   void initState() {
     super.initState();
     _selectedItemsNotifier = ValueNotifier<List<bool>>([]);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final userId = _authService.getCurrentUser()?.uid ?? '';
+      if (userId.isNotEmpty) {
+        Provider.of<UserPreferenceProvider>(context, listen: false).loadUserPreferences(userId);
+      }
+    });
   }
 
   @override
@@ -48,7 +56,6 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
     super.dispose();
   }
 
-  /// Updates the last login timestamp in SharedPreferences
   Future<void> _updateLastLoginTimestamp() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(
@@ -57,7 +64,6 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
     );
   }
 
-  /// Saves selected preferences to Firestore and updates preferenceCompleted
   Future<void> _savePreferences(List<PreferenceModel> selectedPreferences) async {
     if (_isLoading) return;
 
@@ -116,6 +122,13 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
       await _authService.saveUserData(userModel);
       await _updateLastLoginTimestamp();
 
+      // Update UserPreferenceProvider
+      final updatedPreferences = UserPreferenceModel(
+        userId: user.uid,
+        preferences: preferences,
+      );
+      Provider.of<UserPreferenceProvider>(context, listen: false).updateUserPreferences(updatedPreferences);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -132,9 +145,8 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
         );
 
         if (widget.fromProfile) {
-          Navigator.pop(context); // Return to ProfileScreen
+          Navigator.pop(context);
         } else {
-          // Smooth transition to mainScreen with slide and fade
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
@@ -186,11 +198,10 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
     }
   }
 
-  /// Renders icons based on type (SVG or image) from network or assets
   Widget _buildIcon(PreferenceModel pref, bool selected, ThemeData theme, bool isDark) {
     final color = selected
-        ? (isDark ? AppColors.primary : AppColors.lightTextPrimary) // Black for light mode selected
-        : (isDark ? theme.colorScheme.onSurfaceVariant : AppColors.lightTextSecondary); // Gray for unselected
+        ? (isDark ? AppColors.primary : AppColors.lightTextPrimary)
+        : (isDark ? theme.colorScheme.onSurfaceVariant : AppColors.lightTextSecondary);
 
     if (pref.isNetworkIcon) {
       if (pref.isSvg) {
@@ -199,15 +210,35 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
           width: 28.sp,
           height: 28.sp,
           colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-          placeholderBuilder: (context) => CircularProgressIndicator(strokeWidth: 2.w),
-          fit: BoxFit.cover,
+          placeholderBuilder: (context) => SizedBox(
+            width: 28.sp,
+            height: 28.sp,
+            child: Lottie.asset(
+              'assets/animation/loading_animation.json',
+              width: 28.sp,
+              height: 28.sp,
+              fit: BoxFit.contain,
+              onWarning: (warning) => debugPrint('Lottie Warning: $warning'),
+            ),
+          ),
+          fit: BoxFit.contain,
         );
       } else {
         return CachedNetworkImage(
           imageUrl: pref.preferenceIcon,
           width: 28.sp,
           height: 28.sp,
-          placeholder: (context, url) => CircularProgressIndicator(strokeWidth: 2.w),
+          placeholder: (context, url) => SizedBox(
+            width: 28.sp,
+            height: 28.sp,
+            child: Lottie.asset(
+              'assets/animation/loading_animation.json',
+              width: 28.sp,
+              height: 28.sp,
+              fit: BoxFit.contain,
+              onWarning: (warning) => debugPrint('Lottie Warning: $warning'),
+            ),
+          ),
           errorWidget: (context, url, error) => Icon(Icons.broken_image, size: 28.sp, color: color),
           color: color,
         );
@@ -233,9 +264,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
         systemNavigationBarColor: theme.scaffoldBackgroundColor,
-        systemNavigationBarIconBrightness: isDark
-            ? Brightness.light
-            : Brightness.dark,
+        systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
     );
 
@@ -248,33 +277,28 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
               icon: Icon(
                 Icons.arrow_back_ios_new,
                 size: 20.sp,
-                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary, // Black for light
+                color: isDark ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
               ),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
               'Content Preferences',
               style: theme.textTheme.titleLarge?.copyWith(
-                color: isDark ? Colors.white : AppColors.lightTextPrimary, // Black for light
+                color: isDark ? Colors.white : AppColors.lightTextPrimary,
                 fontSize: 20.sp,
                 fontWeight: FontWeight.bold,
                 fontFamily: 'Poppins',
               ),
             ),
-            backgroundColor: Colors.transparent, // No background
+            backgroundColor: Colors.transparent,
             elevation: 0,
           )
-
-
-
               : null,
           body: Container(
             decoration: BoxDecoration(
-              color: isDark
-                  ? null // Keep dark mode as is
-                  : AppColors.lightBackground, // Pure white for light mode (Apple clean vibe)
+              color: isDark ? null : AppColors.lightBackground,
               gradient: isDark
-                  ? LinearGradient( // Keep dark mode gradient
+                  ? LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
@@ -282,17 +306,23 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                   theme.scaffoldBackgroundColor,
                 ],
               )
-                  : null, // No gradient for light mode
+                  : null,
             ),
             child: SafeArea(
               child: StreamBuilder<List<PreferenceModel>>(
                 stream: _preferenceService.streamPreferences(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 4.w,
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    );
                   }
 
                   if (snapshot.hasError) {
+                    debugPrint('StreamBuilder Error: ${snapshot.error}');
                     return Center(
                       child: Text(
                         snapshot.error.toString().replaceFirst('Exception: ', ''),
@@ -305,7 +335,6 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                   }
 
                   _preferences = snapshot.data ?? [];
-                  // Initialize _selectedItemsNotifier and _flipCardKeys
                   if (_selectedItemsNotifier.value.length != _preferences.length ||
                       _flipCardKeys.length != _preferences.length) {
                     _selectedItemsNotifier.value = List<bool>.filled(
@@ -366,7 +395,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                 padding: EdgeInsets.all(16.w),
                                                 decoration: BoxDecoration(
                                                   gradient: isDark
-                                                      ? LinearGradient( // Keep dark mode
+                                                      ? LinearGradient(
                                                     colors: [
                                                       AppColors.primary.withAlpha(51),
                                                       AppColors.primary.withAlpha(26),
@@ -374,7 +403,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                     begin: Alignment.topLeft,
                                                     end: Alignment.bottomRight,
                                                   )
-                                                      : LinearGradient( // Subtle white-gray for light (consistent with Profile)
+                                                      : LinearGradient(
                                                     colors: [
                                                       Colors.white,
                                                       Colors.grey.shade100,
@@ -384,14 +413,14 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                   ),
                                                   borderRadius: BorderRadius.circular(16.r),
                                                   border: Border.all(
-                                                    color: isDark ? Colors.transparent : Colors.grey.shade300, // Gray border for light
+                                                    color: isDark ? Colors.transparent : Colors.grey.shade300,
                                                     width: 1.w,
                                                   ),
                                                   boxShadow: isDark
-                                                      ? [] // Keep dark as is
+                                                      ? []
                                                       : [
                                                     BoxShadow(
-                                                      color: AppColors.lightTextPrimary.withOpacity(0.2), // Subtle shadow
+                                                      color: AppColors.lightTextPrimary.withOpacity(0.2),
                                                       blurRadius: 8.r,
                                                       offset: Offset(0, 2.h),
                                                     ),
@@ -407,7 +436,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                       style: theme.textTheme.headlineMedium?.copyWith(
                                                         fontFamily: 'Poppins',
                                                         fontWeight: FontWeight.bold,
-                                                        color: isDark ? AppColors.primary : AppColors.lightTextPrimary, // Black for light
+                                                        color: isDark ? AppColors.primary : AppColors.lightTextPrimary,
                                                         fontSize: 28.sp,
                                                       ),
                                                     ),
@@ -420,7 +449,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                         fontFamily: 'Poppins',
                                                         color: isDark
                                                             ? theme.colorScheme.onSurfaceVariant
-                                                            : AppColors.lightTextSecondary, // Gray for light
+                                                            : AppColors.lightTextSecondary,
                                                         fontSize: 16.sp,
                                                       ),
                                                     ),
@@ -434,8 +463,8 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                   child: CircleAvatar(
                                                     radius: 12.r,
                                                     backgroundColor: isDark
-                                                        ? AppColors.primary // Keep dark
-                                                        : AppColors.lightTextPrimary, // Black badge for light (Nike bold)
+                                                        ? AppColors.primary
+                                                        : AppColors.lightTextPrimary,
                                                     child: Text(
                                                       '$selectedCount',
                                                       style: TextStyle(
@@ -488,8 +517,8 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                               child: Container(
                                                 decoration: BoxDecoration(
                                                   gradient: isDark
-                                                      ? null // Keep dark as is
-                                                      : LinearGradient( // Subtle white-gray gradient for light (like Profile cards)
+                                                      ? null
+                                                      : LinearGradient(
                                                     colors: [
                                                       Colors.white,
                                                       Colors.grey.shade100,
@@ -501,13 +530,13 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                       ? (selected
                                                       ? AppColors.primary.withAlpha(38)
                                                       : AppColors.darkSurface.withAlpha(230))
-                                                      : null, // No color override for light (use gradient)
+                                                      : null,
                                                   borderRadius: BorderRadius.circular(16.r),
                                                   border: Border.all(
                                                     color: isDark
                                                         ? (selected ? AppColors.primary : theme.dividerColor.withAlpha(77))
-                                                        : (selected ? AppColors.lightTextPrimary : Colors.grey.shade300), // Black border for selected light, gray for unselected
-                                                    width: 1.w, // Thinner for minimalism
+                                                        : (selected ? AppColors.lightTextPrimary : Colors.grey.shade300),
+                                                    width: 1.w,
                                                   ),
                                                   boxShadow: isDark
                                                       ? (selected
@@ -522,8 +551,8 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                       : [
                                                     BoxShadow(
                                                       color: selected
-                                                          ? AppColors.lightTextPrimary.withOpacity(0.2) // Subtle black shadow for selected
-                                                          : Colors.grey.shade200, // Very light gray shadow for unselected
+                                                          ? AppColors.lightTextPrimary.withOpacity(0.2)
+                                                          : Colors.grey.shade200,
                                                       blurRadius: 8.r,
                                                       offset: Offset(0, 2.h),
                                                     ),
@@ -543,7 +572,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                           fontWeight: FontWeight.w600,
                                                           color: isDark
                                                               ? (selected ? Colors.white : theme.colorScheme.onSurface)
-                                                              : (selected ? AppColors.lightTextPrimary : AppColors.lightTextSecondary), // Black for selected light, gray for unselected
+                                                              : (selected ? AppColors.lightTextPrimary : AppColors.lightTextSecondary),
                                                           fontSize: 14.sp,
                                                         ),
                                                         maxLines: 2,
@@ -567,8 +596,8 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                               child: Container(
                                                 decoration: BoxDecoration(
                                                   gradient: isDark
-                                                      ? null // Keep dark as is
-                                                      : LinearGradient( // Subtle white-gray for back side
+                                                      ? null
+                                                      : LinearGradient(
                                                     colors: [
                                                       Colors.white,
                                                       Colors.grey.shade100,
@@ -622,7 +651,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                                             fontFamily: 'Poppins',
                                                             color: isDark
                                                                 ? (selected ? Colors.white : theme.colorScheme.onSurfaceVariant)
-                                                                : (selected ? AppColors.lightTextPrimary : AppColors.lightTextSecondary), // Black/gray for light
+                                                                : (selected ? AppColors.lightTextPrimary : AppColors.lightTextSecondary),
                                                             fontSize: 12.sp,
                                                           ),
                                                           textAlign: TextAlign.center,
@@ -663,12 +692,10 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                           _savePreferences(selectedPreferences);
                                         },
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: isDark
-                                              ? null // Keep dark as is
-                                              : AppColors.lightTextPrimary, // Solid black button for light (Nike bold contrast)
-                                          foregroundColor: Colors.white, // White text for high contrast
-                                          shadowColor: isDark ? null : Colors.grey.shade300, // Subtle gray shadow for light
-                                          elevation: isDark ? null : 2, // Light elevation for depth
+                                          backgroundColor: isDark ? null : AppColors.lightTextPrimary,
+                                          foregroundColor: Colors.white,
+                                          shadowColor: isDark ? null : Colors.grey.shade300,
+                                          elevation: isDark ? null : 2,
                                           padding: EdgeInsets.zero,
                                           minimumSize: Size(double.infinity, 40.h),
                                           shape: RoundedRectangleBorder(
@@ -677,7 +704,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                         ),
                                         child: Ink(
                                           decoration: isDark
-                                              ? BoxDecoration( // Keep dark gradient
+                                              ? BoxDecoration(
                                             gradient: LinearGradient(
                                               colors: [
                                                 AppColors.primary,
@@ -688,7 +715,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                             ),
                                             borderRadius: BorderRadius.circular(16.r),
                                           )
-                                              : BoxDecoration( // No gradient for light (solid black)
+                                              : BoxDecoration(
                                             color: AppColors.lightTextPrimary,
                                             borderRadius: BorderRadius.circular(16.r),
                                           ),
@@ -700,7 +727,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                               style: theme.textTheme.labelLarge?.copyWith(
                                                 fontFamily: 'Poppins',
                                                 fontWeight: FontWeight.bold,
-                                                color: Colors.white, // White text on black button
+                                                color: Colors.white,
                                                 fontSize: 20.sp,
                                               ),
                                             ),
@@ -726,8 +753,12 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
           Container(
             color: Colors.black54,
             child: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              child: Lottie.asset(
+                'assets/animations/loading_animation.json',
+                width: 150.sp,
+                height: 150.sp,
+                fit: BoxFit.contain,
+                onWarning: (warning) => debugPrint('Lottie Warning: $warning'),
               ),
             ),
           ),

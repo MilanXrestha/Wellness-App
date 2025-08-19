@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 
 /// Reusable text field widget for authentication screens.
-class AuthTextField extends StatelessWidget {
+class AuthTextField extends StatefulWidget {
   final TextEditingController controller;
   final String labelText;
   final String iconPath;
@@ -12,6 +12,7 @@ class AuthTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final Widget? suffixIcon;
   final String? Function(String?)? validator;
+  final Widget Function(bool isFocused)? suffixIconBuilder;
 
   const AuthTextField({
     super.key,
@@ -22,40 +23,56 @@ class AuthTextField extends StatelessWidget {
     this.keyboardType,
     this.suffixIcon,
     this.validator,
+    this.suffixIconBuilder,
   });
+
+  @override
+  State<AuthTextField> createState() => _AuthTextFieldState();
+}
+
+class _AuthTextFieldState extends State<AuthTextField> {
+  late FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    _focusNode.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
+    final isFocused = _focusNode.hasFocus;
 
     return Container(
       decoration: isDarkMode
           ? null
           : BoxDecoration(
-              borderRadius: BorderRadius.circular(12.r),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 6.r,
-                  offset: Offset(0, 2.h),
-                ),
-              ],
-            ),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
       child: TextFormField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        validator: validator,
+        focusNode: _focusNode,
+        controller: widget.controller,
+        obscureText: widget.obscureText,
+        keyboardType: widget.keyboardType,
+        validator: widget.validator,
         decoration: InputDecoration(
-          labelText: labelText,
+          labelText: widget.labelText,
           labelStyle: theme.textTheme.bodyMedium?.copyWith(
             fontFamily: 'Poppins',
             color: theme.colorScheme.onSurfaceVariant,
             fontSize: 14.sp,
           ),
           floatingLabelStyle: TextStyle(
-            color: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+            color: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
             fontFamily: 'Poppins',
             fontSize: 16.sp,
           ),
@@ -64,45 +81,49 @@ class AuthTextField extends StatelessWidget {
           border: isDarkMode
               ? theme.inputDecorationTheme.border
               : OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(
-                    color: AppColors.lightTextSecondary,
-                    width: 1.w,
-                  ),
-                ),
+            borderRadius: BorderRadius.circular(12.r),
+            borderSide: BorderSide(
+              color: AppColors.lightTextSecondary,
+              width: 1.w,
+            ),
+          ),
           focusedBorder: isDarkMode
               ? theme.inputDecorationTheme.focusedBorder
               : OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(
-                    color: AppColors.lightTextPrimary,
-                    width: 1.5.w,
-                  ),
-                ),
+            borderRadius: BorderRadius.circular(12.r),
+            borderSide: BorderSide(
+              color: AppColors.colorPrimaryLight,
+              width: 1.5.w,
+            ),
+          ),
           enabledBorder: isDarkMode
               ? theme.inputDecorationTheme.enabledBorder
               : OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: BorderSide(
-                    color: AppColors.lightTextSecondary,
-                    width: 1.w,
-                  ),
-                ),
+            borderRadius: BorderRadius.circular(12.r),
+            borderSide: BorderSide(
+              color: AppColors.colorPrimaryLight,
+              width: 1.w,
+            ),
+          ),
           prefixIcon: Padding(
             padding: EdgeInsets.all(12.w),
             child: SvgPicture.asset(
-              iconPath,
+              widget.iconPath,
               width: 21.w,
               height: 21.h,
               colorFilter: ColorFilter.mode(
-                isDarkMode
+                isFocused
+                    ? (isDarkMode
+                    ? AppColors.primary
+                    : AppColors.colorPrimaryLight) // focused → green
+                    : (isDarkMode
                     ? AppColors.darkTextPrimary
-                    : AppColors.lightSecondary,
+                    : AppColors.lightTextHint), // unfocused → gray
                 BlendMode.srcIn,
               ),
             ),
           ),
-          suffixIcon: suffixIcon,
+          suffixIcon: widget.suffixIconBuilder?.call(isFocused) ?? widget.suffixIcon,
         ),
         style: theme.textTheme.bodyMedium?.copyWith(fontFamily: 'Poppins'),
       ),

@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
@@ -42,7 +43,10 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
     );
     _shakeAnimation = TweenSequence([
       TweenSequenceItem(tween: Tween<double>(begin: 0, end: -0.05), weight: 25),
-      TweenSequenceItem(tween: Tween<double>(begin: -0.05, end: 0.05), weight: 50),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.05, end: 0.05),
+        weight: 50,
+      ),
       TweenSequenceItem(tween: Tween<double>(begin: 0.05, end: 0), weight: 25),
     ]).animate(_shakeController);
   }
@@ -50,7 +54,9 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final canAccessPremium = Provider.of<PremiumStatusProvider>(context).canAccessPremium;
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(
+      context,
+    ).canAccessPremium;
     if (widget.tip.isPremium && !canAccessPremium) {
       _shakeController.repeat();
     } else {
@@ -67,66 +73,119 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
   void _showPremiumDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.3),
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: Row(
-            children: [
-              SvgPicture.asset(
-                'assets/icons/svg/ic_crown.svg',
-                width: 24.r,
-                height: 24.r,
-                semanticsLabel: 'Premium content',
-              ),
-              SizedBox(width: 8.w),
-              Text(
-                'Premium Tip',
-                style: widget.theme.textTheme.titleLarge?.copyWith(
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.w700,
-                  fontFamily: 'Poppins',
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: EdgeInsets.all(24.r),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: widget.isDarkMode
+                      ? [AppColors.darkSurface, AppColors.darkBackground]
+                      : [AppColors.lightBackground, AppColors.lightSurface],
                 ),
-              ),
-            ],
-          ),
-          content: Text(
-            'Subscribe now and unlock powerful tips like this one!',
-            style: widget.theme.textTheme.bodyMedium?.copyWith(
-              fontSize: 16.sp,
-              fontFamily: 'Poppins',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'Cancel',
-                style: widget.theme.textTheme.labelLarge?.copyWith(
-                  fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.pushNamed(context, RoutesName.subscriptionScreen);
-              },
-              style: widget.theme.elevatedButtonTheme.style?.copyWith(
-                padding: MaterialStateProperty.all(
-                  EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                ),
-                textStyle: MaterialStateProperty.all(
-                  widget.theme.textTheme.labelLarge?.copyWith(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.w600,
+                borderRadius: BorderRadius.circular(24.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.shadow,
+                    blurRadius: 20.r,
+                    offset: Offset(0, 10.h),
                   ),
-                ),
+                ],
               ),
-              child: const Text('Subscribe'),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.workspace_premium,
+                    size: 64.r,
+                    color: Colors.orange,
+                  ),
+                  SizedBox(height: 16.h),
+                  Text(
+                    'Unlock Premium Tip',
+                    style: widget.theme.textTheme.titleLarge?.copyWith(
+                      fontSize: 20.sp,
+                      fontWeight: FontWeight.bold,
+                      color: widget.isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 8.h),
+                  Text(
+                    'Subscribe now and unlock powerful tips like this one!',
+                    style: widget.theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 14.sp,
+                      color: widget.isDarkMode
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: 24.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                          ),
+                          child: Text(
+                            'Not Now',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                            Navigator.pushNamed(
+                              context,
+                              RoutesName.subscriptionScreen,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: EdgeInsets.symmetric(vertical: 12.h),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Subscribe',
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.lightBackground,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ],
+          ),
         );
       },
     );
@@ -137,20 +196,26 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
     return Consumer<PremiumStatusProvider>(
       builder: (context, premiumStatus, child) {
         final canAccessPremium = premiumStatus.canAccessPremium;
+        final isPremiumLocked = widget.tip.isPremium && !canAccessPremium;
+
         return Container(
-          width: 280.w,
-          height: 160.h,
+          width: 295.w,
+          height: 150.h,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12.r),
             boxShadow: [
               BoxShadow(
-                color: widget.isDarkMode ? AppColors.darkSurface.withOpacity(0.1) : Colors.black.withAlpha(6),
+                color: widget.isDarkMode
+                    ? AppColors.darkSurface.withOpacity(0.1)
+                    : Colors.black.withAlpha(6),
                 blurRadius: 5.r,
                 spreadRadius: 0.5.r,
                 offset: Offset(0, 1.h),
               ),
               BoxShadow(
-                color: widget.isDarkMode ? AppColors.darkSurface.withOpacity(0.1) : Colors.black.withAlpha(6),
+                color: widget.isDarkMode
+                    ? AppColors.darkSurface.withOpacity(0.1)
+                    : Colors.black.withAlpha(6),
                 blurRadius: 5.r,
                 spreadRadius: 0.5.r,
                 offset: Offset(1.w, 0),
@@ -162,7 +227,9 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12.r),
               side: BorderSide(
-                color: widget.isDarkMode ? Colors.grey.shade600 : Colors.grey.shade400,
+                color: widget.isDarkMode
+                    ? Colors.grey.shade600
+                    : Colors.grey.shade400,
                 width: 1.w,
               ),
             ),
@@ -174,13 +241,13 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                     color: widget.isDarkMode ? null : Colors.white,
                     gradient: widget.isDarkMode
                         ? LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        AppColors.darkSurface,
-                        AppColors.darkSurface.withOpacity(0.7),
-                      ],
-                    )
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              AppColors.darkSurface,
+                              AppColors.darkSurface.withOpacity(0.7),
+                            ],
+                          )
                         : null,
                     borderRadius: BorderRadius.circular(12.r),
                   ),
@@ -214,7 +281,8 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                                 decoration: BoxDecoration(
                                   border: Border(
                                     bottom: BorderSide(
-                                      color: AppColors.primary.withOpacity(0.1),
+                                      color: AppColors.darkSecondary
+                                          .withOpacity(0.1),
                                       width: 1.w,
                                     ),
                                   ),
@@ -228,7 +296,9 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                                         width: 24.r,
                                         height: 24.r,
                                         colorFilter: ColorFilter.mode(
-                                          widget.isDarkMode ? AppColors.primary : Colors.black,
+                                          widget.isDarkMode
+                                              ? AppColors.primary
+                                              : Colors.black,
                                           BlendMode.srcIn,
                                         ),
                                         semanticsLabel: 'Inspiration icon',
@@ -237,14 +307,15 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                                     Expanded(
                                       child: Text(
                                         widget.tip.tipsTitle,
-                                        style: widget.theme.textTheme.bodyMedium?.copyWith(
-                                          fontSize: 14.sp,
-                                          fontFamily: 'Poppins',
-                                          color: widget.isDarkMode
-                                              ? AppColors.darkTextPrimary
-                                              : AppColors.lightTextPrimary,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                        style: widget.theme.textTheme.bodyMedium
+                                            ?.copyWith(
+                                              fontSize: 14.sp,
+                                              fontFamily: 'Poppins',
+                                              color: widget.isDarkMode
+                                                  ? AppColors.darkTextPrimary
+                                                  : AppColors.lightTextPrimary,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
@@ -256,13 +327,14 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                               Flexible(
                                 child: Text(
                                   widget.tip.tipsDescription,
-                                  style: widget.theme.textTheme.bodySmall?.copyWith(
-                                    fontSize: 14.sp,
-                                    fontFamily: 'Poppins',
-                                    color: widget.isDarkMode
-                                        ? AppColors.darkTextSecondary
-                                        : AppColors.lightTextSecondary,
-                                  ),
+                                  style: widget.theme.textTheme.bodySmall
+                                      ?.copyWith(
+                                        fontSize: 14.sp,
+                                        fontFamily: 'Poppins',
+                                        color: widget.isDarkMode
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextSecondary,
+                                      ),
                                   maxLines: 10,
                                   overflow: TextOverflow.ellipsis,
                                   textAlign: TextAlign.justify,
@@ -272,58 +344,99 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                           ),
                         ),
                       ),
-                      if (widget.tip.isPremium && !canAccessPremium)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12.r),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                            child: Container(
-                              color: widget.isDarkMode
-                                  ? AppColors.darkSurface.withOpacity(0.7)
-                                  : AppColors.lightBackground.withOpacity(0.5),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
                 ),
-                if (widget.tip.isPremium && !canAccessPremium)
+
+                // Premium locked overlay
+                if (isPremiumLocked)
                   Positioned.fill(
-                    child: InkWell(
+                    child: GestureDetector(
                       onTap: () {
                         _showPremiumDialog(context);
                       },
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          AnimatedBuilder(
-                            animation: _shakeController,
-                            builder: (context, child) {
-                              return Transform.rotate(
-                                angle: _shakeAnimation.value,
-                                child: SvgPicture.asset(
-                                  'assets/icons/svg/ic_crown.svg',
-                                  width: 40.r,
-                                  height: 40.r,
-                                  semanticsLabel: 'Premium content',
-                                ),
-                              );
-                            },
-                          ),
-                          SizedBox(height: 8.h),
-                          Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 16.w),
-                            child: Text(
-                              'Access premium wisdom. Subscribe to unlock this tip!',
-                              style: widget.theme.textTheme.labelLarge?.copyWith(
-                                color: widget.isDarkMode ? Colors.white : AppColors.lightTextPrimary,
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Poppins',
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12.r),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 4.0, sigmaY: 4.0),
+                          child: Container(
+                            color: widget.isDarkMode
+                                ? AppColors.darkSurface.withOpacity(0.4)
+                                : AppColors.lightBackground.withOpacity(0.4),
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  AnimatedBuilder(
+                                    animation: _shakeController,
+                                    builder: (context, child) {
+                                      return Transform.rotate(
+                                        angle: _shakeAnimation.value,
+                                        child: Icon(
+                                          FontAwesomeIcons.crown,
+                                          size: 40.sp,
+                                          color: const Color(0xFFFFD700),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  SizedBox(height: 8.h),
+                                  Text(
+                                    'Tap to Unlock',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: widget.isDarkMode
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors.lightTextPrimary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Premium indicator badge
+                if (widget.tip.isPremium)
+                  Positioned(
+                    top: 6.h,
+                    right: 8.w,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 10.w,
+                        vertical: 6.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.yellow,
+                        borderRadius: BorderRadius.circular(10.r),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4.r,
+                            offset: Offset(0, 2.h),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.workspace_premium,
+                            size: 14.sp,
+                            color: Colors.black87,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            'PREMIUM',
+                            style: TextStyle(
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],

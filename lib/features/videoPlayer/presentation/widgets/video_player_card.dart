@@ -32,6 +32,7 @@ class VideoPlayerCard extends StatelessWidget {
         final isDarkMode = theme.brightness == Brightness.dark;
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+
           child: Dialog(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -164,8 +165,8 @@ class VideoPlayerCard extends StatelessWidget {
         }
       },
       child: Container(
-        width: 250.w,
-        margin: EdgeInsets.only(right: 16.w),
+        width: 290.w,
+        margin: EdgeInsets.only(right: 10.w),
         child: ClipRect(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -174,7 +175,7 @@ class VideoPlayerCard extends StatelessWidget {
               Stack(
                 children: [
                   Container(
-                    height: 100.h,
+                    height: 150.h,
                     width: double.infinity,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(12.r),
@@ -267,7 +268,7 @@ class VideoPlayerCard extends StatelessWidget {
                   if (tip.isPremium)
                     Positioned(
                       top: 5.h,
-                      left: 5.w,
+                      right: 5.w,
                       child: Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 10.w,
@@ -309,17 +310,17 @@ class VideoPlayerCard extends StatelessWidget {
               ),
               SizedBox(height: 8.h),
               // Title
-              Text(
-                tip.tipsTitle ?? 'Untitled',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  fontFamily: 'Poppins',
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w600,
-                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              // Text(
+              //   tip.tipsTitle ?? 'Untitled',
+              //   style: theme.textTheme.bodyLarge?.copyWith(
+              //     fontFamily: 'Poppins',
+              //     fontSize: 16.sp,
+              //     fontWeight: FontWeight.w600,
+              //     color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+              //   ),
+              //   maxLines: 2,
+              //   overflow: TextOverflow.ellipsis,
+              // ),
             ],
           ),
         ),

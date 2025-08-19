@@ -38,7 +38,7 @@ class OnboardingContent extends StatelessWidget {
           Text(
             model.title,
             style: theme.textTheme.headlineSmall?.copyWith(
-              color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+              color: isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,

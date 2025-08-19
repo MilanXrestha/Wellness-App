@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
@@ -32,6 +33,7 @@ class AudioCard extends StatelessWidget {
       builder: (BuildContext context) {
         return BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+
           child: Dialog(
             backgroundColor: Colors.transparent,
             elevation: 0,
@@ -74,7 +76,7 @@ class AudioCard extends StatelessWidget {
                   ),
                   SizedBox(height: 8.h),
                   Text(
-                    'Subscribe to access exclusive wellness audio content and more!',
+                    'Subscribe to access exclusive audio content and more!',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 14.sp,
                       color: isDarkMode
@@ -121,7 +123,7 @@ class AudioCard extends StatelessWidget {
                             elevation: 0,
                           ),
                           child: Text(
-                            'Subscribe Now',
+                            'Subscribe',
                             style: TextStyle(
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w600,
@@ -165,9 +167,10 @@ class AudioCard extends StatelessWidget {
             }
           },
           child: Container(
-            width: 300.w,
-            height: 130.h,
+            width: 280.w,
+            height: 135.h,
             margin: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20.r),
               gradient: LinearGradient(
@@ -180,8 +183,8 @@ class AudioCard extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: isDarkMode ? AppColors.shadow : AppColors.shadow.withOpacity(0.3),
-                  offset: Offset(0, 4.h),
-                  blurRadius: 8.r,
+                  offset: Offset(0, 2.h),
+                  blurRadius: 6.r,
                   spreadRadius: isDarkMode ? 0.5.r : 0.r,
                 ),
               ],
@@ -190,6 +193,7 @@ class AudioCard extends StatelessWidget {
                 width: isDarkMode ? 1.5.w : 1.w,
               ),
             ),
+
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20.r),
               child: Stack(
@@ -221,60 +225,60 @@ class AudioCard extends StatelessWidget {
                     ),
                   ),
                   // Main content
+
+
                   Padding(
                     padding: EdgeInsets.all(12.r),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Thumbnail
-                        Hero(
-                          tag: 'audio-thumbnail-${tip.tipsId}',
-                          child: Container(
-                            width: 90.w,
-                            height: 90.w,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: isDarkMode
-                                    ? [AppColors.darkSurface, AppColors.darkBackground]
-                                    : [AppColors.lightSurface, AppColors.lightBackground],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  blurRadius: 8.r,
-                                  offset: Offset(0, 2.h),
-                                ),
-                              ],
+                        // Thumbnail (without Hero)
+                        Container(
+                          width: 95.w,
+                          height: 95.w,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isDarkMode
+                                  ? [AppColors.darkSurface, AppColors.darkBackground]
+                                  : [AppColors.lightSurface, AppColors.lightBackground],
                             ),
-                            child: ClipOval(
-                              child: tip.thumbnailUrl != null && tip.thumbnailUrl!.isNotEmpty
-                                  ? CachedNetworkImage(
-                                imageUrl: tip.thumbnailUrl!,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.w,
-                                    color: AppColors.primary,
-                                  ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.1),
+                                blurRadius: 8.r,
+                                offset: Offset(0, 2.h),
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: tip.thumbnailUrl != null && tip.thumbnailUrl!.isNotEmpty
+                                ? CachedNetworkImage(
+                              imageUrl: tip.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.w,
+                                  color: AppColors.primary,
                                 ),
-                                errorWidget: (context, url, error) => Icon(
-                                  Icons.music_note_rounded,
-                                  color: AppColors.primary.withOpacity(0.5),
-                                  size: 36.sp,
-                                ),
-                              )
-                                  : Icon(
+                              ),
+                              errorWidget: (context, url, error) => Icon(
                                 Icons.music_note_rounded,
                                 color: AppColors.primary.withOpacity(0.5),
                                 size: 36.sp,
                               ),
+                            )
+                                : Icon(
+                              Icons.music_note_rounded,
+                              color: AppColors.primary.withOpacity(0.5),
+                              size: 36.sp,
                             ),
                           ),
                         ),
                         SizedBox(width: 12.w),
+
                         // Text content and play button
                         Expanded(
                           child: Column(
@@ -286,18 +290,57 @@ class AudioCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 15.sp,
                                   fontWeight: FontWeight.bold,
-                                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                  color: isDarkMode
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
                                 ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              SizedBox(height: 2.h),
+
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  SvgPicture.asset(
+                                    'assets/icons/svg/ic_mic.svg',
+                                    width: 15.w,
+                                    height: 15.h,
+                                    colorFilter: ColorFilter.mode(
+                                      isDarkMode
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors.lightTextPrimary,
+                                      BlendMode.srcIn,
+                                    ),
+                                  ),
+                                  SizedBox(width: 2.w), // spacing between icon & text
+                                  Expanded(
+                                    child: Text(
+                                      tip.tipsAuthor,
+                                      style: TextStyle(
+                                        fontSize: 13.sp,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
                               SizedBox(height: 8.h),
+
                               // Play button
                               Container(
-                                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+                                padding:
+                                EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.9)],
+                                    colors: [
+                                      AppColors.primary,
+                                      AppColors.primary.withOpacity(0.9)
+                                    ],
                                   ),
                                   borderRadius: BorderRadius.circular(20.r),
                                   boxShadow: [
@@ -333,6 +376,8 @@ class AudioCard extends StatelessWidget {
                       ],
                     ),
                   ),
+
+
                   // Duration chip
                   if (tip.mediaDuration != null && tip.mediaDuration!.isNotEmpty)
                     Positioned(
@@ -378,7 +423,7 @@ class AudioCard extends StatelessWidget {
                   // Premium indicator
                   if (tip.isPremium)
                     Positioned(
-                      top: 8.h,
+                      top: 6.h,
                       right: 8.w,
                       child: Container(
                         padding: EdgeInsets.symmetric(
@@ -424,7 +469,7 @@ class AudioCard extends StatelessWidget {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(20.r),
                           border: Border.all(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.darkSecondary.withOpacity(0.1),
                             width: 1.w,
                           ),
                         ),
@@ -445,7 +490,7 @@ class AudioCard extends StatelessWidget {
 class AudioCardShimmer extends StatelessWidget {
   final bool isDarkMode;
 
-  const AudioCardShimmer({Key? key, required this.isDarkMode}) : super(key: key);
+  const AudioCardShimmer({super.key, required this.isDarkMode});
 
   @override
   Widget build(BuildContext context) {

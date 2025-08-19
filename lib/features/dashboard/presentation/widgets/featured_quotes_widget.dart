@@ -273,7 +273,7 @@ class FeaturedQuotesWidgetState extends State<FeaturedQuotesWidget> {
             ),
           ),
         ),
-        SizedBox(height: 8.h),
+        SizedBox(height: 12.h),
         // Indicator for the current quote in the carousel.
         WormIndicator(
           currentPage: _currentQuoteIndex,

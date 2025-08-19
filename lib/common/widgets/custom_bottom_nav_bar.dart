@@ -40,7 +40,7 @@ class CustomBottomNavBar extends StatelessWidget {
       borderRadius: BorderRadius.circular(24.r),
       child: Container(
         height: 56.h,
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        padding: EdgeInsets.symmetric(horizontal: 10.w),
         decoration: BoxDecoration(
           color: const Color(0xFF121212), // slightly lighter than full black
           borderRadius: BorderRadius.circular(24.r),
@@ -56,7 +56,7 @@ class CustomBottomNavBar extends StatelessWidget {
                   onTap: () => onItemTapped(index),
                   behavior: HitTestBehavior.translucent,
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 3.h),
                     decoration: BoxDecoration(
                       color: chipBackground,
                       borderRadius: BorderRadius.circular(30.r),
@@ -69,7 +69,7 @@ class CustomBottomNavBar extends StatelessWidget {
                           height: 36.h,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: selectedIconBg, // White in light mode, neonGreen in dark mode
+                            color: neonGreen, // White in light mode, neonGreen in dark mode
                             shape: BoxShape.circle,
                           ),
                           child: Icon(

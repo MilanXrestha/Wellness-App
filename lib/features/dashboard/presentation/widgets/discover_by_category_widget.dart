@@ -115,7 +115,7 @@ class DiscoverByCategoryWidget extends StatelessWidget {
   /// Builds a single category card.
   Widget _buildCategoryCard(CategoryModel category, BuildContext context) {
     return SizedBox(
-      width: 120.w,
+      width: 125.w,
       child: Card(
         elevation: 0,
         shape: RoundedRectangleBorder(

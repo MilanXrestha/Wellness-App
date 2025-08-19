@@ -34,7 +34,7 @@ class AuthButtons extends StatelessWidget {
           style: ElevatedButton.styleFrom(
             backgroundColor: isDarkMode
                 ? AppColors.primary
-                : AppColors.lightTextPrimary,
+                : AppColors.colorPrimaryLight,
             foregroundColor: isDarkMode
                 ? AppColors.darkTextPrimary
                 : AppColors.lightBackground,
@@ -89,7 +89,7 @@ class AuthButtons extends StatelessWidget {
             side: BorderSide(
               color: isDarkMode
                   ? AppColors.primary
-                  : AppColors.lightTextPrimary,
+                  : AppColors.colorPrimaryLight,
               width: 1.5.w,
             ),
             minimumSize: Size(double.infinity, 50.h),

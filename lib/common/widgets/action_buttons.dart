@@ -78,7 +78,7 @@ class ActionButtons extends StatelessWidget {
               onPressed: onPrimary,
               style: theme.elevatedButtonTheme.style?.copyWith(
                 backgroundColor: WidgetStateProperty.all(
-                  isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+                  isDarkMode ? AppColors.primary : AppColors.colorPrimaryLight,
                 ),
                 foregroundColor: WidgetStateProperty.all(
                   isDarkMode

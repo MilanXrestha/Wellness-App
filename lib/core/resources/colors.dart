@@ -49,6 +49,8 @@ class AppColors {
   /// Pure white background for light theme scaffolds.
   static const Color lightBackground = Color(0xFFFFFFFF);
 
+  static const Color colorPrimaryLight = Color(0xFF43A047); // Green 600
+
   /// Very light gray used for input fields and cards.
   static const Color lightSurface = Color(0xFFF5F5F5);
 
@@ -62,5 +64,5 @@ class AppColors {
   static const Color lightTextSecondary = Color(0xFF666666);
 
   /// Light gray color for hint text in light theme.
-  static const Color lightTextHint = Color(0xFF999999);
+  static const Color lightTextHint = Color(0xFF9E9E9E);
 }

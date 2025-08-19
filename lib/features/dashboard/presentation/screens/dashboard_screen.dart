@@ -18,21 +18,24 @@ import 'package:wellness_app/features/dashboard/data/models/dashboard_data.dart'
 import 'package:wellness_app/features/dashboard/data/repositories/dashboard_repository.dart';
 import 'package:wellness_app/features/dashboard/domain/usecases/dashboard_usecase.dart';
 import 'package:wellness_app/features/dashboard/domain/utils/user_utils.dart';
+import 'package:wellness_app/features/preferences/data/models/user_preference_model.dart';
 import 'package:wellness_app/features/subscription/data/models/subscription_model.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 import 'package:wellness_app/generated/app_localizations.dart';
 import 'dart:developer';
 import '../../../../common/widgets/horizontal_list_widget.dart';
 import '../../../../common/widgets/section_header_widget.dart';
+import '../../../imageViewer/presentation/widgets/image_card.dart';
+import '../../../preferences/presentation/provider/user_preference_provider.dart';
 import '../../../profile/providers/user_provider.dart';
 import '../../../subscription/presentation/providers/premium_status_provider.dart';
-import '../../../videoPlayer/presentation/widgets/video_player_card.dart';
 import '../widgets/discover_by_category_widget.dart';
 import '../widgets/featured_quotes_widget.dart';
 import '../widgets/dashboard_shimmer.dart';
 import '../widgets/quote_card.dart';
 import '../widgets/tips_card.dart';
 import '../../../audioPlayer/presentation/widgets/audio_card.dart';
+import '../../../videoPlayer/presentation/widgets/video_player_card.dart';
 
 class UserDashboardScreen extends StatefulWidget {
   final VoidCallback onViewAllCategories;
@@ -46,8 +49,7 @@ class UserDashboardScreen extends StatefulWidget {
   State<UserDashboardScreen> createState() => _UserDashboardScreenState();
 }
 
-class _UserDashboardScreenState extends State<UserDashboardScreen>
-    with SingleTickerProviderStateMixin {
+class _UserDashboardScreenState extends State<UserDashboardScreen> with SingleTickerProviderStateMixin {
   final AuthService _authService = AuthService();
   final DashboardUseCase _dashboardUseCase = DashboardUseCase();
   final UserUtils _userUtils = UserUtils();
@@ -56,6 +58,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
   AnimationController? _lottieController;
   bool _showShimmer = true;
   bool _isInitializing = true;
+  bool _isRefreshing = false; // Prevent multiple simultaneous refreshes
   DashboardData? _cachedData;
   Future<DashboardData>? _dashboardFuture;
   StreamSubscription<DocumentSnapshot>? _subscriptionStream;
@@ -74,6 +77,10 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
       _dashboardFuture = Future.value(_emptyDashboardData());
       _initializeWithCache(userId);
       _listenToSubscriptionChanges(userId);
+      // Defer loading preferences to avoid setState during build
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Provider.of<UserPreferenceProvider>(context, listen: false).loadUserPreferences(userId);
+      });
     } else {
       _showShimmer = false;
       _isInitializing = false;
@@ -90,23 +97,17 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
           .snapshots()
           .listen((doc) async {
         if (mounted) {
-          final subscription = doc.exists
-              ? SubscriptionModel.fromFirestore(doc.data()!, userId)
-              : null;
+          final subscription = doc.exists ? SubscriptionModel.fromFirestore(doc.data()!, userId) : null;
           final canAccessPremium = subscription != null &&
               subscription.status == 'active' &&
-              (subscription.endDate == null ||
-                  subscription.endDate!.isAfter(DateTime.now()));
-          Provider.of<PremiumStatusProvider>(context, listen: false)
-              .setPremiumStatus(canAccessPremium);
-          log('Subscription updated for user $userId: canAccessPremium=$canAccessPremium',
-              name: 'UserDashboardScreen');
+              (subscription.endDate == null || subscription.endDate!.isAfter(DateTime.now()));
+          Provider.of<PremiumStatusProvider>(context, listen: false).setPremiumStatus(canAccessPremium);
+          log('Subscription updated for user $userId: canAccessPremium=$canAccessPremium', name: 'UserDashboardScreen');
         }
       }, onError: (e) {
         log('Error listening to subscription changes: $e', name: 'UserDashboardScreen');
         if (mounted) {
-          Provider.of<PremiumStatusProvider>(context, listen: false)
-              .setPremiumStatus(false);
+          Provider.of<PremiumStatusProvider>(context, listen: false).setPremiumStatus(false);
         }
       });
     }
@@ -122,16 +123,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
           _showShimmer = false;
           _isInitializing = false;
         });
-        // Update premium status from cache
         final subscription = cachedData.subscription;
         final canAccessPremium = subscription != null &&
             subscription.status == 'active' &&
-            (subscription.endDate == null ||
-                subscription.endDate!.isAfter(DateTime.now()));
-        Provider.of<PremiumStatusProvider>(context, listen: false)
-            .setPremiumStatus(canAccessPremium);
-        log('Initialized from cache for user $userId: canAccessPremium=$canAccessPremium',
-            name: 'UserDashboardScreen');
+            (subscription.endDate == null || subscription.endDate!.isAfter(DateTime.now()));
+        Provider.of<PremiumStatusProvider>(context, listen: false).setPremiumStatus(canAccessPremium);
+        log('Initialized from cache for user $userId: canAccessPremium=$canAccessPremium', name: 'UserDashboardScreen');
       } else {
         setState(() {
           _showShimmer = true;
@@ -167,14 +164,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
         _showShimmer = false;
         _isInitializing = false;
       });
-      // Update premium status
       final subscription = dashboardData.subscription;
       final canAccessPremium = subscription != null &&
           subscription.status == 'active' &&
-          (subscription.endDate == null ||
-              subscription.endDate!.isAfter(DateTime.now()));
-      Provider.of<PremiumStatusProvider>(context, listen: false)
-          .setPremiumStatus(canAccessPremium);
+          (subscription.endDate == null || subscription.endDate!.isAfter(DateTime.now()));
+      Provider.of<PremiumStatusProvider>(context, listen: false).setPremiumStatus(canAccessPremium);
       log(
         'Dashboard data loaded for user $userId: '
             'user=${dashboardData.user?.userName ?? "null"}, '
@@ -211,6 +205,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
   }
 
   Future<void> _refreshData(String userId) async {
+    if (_isRefreshing) return;
+    _isRefreshing = true;
     try {
       await _dashboardRepository.clearDashboardCache(userId);
       setState(() {
@@ -219,13 +215,14 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
         _dashboardFuture = _initializeDashboardData(userId);
       });
       log('Refreshed data and cleared cache for user $userId', name: 'UserDashboardScreen');
-      // Force refresh premium status
       await Provider.of<PremiumStatusProvider>(context, listen: false).updatePremiumStatus();
     } catch (e, stackTrace) {
       log('Error refreshing data for user $userId: $e', name: 'UserDashboardScreen', stackTrace: stackTrace);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context)!.errorLoadingData)),
       );
+    } finally {
+      _isRefreshing = false;
     }
   }
 
@@ -242,6 +239,19 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
       subscription: null,
       transactions: [],
     );
+  }
+
+  bool _arePreferencesEqual(UserPreferenceModel? a, UserPreferenceModel? b) {
+    if (a == b) return true;
+    if (a == null || b == null) return false;
+    if (a.preferences.length != b.preferences.length) return false;
+    for (int i = 0; i < a.preferences.length; i++) {
+      if (a.preferences[i].preferenceId != b.preferences[i].preferenceId ||
+          a.preferences[i].selectedAt != b.preferences[i].selectedAt) {
+        return false;
+      }
+    }
+    return true;
   }
 
   @override
@@ -265,8 +275,17 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
       return const SizedBox.shrink();
     }
 
-    return Consumer<PremiumStatusProvider>(
-      builder: (context, premiumProvider, child) {
+    return Consumer2<PremiumStatusProvider, UserPreferenceProvider>(
+      builder: (context, premiumProvider, preferenceProvider, child) {
+        // Only refresh if preferences have actually changed
+        if (!preferenceProvider.isLoading && preferenceProvider.userPreferences != null && _cachedData != null) {
+          if (!_arePreferencesEqual(_cachedData!.userPreference, preferenceProvider.userPreferences)) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _refreshData(userId);
+            });
+          }
+        }
+
         if (premiumProvider.isLoading && _isInitializing) {
           return const DashboardShimmer();
         }
@@ -348,26 +367,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
 
   Widget _buildDashboardContent(
       BuildContext context, DashboardData data, String userId, ThemeData theme, bool isDarkMode) {
-    final userPreferenceIds = data.userPreference?.preferences
-        .map((entry) => entry.preferenceId)
-        .toSet() ??
-        <String>{};
-    final filteredCategories = _dashboardUseCase.filterCategories(
-      data.categories,
-      userPreferenceIds,
-    );
-    final featuredQuotes = _dashboardUseCase.filterFeaturedQuotes(
-      data.tips,
-      userPreferenceIds,
-    );
-    final categoryTips = _dashboardUseCase.groupTipsByCategory(
-      data.tips,
-      filteredCategories,
-      userPreferenceIds,
-    );
-    final validCategories = filteredCategories
-        .where((category) => categoryTips.containsKey(category.categoryId))
-        .toList();
+    final userPreferenceIds = data.userPreference?.preferences.map((entry) => entry.preferenceId).toSet() ?? <String>{};
+    final filteredCategories = _dashboardUseCase.filterCategories(data.categories, userPreferenceIds);
+    final featuredQuotes = _dashboardUseCase.filterFeaturedQuotes(data.tips, userPreferenceIds);
+    final categoryTips = _dashboardUseCase.groupTipsByCategory(data.tips, filteredCategories, userPreferenceIds);
+    final validCategories = filteredCategories.where((category) => categoryTips.containsKey(category.categoryId)).toList();
 
     log(
       'Processed data: user=${data.user?.userName ?? "null"}, '
@@ -453,10 +457,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                 child: InkWell(
                                   borderRadius: BorderRadius.circular(30.r),
                                   onTap: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      RoutesName.profileScreen,
-                                    );
+                                    Navigator.pushNamed(context, RoutesName.profileScreen);
                                   },
                                   child: Stack(
                                     clipBehavior: Clip.none,
@@ -471,16 +472,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                             gradient: LinearGradient(
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
-                                              colors: [
-                                                Colors.yellow.shade700,
-                                                Colors.amber.shade500,
-                                              ],
+                                              colors: [Colors.yellow.shade700, Colors.amber.shade500],
                                             ),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: isDarkMode
-                                                    ? Colors.black.withOpacity(0.3)
-                                                    : Colors.black.withOpacity(0.15),
+                                                color: isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.15),
                                                 blurRadius: 12.r,
                                                 spreadRadius: 3.r,
                                                 offset: Offset(0, 2.h),
@@ -492,18 +488,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: isPremium
-                                                ? Colors.transparent
-                                                : (isDarkMode
-                                                ? Colors.grey.shade600
-                                                : Colors.grey.shade300),
+                                            color: isPremium ? Colors.transparent : (isDarkMode ? Colors.grey.shade600 : Colors.grey.shade300),
                                             width: isPremium ? 0 : 2.w,
                                           ),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: isDarkMode
-                                                  ? Colors.black.withOpacity(0.3)
-                                                  : Colors.black.withOpacity(0.15),
+                                              color: isDarkMode ? Colors.black.withOpacity(0.3) : Colors.black.withOpacity(0.15),
                                               blurRadius: 10.r,
                                               spreadRadius: 2.r,
                                               offset: Offset(0, 2.h),
@@ -514,12 +504,8 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                           radius: 28.r,
                                           backgroundColor: isPremium
                                               ? Colors.transparent
-                                              : (isDarkMode
-                                              ? Colors.grey.shade800
-                                              : Colors.grey.shade200),
-                                          backgroundImage: userPhotoUrl != null
-                                              ? CachedNetworkImageProvider(userPhotoUrl)
-                                              : null,
+                                              : (isDarkMode ? Colors.grey.shade800 : Colors.grey.shade200),
+                                          backgroundImage: userPhotoUrl != null ? CachedNetworkImageProvider(userPhotoUrl) : null,
                                           child: userPhotoUrl == null
                                               ? SvgPicture.asset(
                                             'assets/icons/svg/ic_user.svg',
@@ -583,9 +569,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                       overflow: TextOverflow.ellipsis,
                                       style: theme.textTheme.bodyMedium?.copyWith(
                                         fontFamily: 'Poppins',
-                                        color: isDarkMode
-                                            ? AppColors.darkTextSecondary
-                                            : Colors.grey.shade600,
+                                        color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600,
                                         fontSize: 14.sp,
                                       ),
                                     ),
@@ -603,9 +587,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                             width: 44.w,
                             height: 44.w,
                             decoration: BoxDecoration(
-                              color: isDarkMode
-                                  ? AppColors.primary.withOpacity(0.1)
-                                  : Colors.grey.shade100,
+                              color: isDarkMode ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade100,
                               shape: BoxShape.circle,
                             ),
                             child: IconButton(
@@ -620,10 +602,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                 semanticsLabel: 'Notifications',
                               ),
                               onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  RoutesName.notificationScreen,
-                                );
+                                Navigator.pushNamed(context, RoutesName.notificationScreen);
                               },
                             ),
                           ),
@@ -638,10 +617,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                   color: isDarkMode ? null : Colors.black,
                                   gradient: isDarkMode
                                       ? LinearGradient(
-                                    colors: [
-                                      AppColors.primary,
-                                      AppColors.primary.withOpacity(0.7),
-                                    ],
+                                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.7)],
                                   )
                                       : null,
                                 ),
@@ -711,10 +687,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                               ? LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.darkSurface,
-                              AppColors.darkSurface.withOpacity(0.7),
-                            ],
+                            colors: [AppColors.darkSurface, AppColors.darkSurface.withOpacity(0.7)],
                           )
                               : null,
                           borderRadius: BorderRadius.circular(20.r),
@@ -724,9 +697,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: isDarkMode
-                                  ? AppColors.darkSurface.withOpacity(0.1)
-                                  : Colors.black.withAlpha(26),
+                              color: isDarkMode ? AppColors.darkSurface.withOpacity(0.1) : Colors.black.withAlpha(26),
                               blurRadius: 6.r,
                               offset: Offset(0, 2.h),
                             ),
@@ -740,19 +711,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                         ),
                         child: InkWell(
                           onTap: () {
-                            Navigator.pushNamed(
-                              context,
-                              RoutesName.reminderScreen,
-                              arguments: null,
-                            );
+                            Navigator.pushNamed(context, RoutesName.reminderScreen, arguments: null);
                           },
                           borderRadius: BorderRadius.circular(20.r),
                           child: Container(
                             height: 120.h,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 12.h,
-                            ),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                             child: Stack(
                               children: [
                                 Positioned(
@@ -763,9 +727,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                     child: Icon(
                                       Icons.access_time,
                                       size: 80.sp,
-                                      color: isDarkMode
-                                          ? Colors.white.withOpacity(0.7)
-                                          : Colors.black.withAlpha(178),
+                                      color: isDarkMode ? Colors.white.withOpacity(0.7) : Colors.black.withAlpha(178),
                                       semanticLabel: 'Clock icon',
                                     ),
                                   ),
@@ -806,9 +768,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                                             style: theme.textTheme.bodyMedium?.copyWith(
                                               fontFamily: 'Poppins',
                                               fontSize: 15.sp,
-                                              color: isDarkMode
-                                                  ? AppColors.darkTextSecondary
-                                                  : Colors.grey.shade600,
+                                              color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600,
                                             ),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
@@ -831,17 +791,13 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                       SectionHeaderWidget(
                         title: category.categoryName,
                         onViewAll: () {
-                          Navigator.pushNamed(
-                            context,
-                            RoutesName.categoryDetailScreen,
-                            arguments: category,
-                          );
+                          Navigator.pushNamed(context, RoutesName.categoryDetailScreen, arguments: category);
                         },
                         viewAllText: AppLocalizations.of(context)!.viewAll,
                         theme: theme,
                         isDarkMode: isDarkMode,
                       ),
-                      SizedBox(height: 12.h),
+                      SizedBox(height: 1.h),
                       HorizontalListWidget<TipModel>(
                         items: categoryTips[category.categoryId] ?? [],
                         itemBuilder: (tip) {
@@ -867,6 +823,12 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                               categoryName: category.categoryName,
                               featuredTips: categoryTips[category.categoryId] ?? [],
                             );
+                          } else if (tip.tipsType == 'image') {
+                            return ImageCard(
+                              tip: tip,
+                              categoryName: category.categoryName,
+                              featuredTips: categoryTips[category.categoryId] ?? [],
+                            );
                           } else {
                             return TipCard(
                               tip: tip,
@@ -880,12 +842,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen>
                         emptyMessage: AppLocalizations.of(context)!.noDataAvailable,
                         theme: theme,
                         isDarkMode: isDarkMode,
-                        height: 180, // Increased from 150 to accommodate larger video card
                         placeholderCount: 3,
                       ),
                     ],
                   ],
-                  SizedBox(height: 100.h), // Increased from 80.h for more bottom padding
+                  SizedBox(height: 100.h),
                 ],
               ),
             ),
