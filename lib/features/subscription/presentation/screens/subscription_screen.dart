@@ -35,7 +35,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   final List<Map<String, dynamic>> _plans = [
     {
-      'planId': 'monthly',
+      'planId': 'GOLD',
       'name': 'Monthly',
       'price': 50.0,
       'duration': '1 month',
@@ -47,7 +47,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       ],
     },
     {
-      'planId': 'quarterly',
+      'planId': 'PLATINUM',
       'name': '3 Months',
       'price': 135.0,
       'duration': '3 months',
@@ -60,7 +60,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       'recommended': true,
     },
     {
-      'planId': 'annual',
+      'planId': 'DIAMOND',
       'name': 'Annual',
       'price': 480.0,
       'duration': '12 months',
@@ -82,11 +82,12 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   double _getUpgradeSavings(String currentPlanId, String newPlanId) {
-    if (currentPlanId == 'monthly' && newPlanId == 'quarterly') return 10.0;
-    if (currentPlanId == 'monthly' && newPlanId == 'annual') return 20.0;
-    if (currentPlanId == 'quarterly' && newPlanId == 'annual') return 10.0;
+    if (currentPlanId == 'GOLD' && newPlanId == 'PLATINUM') return 10.0;
+    if (currentPlanId == 'GOLD' && newPlanId == 'DIAMOND') return 20.0;
+    if (currentPlanId == 'PLATINUM' && newPlanId == 'DIAMOND') return 10.0;
     return 0.0;
   }
+
 
   Future<void> _subscribeToPlan(Map<String, dynamic> plan) async {
     if (_isSubscribing) return;

@@ -416,9 +416,11 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                             return Container(
                               height: 56.h,
                               decoration: BoxDecoration(
-                                color: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
+                                color: isDarkMode ? Color(0xFF121212) : AppColors.lightBackground,
                                 borderRadius: BorderRadius.circular(24.r),
-                                boxShadow: [
+                                boxShadow: isDarkMode
+                                    ? [] // no shadow in dark mode
+                                    : [
                                   BoxShadow(
                                     color: AppColors.shadow,
                                     blurRadius: 6.r,

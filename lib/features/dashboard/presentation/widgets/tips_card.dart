@@ -373,7 +373,7 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                                       return Transform.rotate(
                                         angle: _shakeAnimation.value,
                                         child: Icon(
-                                          FontAwesomeIcons.crown,
+                                          Icons.workspace_premium,
                                           size: 40.sp,
                                           color: const Color(0xFFFFD700),
                                         ),
@@ -382,7 +382,7 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                                   ),
                                   SizedBox(height: 8.h),
                                   Text(
-                                    'Tap to Unlock',
+                                    'Tap for mindful inspiration',
                                     style: TextStyle(
                                       fontSize: 14.sp,
                                       fontWeight: FontWeight.w600,

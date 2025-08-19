@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:wellness_app/features/notifications/data/models/notification_model.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
@@ -11,6 +12,8 @@ import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/core/db/database_helper.dart';
 import 'dart:developer';
+
+import '../../../dashboard/presentation/providers/notification_count_provider.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -26,6 +29,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
   void initState() {
     super.initState();
     _checkUnreadNotifications();
+    // Fetch the latest count
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationCountProvider>(context, listen: false)
+          .fetchUnreadNotificationCount();
+    });
   }
 
   Future<void> _checkUnreadNotifications() async {
@@ -76,6 +84,10 @@ class _NotificationScreenState extends State<NotificationScreen> {
           );
         }
       }
+      // Update the notification provider
+      final provider = Provider.of<NotificationCountProvider>(context, listen: false);
+      await provider.markAllNotificationsAsRead();
+
       setState(() {
         _hasUnreadNotifications = false;
       });
@@ -94,6 +106,268 @@ class _NotificationScreenState extends State<NotificationScreen> {
       await _checkUnreadNotifications();
     } catch (e, stackTrace) {
       log('Error deleting notification $id: $e', stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _navigateToContent(NotificationModel notification) async {
+    try {
+      // Mark as read first
+      await FirebaseFirestore.instance
+          .collection('notifications')
+          .doc(notification.id)
+          .update({'isRead': true});
+
+      await DatabaseHelper.instance.insertNotification(
+        NotificationModel(
+          id: notification.id,
+          userId: notification.userId,
+          title: notification.title,
+          body: notification.body,
+          type: notification.type,
+          isRead: true,
+          payload: notification.payload,
+          timestamp: notification.timestamp,
+        ),
+      );
+
+
+      // Update the notification provider
+      Provider.of<NotificationCountProvider>(context, listen: false)
+          .decrementUnreadCount();
+
+      await _checkUnreadNotifications();
+
+      // Extract data from payload
+      final payloadMap = notification.payload;
+      final tipId = payloadMap['tipId'] as String?;
+      final contentType = payloadMap['contentType'] as String? ?? notification.type;
+      final isFromReminder = payloadMap['isFromReminder'] as bool? ?? false;
+
+      if (tipId == null || tipId.isEmpty) {
+        log('No tipId in notification payload');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No content associated with this notification')),
+        );
+        return;
+      }
+
+      log('Fetching tip with tipId=$tipId, contentType=$contentType');
+
+      // Fetch the tip from Firestore
+      final tipDoc = await FirebaseFirestore.instance
+          .collection('tips')
+          .doc(tipId)
+          .get();
+
+      if (!tipDoc.exists || tipDoc.data() == null) {
+        log('Tip not found for tipId=$tipId');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Content not found')),
+        );
+        return;
+      }
+
+      final tip = TipModel.fromFirestore(tipDoc.data()!, tipDoc.id);
+      log('Fetched tip: ${tip.tipsId}, type: ${tip.tipsType}');
+
+      // Navigate based on content type
+      switch (tip.tipsType) {
+        case 'video':
+        // Fetch related video content
+          List<TipModel> relatedVideoTips = [tip]; // Include current tip by default
+
+          try {
+            final relatedTipsSnapshot = await FirebaseFirestore.instance
+                .collection('tips')
+                .where('tipsType', isEqualTo: 'video')
+                .where('categoryId', isEqualTo: tip.categoryId)
+                .limit(5)
+                .get();
+
+            if (relatedTipsSnapshot.docs.isNotEmpty) {
+              final fetchedTips = relatedTipsSnapshot.docs
+                  .map((doc) => TipModel.fromFirestore(doc.data(), doc.id))
+                  .toList();
+
+              // Make sure the current tip is in the list
+              if (!fetchedTips.any((t) => t.tipsId == tip.tipsId)) {
+                fetchedTips.insert(0, tip);
+              }
+
+              relatedVideoTips = fetchedTips;
+              log('Found ${relatedVideoTips.length} related video tips');
+            }
+          } catch (e) {
+            log('Error fetching related video tips: $e');
+            // Continue with just the current tip if there's an error
+          }
+
+          Navigator.pushNamed(
+            context,
+            RoutesName.videoPlayerScreen,
+            arguments: {
+              'tip': tip,
+              'categoryName': isFromReminder ? 'Video Content' : 'Videos',
+              'featuredTips': relatedVideoTips,
+            },
+          );
+          log('Navigated to VideoPlayerScreen');
+          break;
+
+        case 'audio':
+        // Fetch related audio content
+          List<TipModel> relatedAudioTips = [tip]; // Include current tip by default
+
+          try {
+            final relatedTipsSnapshot = await FirebaseFirestore.instance
+                .collection('tips')
+                .where('tipsType', isEqualTo: 'audio')
+                .where('categoryId', isEqualTo: tip.categoryId)
+                .limit(5)
+                .get();
+
+            if (relatedTipsSnapshot.docs.isNotEmpty) {
+              final fetchedTips = relatedTipsSnapshot.docs
+                  .map((doc) => TipModel.fromFirestore(doc.data(), doc.id))
+                  .toList();
+
+              // Make sure the current tip is in the list
+              if (!fetchedTips.any((t) => t.tipsId == tip.tipsId)) {
+                fetchedTips.insert(0, tip);
+              }
+
+              relatedAudioTips = fetchedTips;
+              log('Found ${relatedAudioTips.length} related audio tips');
+            }
+          } catch (e) {
+            log('Error fetching related audio tips: $e');
+            // Continue with just the current tip if there's an error
+          }
+
+          Navigator.pushNamed(
+            context,
+            RoutesName.mediaPlayerScreen,
+            arguments: {
+              'tip': tip,
+              'categoryName': isFromReminder ? 'Audio Content' : 'Audio',
+              'featuredTips': relatedAudioTips,
+            },
+          );
+          log('Navigated to MediaPlayerScreen with ${relatedAudioTips.length} related tips');
+          break;
+
+        case 'image':
+        // Fetch related image content
+          List<TipModel> relatedImageTips = [tip]; // Include current tip by default
+
+          try {
+            final relatedTipsSnapshot = await FirebaseFirestore.instance
+                .collection('tips')
+                .where('tipsType', isEqualTo: 'image')
+                .where('categoryId', isEqualTo: tip.categoryId)
+                .limit(5)
+                .get();
+
+            if (relatedTipsSnapshot.docs.isNotEmpty) {
+              final fetchedTips = relatedTipsSnapshot.docs
+                  .map((doc) => TipModel.fromFirestore(doc.data(), doc.id))
+                  .toList();
+
+              // Make sure the current tip is in the list
+              if (!fetchedTips.any((t) => t.tipsId == tip.tipsId)) {
+                fetchedTips.insert(0, tip);
+              }
+
+              relatedImageTips = fetchedTips;
+              log('Found ${relatedImageTips.length} related image tips');
+            }
+          } catch (e) {
+            log('Error fetching related image tips: $e');
+            // Continue with just the current tip if there's an error
+          }
+
+          Navigator.pushNamed(
+            context,
+            RoutesName.imageViewerScreen,
+            arguments: {
+              'tip': tip,
+              'imageTips': relatedImageTips,
+              'initialIndex': 0,
+            },
+          );
+          log('Navigated to ImageViewerScreen');
+          break;
+
+        default:
+        // Default for tips, quotes, healthTips, etc.
+          Navigator.pushNamed(
+            context,
+            RoutesName.tipsDetailScreen,
+            arguments: {
+              'tip': tip,
+              'categoryName': isFromReminder
+                  ? 'Recently Added'
+                  : (tip.tipsType == 'tip' ? 'Health Tips' : 'Latest Quotes'),
+              'userId': notification.userId,
+              'featuredTips': <TipModel>[tip], // Include at least the current tip
+              'allHealthTips': false,
+              'allQuotes': false,
+            },
+          );
+          log('Navigated to TipsDetailScreen');
+          break;
+      }
+    } catch (e, stackTrace) {
+      log('Error navigating to content: $e', stackTrace: stackTrace);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
+  // Get an icon based on notification type/content type
+  IconData _getNotificationIcon(NotificationModel notification) {
+    final contentType = notification.payload['contentType'] as String? ?? notification.type;
+
+    switch (contentType.toLowerCase()) {
+      case 'video':
+        return Icons.videocam;
+      case 'audio':
+        return Icons.headphones;
+      case 'image':
+        return Icons.image;
+      case 'quote':
+        return Icons.format_quote;
+      case 'healthtips':
+        return Icons.medical_services;
+      case 'tip':
+        return Icons.lightbulb;
+      default:
+        return notification.isRead ? Icons.notifications : Icons.notifications_active;
+    }
+  }
+
+  // Get a color based on notification type/content type
+  Color _getNotificationColor(NotificationModel notification, bool isDarkMode) {
+    final contentType = notification.payload['contentType'] as String? ?? notification.type;
+
+    if (notification.isRead) {
+      return isDarkMode ? Colors.grey[700]! : Colors.grey[300]!;
+    }
+
+    switch (contentType.toLowerCase()) {
+      case 'video':
+        return Colors.red[400]!;
+      case 'audio':
+        return Colors.purple[400]!;
+      case 'image':
+        return Colors.blue[400]!;
+      case 'quote':
+        return Colors.amber[400]!;
+      case 'healthtips':
+        return Colors.green[400]!;
+      default:
+        return AppColors.primary;
     }
   }
 
@@ -193,75 +467,8 @@ class _NotificationScreenState extends State<NotificationScreen> {
                     ),
                   ),
                   child: InkWell(
-                      borderRadius: BorderRadius.circular(16.r),
-                      onTap: () async {
-                        log('Tapped notification: id=${notification.id}, title=${notification.title}, payload=${notification.payload}');
-                        await FirebaseFirestore.instance
-                            .collection('notifications')
-                            .doc(notification.id)
-                            .update({'isRead': true});
-                        await DatabaseHelper.instance.insertNotification(
-                          NotificationModel(
-                            id: notification.id,
-                            userId: notification.userId,
-                            title: notification.title,
-                            body: notification.body,
-                            type: notification.type,
-                            isRead: true,
-                            payload: notification.payload,
-                            timestamp: notification.timestamp,
-                          ),
-                        );
-                        await _checkUnreadNotifications();
-                        final payloadMap = notification.payload;
-                        final isFromReminder = payloadMap['isFromReminder'] as bool? ?? false;
-                        if (payloadMap.containsKey('tipId')) {
-                          final tipId = payloadMap['tipId'] as String?;
-                          log('Fetching tip with tipId=$tipId');
-                          if (tipId != null && tipId.isNotEmpty) {
-                            final tipDoc = await FirebaseFirestore.instance
-                                .collection('tips')
-                                .doc(tipId)
-                                .get();
-                            if (tipDoc.exists && tipDoc.data() != null) {
-                              final tip = TipModel.fromFirestore(
-                                tipDoc.data()!,
-                                tipDoc.id,
-                              );
-                              log('Navigating to TipsDetailScreen with tip: title=${tip.tipsTitle}, id=${tip.tipsId}');
-                              Navigator.pushNamed(
-                                context,
-                                RoutesName.tipsDetailScreen,
-                                arguments: {
-                                  'tip': tip,
-                                  'categoryName': isFromReminder
-                                      ? 'Recently Added'
-                                      : (notification.type == 'tip' ? 'Health Tips' : 'Latest Quotes'),
-                                  'userId': notification.userId,
-                                  'featuredTips': <TipModel>[], // Empty to avoid extra content
-                                  'allHealthTips': false,      // Always false to show only the specific tip
-                                  'allQuotes': false,          // Always false to show only the specific tip
-                                },
-                              );
-                            } else {
-                              log('Tip not found for tipId=$tipId');
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Tip not found')),
-                              );
-                            }
-                          } else {
-                            log('Invalid or missing tipId in payload');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Invalid notification data')),
-                            );
-                          }
-                        } else {
-                          log('No tipId in payload');
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('No tip associated with this notification')),
-                          );
-                        }
-                    },
+                    borderRadius: BorderRadius.circular(16.r),
+                    onTap: () => _navigateToContent(notification),
                     child: Padding(
                       padding: EdgeInsets.all(12.w),
                       child: Row(
@@ -271,17 +478,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
                             padding: EdgeInsets.all(8.w),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: notification.isRead
-                                  ? (isDarkMode ? Colors.grey[800] : Colors.grey[200])
-                                  : AppColors.primary.withOpacity(0.1),
+                              color: _getNotificationColor(notification, isDarkMode).withOpacity(0.15),
                             ),
                             child: Icon(
-                              notification.isRead
-                                  ? Icons.notifications
-                                  : Icons.notifications_active,
-                              color: notification.isRead
-                                  ? (isDarkMode ? Colors.grey[400] : Colors.grey[600])
-                                  : AppColors.primary,
+                              _getNotificationIcon(notification),
+                              color: _getNotificationColor(notification, isDarkMode),
                               size: 24.sp,
                             ),
                           ),
@@ -294,7 +495,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   notification.title,
                                   style: theme.textTheme.bodyLarge?.copyWith(
                                     fontSize: 16.sp,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: notification.isRead ? FontWeight.normal : FontWeight.w600,
                                     color: isDarkMode
                                         ? AppColors.darkTextPrimary
                                         : AppColors.lightTextPrimary,
@@ -315,14 +516,35 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                                 SizedBox(height: 4.h),
-                                Text(
-                                  _formatTimestamp(notification.timestamp),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    fontSize: 12.sp,
-                                    color: isDarkMode
-                                        ? AppColors.darkTextSecondary.withOpacity(0.7)
-                                        : AppColors.lightTextSecondary.withOpacity(0.7),
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      _formatTimestamp(notification.timestamp),
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        fontSize: 12.sp,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextSecondary.withOpacity(0.7)
+                                            : AppColors.lightTextSecondary.withOpacity(0.7),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    // Show content type badge
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                      decoration: BoxDecoration(
+                                        color: _getNotificationColor(notification, isDarkMode).withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                      child: Text(
+                                        _getContentTypeLabel(notification),
+                                        style: TextStyle(
+                                          fontSize: 10.sp,
+                                          color: _getNotificationColor(notification, isDarkMode),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
@@ -341,11 +563,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
                       ),
                     ),
                   ),
-
-
-
-
-
                 ),
               ),
             ),
@@ -353,6 +570,27 @@ class _NotificationScreenState extends State<NotificationScreen> {
         );
       },
     );
+  }
+
+  String _getContentTypeLabel(NotificationModel notification) {
+    final contentType = notification.payload['contentType'] as String? ?? notification.type;
+
+    switch (contentType.toLowerCase()) {
+      case 'video':
+        return 'Video';
+      case 'audio':
+        return 'Audio';
+      case 'image':
+        return 'Image';
+      case 'quote':
+        return 'Quote';
+      case 'healthtips':
+        return 'Health';
+      case 'tip':
+        return 'Tip';
+      default:
+        return contentType.capitalize();
+    }
   }
 
   String _formatTimestamp(DateTime? timestamp) {
@@ -437,22 +675,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     final userId = AuthService().getCurrentUser()?.uid;
     log('NotificationScreen userId: $userId');
 
-    if (userId != null) {
-      FirebaseFirestore.instance
-          .collection('notifications')
-          .where('userId', isEqualTo: userId)
-          .orderBy('timestamp', descending: true)
-          .limit(50)
-          .get()
-          .then((snapshot) {
-        log('Firestore query returned ${snapshot.docs.length} documents: ${snapshot.docs.map((doc) => doc.id).toList()}');
-      }).catchError((e, stackTrace) {
-        log('Error fetching Firestore notifications: $e', stackTrace: stackTrace);
-      });
-    } else {
-      log('No userId, skipping Firestore query');
-    }
-
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
@@ -477,7 +699,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           actions: [
             if (_hasUnreadNotifications)
               TextButton(
-                onPressed: () => _markAllAsRead(userId!),
+                onPressed: () => userId != null ? _markAllAsRead(userId) : null,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                 ),
@@ -574,12 +796,18 @@ class _NotificationScreenState extends State<NotificationScreen> {
               ),
             )
                 .toList();
-            log('StreamBuilder fetched ${notifications.length} notifications: ${notifications.map((n) => n.id).toList()}');
+            log('StreamBuilder fetched ${notifications.length} notifications');
 
             return _buildNotificationList(context, notifications, theme, isDarkMode);
           },
         ),
       ),
     );
+  }
+}
+
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1)}";
   }
 }

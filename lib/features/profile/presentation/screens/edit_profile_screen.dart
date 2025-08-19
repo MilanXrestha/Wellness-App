@@ -1,16 +1,18 @@
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // For direct Firebase updates
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:provider/provider.dart'; // Added for Provider
-import 'package:wellness_app/core/resources/colors.dart'; // Ensure this is imported for AppColors
+import 'package:provider/provider.dart';
+import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/common/widgets/custom_cropper_screen.dart';
+import 'package:wellness_app/features/profile/data/user_model.dart';
 
-import '../../providers/user_provider.dart'; // Assuming this is your custom cropper widget
+import '../../providers/user_provider.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -27,15 +29,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
   XFile? _pickedImage;
   String? _uploadedImageUrl;
   bool _isSaving = false;
-  String? _errorMessage; // For form validation error
+  String? _errorMessage;
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
-  double _avatarScale = 1.0; // For avatar tap animation
+  double _avatarScale = 1.0;
 
   @override
   void initState() {
     super.initState();
-    // Fade animation for smooth entry
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
@@ -57,7 +58,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
   }
 
   Future<void> _refreshUserProfile() async {
-    // Use Provider to get the latest user
     final userProvider = context.read<UserProvider>();
     await userProvider.refreshUser();
     final user = userProvider.user;
@@ -94,7 +94,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       if (!await _requestPhotoPermission()) return;
 
       final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile == null) return; // User cancelled
+      if (pickedFile == null) return;
 
       final croppedFile = await Navigator.push(
         context,
@@ -106,8 +106,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       if (croppedFile != null) {
         setState(() {
           _pickedImage = XFile(croppedFile.path);
-          _uploadedImageUrl = null; // Reset uploaded URL when new image is picked
-          _errorMessage = null; // Clear any error messages
+          _uploadedImageUrl = null;
+          _errorMessage = null;
         });
       }
     } catch (e) {
@@ -165,20 +165,58 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       setState(() {
         _pickedImage = null;
         _uploadedImageUrl = null;
-        _errorMessage = null; // Clear errors
+        _errorMessage = null;
       });
       try {
         final user = FirebaseAuth.instance.currentUser;
         if (user != null) {
           await user.updateDisplayName(_nameController.text.trim());
-          await user.updatePhotoURL(null); // Explicitly set photoURL to null
+          await user.updatePhotoURL(null);
           await user.reload();
+
+          // Update Firestore to set photoURL to null
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+          UserModel? userModel;
+          if (userDoc.exists) {
+            userModel = UserModel.fromFirestore(userDoc.data()!, userDoc.id);
+          } else {
+            userModel = UserModel(
+              userId: user.uid,
+              userEmail: user.email ?? 'Unknown',
+              userName: _nameController.text.trim(),
+              userRole: 'user',
+              preferenceCompleted: user.providerData.isNotEmpty,
+              createdAt: DateTime.now(),
+              photoURL: null,
+              fcmToken: null,
+            );
+          }
+
+          final updatedUserModel = UserModel(
+            userId: userModel.userId,
+            userEmail: userModel.userEmail,
+            userName: _nameController.text.trim(),
+            userRole: userModel.userRole,
+            preferenceCompleted: userModel.preferenceCompleted,
+            createdAt: userModel.createdAt,
+            photoURL: null,
+            fcmToken: userModel.fcmToken,
+          );
+
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .set(updatedUserModel.toFirestore(), SetOptions(merge: true));
         }
-        // Trigger provider refresh to notify all listeners
+
         await context.read<UserProvider>().refreshUser();
         _showSnackBar('Profile picture removed successfully!', AppColors.primary);
-        await Future.delayed(const Duration(milliseconds: 500)); // Small delay for propagation
-        if (context.mounted) Navigator.pop(context); // No need for result; Provider handles refresh
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (context.mounted) Navigator.pop(context);
       } catch (e) {
         _showSnackBar('Error removing profile picture: ${e.toString().replaceFirst('Exception: ', '')}', AppColors.error);
       }
@@ -210,7 +248,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
     }
     setState(() {
       _isSaving = true;
-      _errorMessage = null; // Clear any error messages
+      _errorMessage = null;
     });
     try {
       String? photoUrl = _uploadedImageUrl;
@@ -223,15 +261,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
       }
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // Fetch existing user document from Firestore
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        UserModel? userModel;
+        if (userDoc.exists) {
+          userModel = UserModel.fromFirestore(userDoc.data()!, userDoc.id);
+        } else {
+          userModel = UserModel(
+            userId: user.uid,
+            userEmail: user.email ?? 'Unknown',
+            userName: _nameController.text.trim(),
+            userRole: 'user',
+            preferenceCompleted: user.providerData.isNotEmpty,
+            createdAt: DateTime.now(),
+            photoURL: photoUrl,
+            fcmToken: null,
+          );
+        }
+
+        // Update Firebase Authentication
         await user.updateDisplayName(_nameController.text.trim());
-        await user.updatePhotoURL(photoUrl); // Handles null properly
+        await user.updatePhotoURL(photoUrl);
         await user.reload();
+
+        // Update Firestore
+        final updatedUserModel = UserModel(
+          userId: userModel.userId,
+          userEmail: userModel.userEmail,
+          userName: _nameController.text.trim(),
+          userRole: userModel.userRole,
+          preferenceCompleted: userModel.preferenceCompleted,
+          createdAt: userModel.createdAt,
+          photoURL: photoUrl,
+          fcmToken: userModel.fcmToken,
+        );
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set(updatedUserModel.toFirestore(), SetOptions(merge: true));
+
+        await context.read<UserProvider>().refreshUser();
+        _showSnackBar('Profile updated successfully!', AppColors.primary);
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (context.mounted) Navigator.pop(context);
       }
-      // Trigger provider refresh to notify all listeners
-      await context.read<UserProvider>().refreshUser();
-      _showSnackBar('Profile updated successfully!', AppColors.primary);
-      await Future.delayed(const Duration(milliseconds: 500)); // Small delay for propagation
-      if (context.mounted) Navigator.pop(context); // No need for result; Provider handles refresh
     } catch (e) {
       _showSnackBar('Error updating profile: ${e.toString().replaceFirst('Exception: ', '')}', AppColors.error);
     } finally {
@@ -246,7 +324,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
           message,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontFamily: 'Poppins',
-            color: AppColors.lightBackground, // White text for contrast
+            color: AppColors.lightBackground,
             fontSize: 14.sp,
           ),
         ),
@@ -278,7 +356,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
         opacity: _fadeAnimation,
         child: Container(
           decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor, // Use theme background for consistency
+            color: theme.scaffoldBackgroundColor,
           ),
           child: Scaffold(
             backgroundColor: Colors.transparent,
@@ -336,7 +414,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                               size: 24.sp,
                               color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                             ),
-                            onPressed: null, // Dummy for symmetry
+                            onPressed: null,
                           ),
                         ),
                       ],
@@ -347,25 +425,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
             ),
             body: SafeArea(
               child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h), // Increased vertical padding for breathing room
+                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Card(
-                      elevation: 4, // Reduced for subtler shadow
+                      elevation: 4,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16.r),
                         side: BorderSide(
-                          color: isDarkMode ? AppColors.primary.withOpacity(0.3) : AppColors.lightTextSecondary.withOpacity(0.3), // Gray border in light mode for black/white vibe
-                          width: 0.5.w, // Thinner border
+                          color: isDarkMode ? AppColors.primary.withOpacity(0.3) : AppColors.lightTextSecondary.withOpacity(0.3),
+                          width: 0.5.w,
                         ),
                       ),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface, // Themed surface color
+                          color: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface,
                           borderRadius: BorderRadius.circular(16.r),
                         ),
-                        padding: EdgeInsets.all(24.w), // Increased padding for better spacing
+                        padding: EdgeInsets.all(24.w),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -391,22 +469,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                           ? NetworkImage(_uploadedImageUrl!)
                                           : null,
                                       backgroundColor: AppColors.primary.withOpacity(0.2),
-                                      child: !hasImage // Only show placeholder if no image
+                                      child: !hasImage
                                           ? Icon(
                                         Icons.person,
                                         color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                         size: 50.sp,
                                       )
-                                          : null, // No child icon if there's an image
+                                          : null,
                                     ),
-                                    if (hasImage) // Edit badge overlay only if there's an image
+                                    if (hasImage)
                                       Positioned(
                                         bottom: 0,
                                         right: 0,
                                         child: Container(
                                           padding: EdgeInsets.all(4.w),
                                           decoration: BoxDecoration(
-                                            color: isDarkMode ? AppColors.primary.withOpacity(0.7) : AppColors.lightTextPrimary.withOpacity(0.7), // Black with opacity in light mode
+                                            color: isDarkMode ? AppColors.primary.withOpacity(0.7) : AppColors.lightTextPrimary.withOpacity(0.7),
                                             shape: BoxShape.circle,
                                           ),
                                           child: Icon(
@@ -420,7 +498,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                 ),
                               ),
                             ),
-                            SizedBox(height: 12.h), // Increased spacing
+                            SizedBox(height: 12.h),
                             Text(
                               hasImage ? 'Tap to change image' : 'Tap to select and crop image',
                               style: theme.textTheme.bodySmall?.copyWith(
@@ -449,7 +527,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                 ),
                               ),
                             ],
-                            SizedBox(height: 24.h), // Increased spacing
+                            SizedBox(height: 24.h),
                             TextField(
                               controller: _nameController,
                               style: theme.textTheme.bodyMedium?.copyWith(
@@ -469,7 +547,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                   color: isDarkMode ? AppColors.darkTextSecondary.withOpacity(0.6) : AppColors.lightTextSecondary.withOpacity(0.6),
                                 ),
                                 filled: true,
-                                fillColor: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface, // Themed fill color
+                                fillColor: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface,
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12.r),
                                   borderSide: BorderSide(
@@ -491,36 +569,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                     width: 1.5.w,
                                   ),
                                 ),
-                                errorText: _errorMessage, // Show validation error
+                                errorText: _errorMessage,
                                 errorStyle: TextStyle(color: AppColors.error, fontSize: 12.sp),
                               ),
                             ),
-                            SizedBox(height: 24.h), // Increased spacing
+                            SizedBox(height: 24.h),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                // Cancel Button (Outlined with border)
                                 Expanded(
                                   child: GestureDetector(
                                     onTap: () {
-                                      Feedback.forTap(context); // Haptic feedback
+                                      Feedback.forTap(context);
                                       Navigator.pop(context);
                                     },
                                     child: AnimatedScale(
-                                      scale: 1.0, // Can add press scale if desired
+                                      scale: 1.0,
                                       duration: const Duration(milliseconds: 200),
                                       child: ElevatedButton(
                                         onPressed: () => Navigator.pop(context),
                                         style: theme.outlinedButtonTheme.style?.copyWith(
                                           backgroundColor: WidgetStateProperty.all(
-                                            isDarkMode ? AppColors.darkSecondary : AppColors.lightBackground, // White in light mode
+                                            isDarkMode ? AppColors.darkSecondary : AppColors.lightBackground,
                                           ),
                                           foregroundColor: WidgetStateProperty.all(
-                                            isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary, // Black text in light mode
+                                            isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                                           ),
                                           side: WidgetStateProperty.all(
                                             BorderSide(
-                                              color: isDarkMode ? AppColors.primary : AppColors.lightTextSecondary, // Gray border in light mode
+                                              color: isDarkMode ? AppColors.primary : AppColors.lightTextSecondary,
                                               width: 1.w,
                                             ),
                                           ),
@@ -537,11 +614,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                   ),
                                 ),
                                 SizedBox(width: 16.w),
-                                // Save Button (Filled with gradient and subtle border/shadow)
                                 Expanded(
                                   child: GestureDetector(
-                                    onTap: _isSaving ? null : () {
-                                      Feedback.forTap(context); // Haptic feedback
+                                    onTap: _isSaving
+                                        ? null
+                                        : () {
+                                      Feedback.forTap(context);
                                       _saveProfile();
                                     },
                                     child: AnimatedContainer(
@@ -551,18 +629,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> with SingleTicker
                                         onPressed: _isSaving ? null : _saveProfile,
                                         style: theme.elevatedButtonTheme.style?.copyWith(
                                           backgroundColor: WidgetStateProperty.all(
-                                            isDarkMode ? AppColors.primary : AppColors.lightTextPrimary, // Black background in light mode
+                                            isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                                           ),
                                           foregroundColor: WidgetStateProperty.all(
-                                            isDarkMode ? AppColors.darkTextPrimary : AppColors.lightBackground, // White text in light mode
+                                            isDarkMode ? AppColors.darkTextPrimary : AppColors.lightBackground,
                                           ),
-                                          overlayColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)), // Subtle overlay
+                                          overlayColor: WidgetStateProperty.all(AppColors.primary.withOpacity(0.1)),
                                           shape: WidgetStateProperty.all(
                                             RoundedRectangleBorder(
                                               borderRadius: BorderRadius.circular(12.r),
                                               side: BorderSide(
-                                                color: AppColors.primary.withOpacity(0.5), // Subtle green border accent
-                                                width: 0.5.w, // Thin border
+                                                color: AppColors.primary.withOpacity(0.5),
+                                                width: 0.5.w,
                                               ),
                                             ),
                                           ),

@@ -69,6 +69,14 @@ class NotificationService {
         },
       );
 
+      // Register background/terminated state handler
+      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails().then((details) async {
+        if (details != null && details.didNotificationLaunchApp && details.notificationResponse?.payload != null) {
+          log('App launched from notification: ${details.notificationResponse?.payload}');
+          await onClickToNotification(details.notificationResponse!.payload!);
+        }
+      });
+
       await _createNotificationChannel();
       await _requestNotificationPermission();
       _isInitialized = true;
@@ -84,6 +92,9 @@ class NotificationService {
       'Wellness Notifications',
       description: 'Notifications for wellness updates',
       importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
+      enableLights: true,
     );
 
     final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -167,6 +178,8 @@ class NotificationService {
           enableVibration: true,
           showWhen: true,
           icon: 'ic_notification',
+          fullScreenIntent: true, // Make notification clickable even when screen is locked
+          category: AndroidNotificationCategory.message, // Ensure high priority
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -186,66 +199,12 @@ class NotificationService {
         payload: payloadJson,
       );
 
-      final notificationModel = NotificationModel(
-        id: const Uuid().v4(),
-        userId: currentUserId ?? '',
-        title: message.notification?.title ?? message.data['title'] ?? 'No Title',
-        body: message.notification?.body ?? message.data['body'] ?? 'No Body',
-        type: message.data['type'] ?? 'custom',
-        isRead: false,
-        payload: message.data,
-        timestamp: DateTime.now(),
-      );
-
-      // Save to Firestore
-      try {
-        await _firestore
-            .collection('notifications')
-            .doc(notificationModel.id)
-            .set(notificationModel.toFirestore());
-        log('Saved FCM notification to Firestore: ${notificationModel.id}');
-      } catch (e, stackTrace) {
-        log('Error saving FCM notification to Firestore: $e', stackTrace: stackTrace);
-      }
-
-      // Save to local database
-      try {
-        await DatabaseHelper.instance.insertNotification(notificationModel);
-        log('Saved FCM notification to local database: ${notificationModel.id}');
-      } catch (e, stackTrace) {
-        log('Error saving FCM notification to local database: $e', stackTrace: stackTrace);
-      }
+      // Don't create a notification record in the database since this
+      // is just displaying a notification, not storing it for history
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_pendingNotificationKey, payloadJson);
       log('Stored pending notification payload: ${message.data}');
-
-      if (currentUserId != null) {
-        final idToken = await AuthService().getCurrentUser()?.getIdToken();
-        if (idToken == null) {
-          log('No ID token available for saving notification');
-          return;
-        }
-        final response = await http.post(
-          Uri.parse('$_vercelDomain/api/saveNotification'),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $idToken',
-          },
-          body: json.encode({
-            'userId': currentUserId,
-            'title': message.notification?.title ?? message.data['title'] ?? 'No Title',
-            'body': message.notification?.body ?? message.data['body'] ?? 'No Body',
-            'payload': message.data,
-            'type': message.data['type'] ?? 'custom',
-          }),
-        );
-        if (response.statusCode != 200) {
-          log('Error saving notification to Vercel: ${response.body}');
-        }
-      } else {
-        log('No userId found for notification storage');
-      }
     } catch (e, stackTrace) {
       log("Error showing notification: $e", stackTrace: stackTrace);
     }
@@ -263,8 +222,10 @@ class NotificationService {
       String title = 'Your ${reminder.type.capitalize()} Reminder';
       String body = 'Time to check your ${reminder.type} content';
       String? tipId;
+      String contentType = reminder.type; // Default content type
 
       if (await DataRepository.instance.isOnline()) {
+        // Get tips matching this reminder's criteria
         final tips = await DataRepository.instance.getTipsByCategory(
           reminder.categoryId,
           includePremium: false,
@@ -273,16 +234,20 @@ class NotificationService {
           return [];
         });
         log('Fetched ${tips.length} tips for category ${reminder.categoryId}, type: ${reminder.type}');
+
+        // Filter tips based on reminder type
         final filteredTips = tips.where((tip) {
-          if (reminder.type == 'both') return true;
+          if (reminder.type == 'all') return true;
           return tip.tipsType == reminder.type;
         }).toList();
 
         if (filteredTips.isNotEmpty) {
+          // Select a random tip to show
           final tip = filteredTips[DateTime.now().millisecondsSinceEpoch % filteredTips.length];
-          log('Selected tip: ${tip.tipsId}, title: ${tip.tipsTitle}');
+          log('Selected tip: ${tip.tipsId}, title: ${tip.tipsTitle}, type: ${tip.tipsType}');
           body = tip.tipsTitle;
           tipId = tip.tipsId;
+          contentType = tip.tipsType; // Set actual content type from tip
         } else {
           log('No tips found for reminder ${reminder.id}, using default message');
         }
@@ -290,10 +255,15 @@ class NotificationService {
         log('Offline: Using default notification message for reminder ${reminder.id}');
       }
 
+      // Create a unique ID for this notification
       final notificationId = const Uuid().v4().hashCode.abs();
+
+      // Parse the time from reminder
       final timeParts = reminder.time.split(':');
       final hour = int.parse(timeParts[0]);
       final minute = int.parse(timeParts[1]);
+
+      // Calculate scheduled date
       final now = tz.TZDateTime.now(tz.local);
       var scheduledDate = tz.TZDateTime(
         tz.local,
@@ -306,11 +276,14 @@ class NotificationService {
 
       final timeDiff = scheduledDate.difference(now).inSeconds;
       log('Current time (local): $now, Scheduled date (local): $scheduledDate, time difference: $timeDiff seconds');
+
+      // If time has already passed today, schedule for tomorrow
       if (timeDiff < 0) {
         scheduledDate = scheduledDate.add(const Duration(days: 1));
         log('Scheduled date moved to next day: $scheduledDate');
       }
 
+      // Create notification details
       const androidDetails = AndroidNotificationDetails(
         'wellness_channel',
         'Wellness Reminders',
@@ -319,6 +292,8 @@ class NotificationService {
         priority: Priority.high,
         playSound: true,
         enableVibration: true,
+        fullScreenIntent: true,
+        category: AndroidNotificationCategory.reminder,
       );
       const iosDetails = DarwinNotificationDetails(
         presentAlert: true,
@@ -327,58 +302,23 @@ class NotificationService {
       );
       final notificationDetails = NotificationDetails(android: androidDetails, iOS: iosDetails);
 
+      // Create payload with content type information
       final payload = {
         'tipId': tipId,
         'type': reminder.type,
         'userId': reminder.userId,
         'isFromReminder': true,
+        'contentType': contentType, // Include content type for proper navigation
       };
       final payloadJson = json.encode(payload);
 
-      // Create NotificationModel
-      final notificationModel = NotificationModel(
-        id: const Uuid().v4(),
-        userId: reminder.userId,
-        title: title,
-        body: body,
-        type: reminder.type,
-        isRead: false,
-        payload: payload,
-        timestamp: DateTime.now(),
-      );
-
-      // Save to local database first (for offline reliability)
-      try {
-        await DatabaseHelper.instance.insertNotification(notificationModel);
-        log('Saved reminder notification to local database: ${notificationModel.id}');
-      } catch (e, stackTrace) {
-        log('Error saving reminder notification to local database: $e', stackTrace: stackTrace);
-      }
-
-      // Save to Firestore
-      if (await DataRepository.instance.isOnline()) {
-        try {
-          await _firestore
-              .collection('notifications')
-              .doc(notificationModel.id)
-              .set(notificationModel.toFirestore());
-          log('Saved reminder notification to Firestore: ${notificationModel.id}');
-        } catch (e, stackTrace) {
-          log('Error saving reminder notification to Firestore: $e', stackTrace: stackTrace);
-        }
-      } else {
-        log('Offline: Queuing reminder notification for later sync');
-        final prefs = await SharedPreferences.getInstance();
-        final pendingNotifications = prefs.getStringList(_pendingNotificationKey + '_reminders') ?? [];
-        pendingNotifications.add(jsonEncode(notificationModel.toJson()));
-        await prefs.setStringList(_pendingNotificationKey + '_reminders', pendingNotifications);
-      }
-
+      // Request exact alarm permission
       final exactAlarmsPermitted = await requestExactAlarmPermission();
       final scheduleMode = exactAlarmsPermitted
           ? AndroidScheduleMode.exactAllowWhileIdle
           : AndroidScheduleMode.inexactAllowWhileIdle;
 
+      // Schedule the notification based on frequency
       if (reminder.frequency == 'daily') {
         await flutterLocalNotificationsPlugin.zonedSchedule(
           notificationId,
@@ -388,14 +328,16 @@ class NotificationService {
           notificationDetails,
           androidScheduleMode: scheduleMode,
           matchDateTimeComponents: DateTimeComponents.time,
-          payload: payloadJson,
+          payload: payloadJson
         );
         log('Scheduled daily notification $notificationId for reminder ${reminder.id} at ${reminder.time} with mode $scheduleMode');
       } else if (reminder.frequency == 'weekly' && reminder.dayOfWeek != null) {
+        // Adjust date to next occurrence of the specified day of week
         while (scheduledDate.weekday != reminder.dayOfWeek) {
           scheduledDate = scheduledDate.add(const Duration(days: 1));
         }
         log('Adjusted weekly scheduled date: $scheduledDate');
+
         await flutterLocalNotificationsPlugin.zonedSchedule(
           notificationId,
           title,
@@ -404,11 +346,12 @@ class NotificationService {
           notificationDetails,
           androidScheduleMode: scheduleMode,
           matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          payload: payloadJson,
+          payload: payloadJson
         );
         log('Scheduled weekly notification $notificationId for reminder ${reminder.id} on day ${reminder.dayOfWeek} at ${reminder.time} with mode $scheduleMode');
       }
 
+      // Update reminder with notification ID
       final updatedReminder = ReminderModel(
         id: reminder.id,
         userId: reminder.userId,
@@ -435,6 +378,15 @@ class NotificationService {
       pendingReminders.add(jsonEncode(reminder.toJson()));
       await prefs.setStringList(_pendingRemindersKey, pendingReminders);
       log('Notification queued for reminder: ${reminder.id}');
+
+      // Even if we're offline, try to schedule the local notification
+      // since this doesn't require network
+      try {
+        await scheduleReminderNotification(reminder);
+        log('Successfully scheduled local notification for offline reminder: ${reminder.id}');
+      } catch (e, stackTrace) {
+        log('Failed to schedule local notification for offline reminder: $e', error: e, stackTrace: stackTrace);
+      }
     } catch (e, stackTrace) {
       log('Failed to queue notification: $e', error: e, stackTrace: stackTrace);
       rethrow;
@@ -447,8 +399,10 @@ class NotificationService {
         log('Offline: Skipping notification sync');
         return;
       }
+
       final prefs = await SharedPreferences.getInstance();
       final pendingReminders = prefs.getStringList(_pendingRemindersKey) ?? [];
+
       for (var reminderJson in pendingReminders) {
         final reminder = ReminderModel.fromJson(jsonDecode(reminderJson));
         log('Scheduling queued notification for reminder: ${reminder.id}');
@@ -460,22 +414,6 @@ class NotificationService {
         }
       }
       await prefs.setStringList(_pendingRemindersKey, []);
-
-      // Sync pending notification models
-      final pendingNotifications = prefs.getStringList(_pendingNotificationKey + '_reminders') ?? [];
-      for (var notificationJson in pendingNotifications) {
-        final notification = NotificationModel.fromJson(jsonDecode(notificationJson));
-        try {
-          await _firestore
-              .collection('notifications')
-              .doc(notification.id)
-              .set(notification.toFirestore());
-          log('Synced pending notification to Firestore: ${notification.id}');
-        } catch (e, stackTrace) {
-          log('Error syncing pending notification ${notification.id}: $e', stackTrace: stackTrace);
-        }
-      }
-      await prefs.setStringList(_pendingNotificationKey + '_reminders', []);
       log('Cleared queued notifications');
     } catch (e, stackTrace) {
       log('Error syncing pending notifications: $e', error: e, stackTrace: stackTrace);
@@ -500,42 +438,112 @@ class NotificationService {
     try {
       final data = jsonDecode(payload) as Map<String, dynamic>;
       log("Notification clicked with payload: $data");
+
       final tipId = data['tipId'] as String?;
       final type = data['type'] as String? ?? 'tip';
+      final contentType = data['contentType'] as String? ?? type; // Default to type if contentType not specified
       final isFromReminder = data['isFromReminder'] as bool? ?? false;
       final userId = data['userId'] as String? ?? '';
 
       if (tipId != null && tipId.isNotEmpty) {
+        // Fetch the tip from Firestore
         final tipDoc = await _firestore.collection('tips').doc(tipId).get();
         if (!tipDoc.exists) {
           log('Tip not found for tipId: $tipId');
           return;
         }
+
         final tip = TipModel.fromFirestore(tipDoc.data()! as Map<String, dynamic>, tipId);
+        log('Fetched tip: ${tip.tipsId}, type: ${tip.tipsType}');
 
-        final featuredTipsSnapshot = await _firestore
-            .collection('tips')
-            .where('isFeatured', isEqualTo: true)
-            .limit(5)
-            .get();
-        final featuredTips = featuredTipsSnapshot.docs
-            .map((doc) => TipModel.fromFirestore(doc.data() as Map<String, dynamic>, doc.id))
-            .toList();
+        // Save notification click to database to mark as read
+        if (isFromReminder) {
+          try {
+            final notificationModel = NotificationModel(
+              id: const Uuid().v4(),
+              userId: userId,
+              title: 'Reminder: ${tip.tipsTitle}',
+              body: tip.tipsDescription.length > 100
+                  ? '${tip.tipsDescription.substring(0, 100)}...'
+                  : tip.tipsDescription,
+              type: tip.tipsType,
+              isRead: true, // Mark as read since user clicked it
+              payload: data,
+              timestamp: DateTime.now(),
+            );
 
+            await DatabaseHelper.instance.insertNotification(notificationModel);
+            await _firestore
+                .collection('notifications')
+                .doc(notificationModel.id)
+                .set(notificationModel.toFirestore());
+            log('Created read notification record for reminder click: ${notificationModel.id}');
+          } catch (e) {
+            log('Error creating notification record: $e');
+          }
+        }
+
+        // Get the navigator instance
         final navigator = navigatorKey.currentState;
         if (navigator != null) {
-          navigator.pushNamed(
-            RoutesName.tipsDetailScreen,
-            arguments: {
-              'tip': tip,
-              'userId': userId,
-              'featuredTips': featuredTips,
-              'allHealthTips': false, // Always false to show only the specific tip
-              'allQuotes': false,     // Always false to show only the specific tip
-              'categoryName': isFromReminder ? 'Recently Added' : (type == 'tip' ? 'Health Tips' : 'Latest Quotes'),
-            },
-          );
-          log('Navigated to TipsDetailScreen with tipId: $tipId, categoryName: ${isFromReminder ? 'Recently Added' : (type == 'tip' ? 'Health Tips' : 'Latest Quotes')}');
+          // Navigate based on content type
+          switch (tip.tipsType) {
+            case 'video':
+              navigator.pushNamed(
+                RoutesName.videoPlayerScreen,
+                arguments: {
+                  'tip': tip,
+                  'categoryName': isFromReminder ? 'Video Content' : 'Videos',
+                  'featuredTips': <TipModel>[], // Optional: fetch related videos
+                },
+              );
+              log('Navigated to VideoPlayerScreen with tipId: ${tip.tipsId}');
+              break;
+
+            case 'audio':
+              navigator.pushNamed(
+                RoutesName.mediaPlayerScreen,
+                arguments: {
+                  'tip': tip,
+                  'categoryName': isFromReminder ? 'Audio Content' : 'Audio',
+                  'featuredTips': <TipModel>[], // Optional: fetch related audio
+                },
+              );
+              log('Navigated to MediaPlayerScreen with tipId: ${tip.tipsId}');
+              break;
+
+            case 'image':
+              navigator.pushNamed(
+                RoutesName.imageViewerScreen,
+                arguments: {
+                  'tip': tip,
+                  'imageTips': <TipModel>[tip], // Optional: fetch related images
+                  'initialIndex': 0,
+                },
+              );
+              log('Navigated to ImageViewerScreen with tipId: ${tip.tipsId}');
+              break;
+
+            default:
+            // Default for tips, quotes, etc.
+              navigator.pushNamed(
+                RoutesName.tipsDetailScreen,
+                arguments: {
+                  'tip': tip,
+                  'categoryName': isFromReminder
+                      ? 'Recently Added'
+                      : (tip.tipsType == 'tip' ? 'Health Tips' : 'Latest Quotes'),
+                  'userId': userId,
+                  'featuredTips': <TipModel>[],
+                  'allHealthTips': false,
+                  'allQuotes': false,
+                },
+              );
+              log('Navigated to TipsDetailScreen with tipId: ${tip.tipsId}');
+              break;
+          }
+
+          // Clear pending notification after handling
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove(_pendingNotificationKey);
         } else {
@@ -558,11 +566,23 @@ class NotificationService {
         await onClickToNotification(json.encode(initialMessage.data));
       }
 
+      // Check for pending notifications
       final prefs = await SharedPreferences.getInstance();
       final storedPayload = prefs.getString(_pendingNotificationKey);
       if (storedPayload != null) {
         log('Handling stored notification payload: $storedPayload');
         await onClickToNotification(storedPayload);
+      }
+
+      // Check for app launch from notification
+      final NotificationAppLaunchDetails? launchDetails =
+      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+      if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
+        final payload = launchDetails.notificationResponse?.payload;
+        if (payload != null) {
+          log('App launched by notification: $payload');
+          await onClickToNotification(payload);
+        }
       }
     } catch (e, stackTrace) {
       log("Error handling initial notification: $e", stackTrace: stackTrace);

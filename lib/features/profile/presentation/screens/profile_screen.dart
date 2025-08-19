@@ -546,33 +546,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return '${monthNames[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  Widget _buildPremiumStat(String label, String value, bool isDarkMode) {
-    return Column(
-      children: [
-        Text(
-          value.isEmpty ? 'N/A' : value.toUpperCase(),
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.bold,
-            color: const Color(0xFFFFD700),
-            fontFamily: 'Poppins',
-          ),
-        ),
-        SizedBox(height: 4.h),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 10.sp,
-            color: isDarkMode
-                ? Colors.white.withOpacity(0.7)
-                : AppColors.lightTextSecondary,
-            fontFamily: 'Poppins',
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -619,7 +592,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           height: 56.h,
                           decoration: BoxDecoration(
                             color: isDarkMode
-                                ? AppColors.darkSurface
+                                ? const Color(0xFF121212)
                                 : AppColors.lightBackground,
                             borderRadius: BorderRadius.circular(24.r),
                             boxShadow: isDarkMode
@@ -705,321 +678,381 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   (_subscription!.endDate == null ||
                                       _subscription!.endDate!
                                           .isAfter(DateTime.now()));
-                              final subscriptionDate =
-                              _subscription?.startDate != null &&
-                                  _subscription!.status == 'active' &&
-                                  (_subscription!.endDate == null ||
-                                      _subscription!.endDate!
-                                          .isAfter(DateTime.now()))
-                                  ? _formatDate(_subscription!.startDate)
-                                  : joinedDate;
                               final planName = _subscription?.planId != null &&
                                   _subscription!.status == 'active' &&
                                   (_subscription!.endDate == null ||
                                       _subscription!.endDate!
                                           .isAfter(DateTime.now()))
-                                  ? _subscription!.planId
+                                  ? _subscription!.planId!.toUpperCase()
+                                  : 'N/A';
+                              final memberSince = user?.metadata.creationTime != null
+                                  ? user!.metadata.creationTime!.year.toString()
                                   : 'N/A';
 
                               if (isPremium) {
-                                return Container(
-                                  width: double.infinity,
-                                  padding: EdgeInsets.all(24.w),
-                                  margin: EdgeInsets.only(bottom: 20.h),
-                                  decoration: BoxDecoration(
-                                    color: isDarkMode
-                                        ? AppColors.darkSurface
-                                        : AppColors.lightBackground,
-                                    borderRadius: BorderRadius.circular(20.r),
-                                    border: Border.all(
-                                      color: isDarkMode
-                                          ? AppColors.darkTextHint
-                                          : AppColors.lightTextHint,
-                                      width: 1.w,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: isDarkMode
-                                            ? AppColors.shadow.withOpacity(0.3)
-                                            : AppColors.lightTextPrimary
-                                            .withOpacity(0.15),
-                                        blurRadius: 12.r,
-                                        spreadRadius: 1.r,
-                                        offset: Offset(0, 4.h),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Stack(
-                                    children: [
-                                      Positioned(
-                                        left: 0,
-                                        right: 0,
-                                        top: -50.h,
-                                        bottom: 0,
-                                        child: ClipRRect(
-                                          borderRadius:
-                                          BorderRadius.circular(20.r),
-                                          child: CustomPaint(
-                                            painter: PremiumBackgroundPainter(),
+                                // COMPACT PREMIUM CARD WITH DIAMOND PATTERN
+                                return Column(
+                                  children: [
+                                    // Premium black and gold card
+                                    Container(
+                                      width: double.infinity,
+                                      height: 180.h,
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                          colors: [
+                                            Color(0xFF000000), // Deep black
+                                            Color(0xFF141414), // Rich black
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(12.r),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.3),
+                                            blurRadius: 10.r,
+                                            spreadRadius: 1.r,
+                                            offset: Offset(0, 4.h),
                                           ),
+                                          BoxShadow(
+                                            color: const Color(0xFFD4AF37).withOpacity(0.2),
+                                            blurRadius: 8.r,
+                                            spreadRadius: 0,
+                                            offset: Offset(0, 1.h),
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: const Color(0xFFD4AF37).withOpacity(0.3),
+                                          width: 1.w,
                                         ),
                                       ),
-                                      Positioned(
-                                        top: 0,
-                                        right: 0,
-                                        child: Container(
-                                          padding: EdgeInsets.symmetric(
-                                              horizontal: 12.w, vertical: 6.h),
-                                          decoration: BoxDecoration(
-                                            gradient: const LinearGradient(
-                                              colors: [
-                                                Color(0xFFFFD700),
-                                                Color(0xFFFFA500),
-                                              ],
-                                            ),
-                                            borderRadius:
-                                            BorderRadius.circular(20.r),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color:
-                                                Colors.amber.withOpacity(0.4),
-                                                blurRadius: 1.r,
-                                                offset: Offset(0, 1.h),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Row(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Icon(
-                                                Icons.workspace_premium,
-                                                size: 14.sp,
-                                                color: Colors.black87,
-                                              ),
-                                              SizedBox(width: 4.w),
-                                              Text(
-                                                'PREMIUM',
-                                                style: TextStyle(
-                                                  fontSize: 10.sp,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.black87,
-                                                  letterSpacing: 0.5,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                      Column(
+                                      child: Stack(
                                         children: [
-                                          SizedBox(height: 20.h),
-                                          Stack(
-                                            alignment: Alignment.center,
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Container(
-                                                width: 108.w,
-                                                height: 108.w,
-                                                decoration: const BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  gradient: LinearGradient(
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                    colors: [
-                                                      Color(0xFFFFD700),
-                                                      Color(0xFFFFA500),
-                                                      Color(0xFFFFD700),
-                                                    ],
-                                                    stops: [0.0, 0.5, 1.0],
-                                                  ),
+                                          // Diamond pattern background
+                                          Positioned.fill(
+                                            child: CustomPaint(
+                                              painter: DiamondPatternPainter(),
+                                            ),
+                                          ),
+
+                                          // Card content
+                                          Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 16.w,
+                                              vertical: 12.h,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                // Top row with plan badge and logo
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    // Premium badge
+                                                    Container(
+                                                      padding: EdgeInsets.symmetric(
+                                                        horizontal: 10.w,
+                                                        vertical: 5.h,
+                                                      ),
+                                                      decoration: BoxDecoration(
+                                                        gradient: const LinearGradient(
+                                                          begin: Alignment.topLeft,
+                                                          end: Alignment.bottomRight,
+                                                          colors: [
+                                                            Color(0xFFD4AF37), // Gold
+                                                            Color(0xFFB8860B), // Dark gold
+                                                          ],
+                                                        ),
+                                                        borderRadius: BorderRadius.circular(20.r),
+                                                        boxShadow: [
+                                                          BoxShadow(
+                                                            color: Colors.black.withOpacity(0.2),
+                                                            blurRadius: 4.r,
+                                                            offset: Offset(0, 2.h),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Icon(
+                                                            FontAwesomeIcons.diamond,
+                                                            size: 10.sp,
+                                                            color: Colors.black,
+                                                          ),
+                                                          SizedBox(width: 4.w),
+                                                          Text(
+                                                            planName,
+                                                            style: TextStyle(
+                                                              fontSize: 10.sp,
+                                                              fontWeight: FontWeight.bold,
+                                                              color: Colors.black,
+                                                              letterSpacing: 0.5,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+
+                                                    // Logo
+                                                    ShaderMask(
+                                                      shaderCallback: (bounds) => const LinearGradient(
+                                                        colors: [
+                                                          Color(0xFFD4AF37),
+                                                          Color(0xFFF0E68C),
+                                                          Color(0xFFD4AF37),
+                                                        ],
+                                                      ).createShader(bounds),
+                                                      child: Text(
+                                                        'WELLNESS',
+                                                        style: TextStyle(
+                                                          fontSize: 16.sp,
+                                                          fontWeight: FontWeight.w600,
+                                                          letterSpacing: 1.0,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
-                                              Container(
-                                                width: 100.w,
-                                                height: 100.w,
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: isDarkMode
-                                                      ? AppColors.darkBackground
-                                                      : AppColors.lightBackground,
-                                                ),
-                                                child: Padding(
-                                                  padding: EdgeInsets.all(3.w),
-                                                  child: CircleAvatar(
-                                                    radius: 48.r,
-                                                    backgroundColor: isDarkMode
-                                                        ? AppColors.darkSurface
-                                                        : AppColors.lightBackground,
-                                                    child: userPhotoUrl != null
-                                                        ? ClipOval(
-                                                      child:
-                                                      CachedNetworkImage(
-                                                        imageUrl:
-                                                        userPhotoUrl,
-                                                        width: 96.r,
-                                                        height: 96.r,
-                                                        fit: BoxFit.cover,
-                                                        placeholder:
-                                                            (context, url) =>
-                                                            Center(
-                                                              child:
-                                                              CircularProgressIndicator(
-                                                                color: AppColors
-                                                                    .primary,
+
+                                                // Center content with crown and name
+                                                Expanded(
+                                                  child: Center(
+                                                    child: Row(
+                                                      mainAxisAlignment: MainAxisAlignment.center,
+                                                      children: [
+                                                        // Crown icon
+                                                        Container(
+                                                          width: 40.w,
+                                                          height: 40.w,
+                                                          decoration: BoxDecoration(
+                                                            shape: BoxShape.circle,
+                                                            border: Border.all(
+                                                              color: const Color(0xFFD4AF37),
+                                                              width: 1.w,
+                                                            ),
+                                                          ),
+                                                          child: Center(
+                                                            child: ShaderMask(
+                                                              shaderCallback: (bounds) => const LinearGradient(
+                                                                colors: [
+                                                                  Color(0xFFD4AF37),
+                                                                  Color(0xFFF0E68C),
+                                                                ],
+                                                              ).createShader(bounds),
+                                                              child: FaIcon(
+                                                                FontAwesomeIcons.crown,
+                                                                size: 18.sp,
+                                                                color: Colors.white,
                                                               ),
                                                             ),
-                                                        errorWidget: (context,
-                                                            url,
-                                                            error) =>
-                                                            SvgPicture.asset(
-                                                              'assets/icons/svg/ic_user.svg',
-                                                              width: 60.sp,
-                                                              height: 60.sp,
-                                                              colorFilter:
-                                                              ColorFilter
-                                                                  .mode(
-                                                                isDarkMode
-                                                                    ? AppColors
-                                                                    .darkTextPrimary
-                                                                    : AppColors
-                                                                    .lightTextPrimary,
-                                                                BlendMode
-                                                                    .srcIn,
+                                                          ),
+                                                        ),
+                                                        SizedBox(width: 12.w),
+
+                                                        // Premium member name
+                                                        Column(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            Text(
+                                                              'PREMIUM MEMBER',
+                                                              style: TextStyle(
+                                                                fontSize: 10.sp,
+                                                                fontWeight: FontWeight.w500,
+                                                                color: const Color(0xFFD4AF37),
+                                                                letterSpacing: 1.0,
                                                               ),
                                                             ),
-                                                      ),
-                                                    )
-                                                        : SvgPicture.asset(
-                                                      'assets/icons/svg/ic_user.svg',
-                                                      width: 60.sp,
-                                                      height: 60.sp,
-                                                      colorFilter:
-                                                      ColorFilter.mode(
-                                                        isDarkMode
-                                                            ? AppColors
-                                                            .darkTextPrimary
-                                                            : AppColors
-                                                            .lightTextPrimary,
-                                                        BlendMode.srcIn,
-                                                      ),
+                                                            SizedBox(height: 4.h),
+                                                            Text(
+                                                              userName.toUpperCase(),
+                                                              style: TextStyle(
+                                                                fontSize: 18.sp,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: Colors.white,
+                                                                letterSpacing: 0.5,
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
                                                     ),
                                                   ),
                                                 ),
-                                              ),
-                                              Positioned(
-                                                top: -15.h,
-                                                child: FaIcon(
-                                                  FontAwesomeIcons.crown,
-                                                  size: 24.sp,
-                                                  color: const Color(0xFFFFD700),
+
+                                                // Stats row at bottom
+                                                Container(
+                                                  padding: EdgeInsets.symmetric(vertical: 8.h),
+                                                  decoration: BoxDecoration(
+                                                    border: Border(
+                                                      top: BorderSide(
+                                                        color: const Color(0xFFD4AF37).withOpacity(0.3),
+                                                        width: 1.h,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                                    children: [
+                                                      _buildStat('MEMBER SINCE', memberSince),
+                                                      _buildVerticalDivider(),
+                                                      _buildStat('STATUS', 'ACTIVE'),
+                                                      _buildVerticalDivider(),
+                                                      _buildStat('BENEFITS', '100%'),
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
-                                            ],
-                                          ),
-                                          SizedBox(height: 20.h),
-                                          Text(
-                                            userName,
-                                            style: theme.textTheme.headlineSmall
-                                                ?.copyWith(
-                                              fontSize: 24.sp,
-                                              fontWeight: FontWeight.w700,
-                                              fontFamily: 'Poppins',
-                                              color: isDarkMode
-                                                  ? Colors.white
-                                                  : AppColors.lightTextPrimary,
+                                              ],
                                             ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            textAlign: TextAlign.center,
                                           ),
-                                          SizedBox(height: 8.h),
-                                          Text(
-                                            userEmail,
-                                            style: theme.textTheme.bodyMedium
-                                                ?.copyWith(
-                                              fontSize: 14.sp,
-                                              fontFamily: 'Poppins',
-                                              color: isDarkMode
-                                                  ? Colors.white.withOpacity(0.8)
-                                                  : AppColors.lightTextSecondary,
+
+                                          // Decorative corners
+                                          Positioned(
+                                            top: 8.h,
+                                            left: 8.w,
+                                            child: _buildCorner(),
+                                          ),
+                                          Positioned(
+                                            top: 8.h,
+                                            right: 8.w,
+                                            child: Transform.rotate(
+                                              angle: pi / 2,
+                                              child: _buildCorner(),
                                             ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            textAlign: TextAlign.center,
                                           ),
-                                          SizedBox(height: 24.h),
-                                          Row(
-                                            mainAxisAlignment:
-                                            MainAxisAlignment.spaceEvenly,
-                                            children: [
-                                              _buildPremiumStat(
-                                                'Member Since',
-                                                subscriptionDate.split(' ').length >=
-                                                    3
-                                                    ? subscriptionDate
-                                                    .split(' ')[2]
-                                                    : subscriptionDate.split(' ').last,
-                                                isDarkMode,
-                                              ),
-                                              Container(
-                                                width: 1.w,
-                                                height: 40.h,
-                                                color: isDarkMode
-                                                    ? Colors.white.withOpacity(0.2)
-                                                    : AppColors.lightTextHint
-                                                    .withOpacity(0.2),
-                                              ),
-                                              _buildPremiumStat(
-                                                'Status',
-                                                _subscription?.status ?? 'N/A',
-                                                isDarkMode,
-                                              ),
-                                              Container(
-                                                width: 1.w,
-                                                height: 40.h,
-                                                color: isDarkMode
-                                                    ? Colors.white.withOpacity(0.2)
-                                                    : AppColors.lightTextHint
-                                                    .withOpacity(0.2),
-                                              ),
-                                              _buildPremiumStat(
-                                                  'Plan', planName, isDarkMode),
-                                            ],
+                                          Positioned(
+                                            bottom: 8.h,
+                                            right: 8.w,
+                                            child: Transform.rotate(
+                                              angle: pi,
+                                              child: _buildCorner(),
+                                            ),
                                           ),
-                                          SizedBox(height: 20.h),
+                                          Positioned(
+                                            bottom: 8.h,
+                                            left: 8.w,
+                                            child: Transform.rotate(
+                                              angle: 3 * pi / 2,
+                                              child: _buildCorner(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+
+                                    SizedBox(height: 16.h),
+
+                                    // User info card
+                                    Container(
+                                      width: double.infinity,
+                                      padding: EdgeInsets.all(16.w),
+                                      decoration: BoxDecoration(
+                                        color: isDarkMode
+                                            ? Colors.grey[900]
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12.r),
+                                        border: Border.all(
+                                          color: const Color(0xFFD4AF37).withOpacity(0.3),
+                                          width: 1.w,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.1),
+                                            blurRadius: 8.r,
+                                            offset: Offset(0, 2.h),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // User avatar
                                           Container(
-                                            padding: EdgeInsets.symmetric(
-                                                horizontal: 16.w, vertical: 12.h),
+                                            width: 60.w,
+                                            height: 60.w,
                                             decoration: BoxDecoration(
-                                              color: isDarkMode
-                                                  ? Colors.white.withOpacity(0.1)
-                                                  : AppColors.lightSurface
-                                                  .withOpacity(0.1),
-                                              borderRadius:
-                                              BorderRadius.circular(12.r),
+                                              shape: BoxShape.circle,
                                               border: Border.all(
-                                                color: const Color(0xFFFFD700)
-                                                    .withOpacity(0.3),
-                                                width: 1.w,
+                                                color: const Color(0xFFD4AF37),
+                                                width: 2.w,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: const Color(0xFFD4AF37).withOpacity(0.2),
+                                                  blurRadius: 6.r,
+                                                  offset: Offset(0, 2.h),
+                                                ),
+                                              ],
+                                            ),
+                                            child: ClipOval(
+                                              child: userPhotoUrl != null
+                                                  ? CachedNetworkImage(
+                                                imageUrl: userPhotoUrl,
+                                                width: 60.w,
+                                                height: 60.w,
+                                                fit: BoxFit.cover,
+                                                placeholder: (context, url) => Center(
+                                                  child: CircularProgressIndicator(
+                                                    color: const Color(0xFFD4AF37),
+                                                  ),
+                                                ),
+                                                errorWidget: (context, url, error) => SvgPicture.asset(
+                                                  'assets/icons/svg/ic_user.svg',
+                                                  width: 30.sp,
+                                                  height: 30.sp,
+                                                  colorFilter: ColorFilter.mode(
+                                                    isDarkMode
+                                                        ? Colors.white70
+                                                        : Colors.black54,
+                                                    BlendMode.srcIn,
+                                                  ),
+                                                ),
+                                              )
+                                                  : SvgPicture.asset(
+                                                'assets/icons/svg/ic_user.svg',
+                                                width: 30.sp,
+                                                height: 30.sp,
+                                                colorFilter: ColorFilter.mode(
+                                                  isDarkMode
+                                                      ? Colors.white70
+                                                      : Colors.black54,
+                                                  BlendMode.srcIn,
+                                                ),
                                               ),
                                             ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                              MainAxisAlignment.center,
+                                          ),
+
+                                          SizedBox(width: 16.w),
+
+                                          // User details
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
                                               children: [
-                                                Icon(
-                                                  Icons.verified,
-                                                  size: 16.sp,
-                                                  color: const Color(0xFFFFD700),
-                                                ),
-                                                SizedBox(width: 8.w),
                                                 Text(
-                                                  'Premium Benefits Unlocked',
+                                                  userEmail,
+                                                  style: TextStyle(
+                                                    fontSize: 14.sp,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: isDarkMode
+                                                        ? Colors.white
+                                                        : Colors.black87,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                SizedBox(height: 4.h),
+                                                Text(
+                                                  'Joined: $joinedDate',
                                                   style: TextStyle(
                                                     fontSize: 12.sp,
-                                                    fontWeight: FontWeight.w600,
-                                                    color: const Color(0xFFFFD700),
-                                                    fontFamily: 'Poppins',
+                                                    color: isDarkMode
+                                                        ? Colors.white70
+                                                        : Colors.black54,
                                                   ),
                                                 ),
                                               ],
@@ -1027,8 +1060,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                           ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 );
                               } else {
                                 return Container(
@@ -1279,42 +1312,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  Widget _buildStat(String label, String value) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ShaderMask(
+          shaderCallback: (Rect bounds) {
+            return const LinearGradient(
+              colors: [
+                Color(0xFFD4AF37), // Gold
+                Color(0xFFF0E68C), // Light gold
+              ],
+            ).createShader(bounds);
+          },
+          child: Text(
+            value,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.white, // Will be overridden by shader
+            ),
+          ),
+        ),
+        SizedBox(height: 2.h),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 8.sp,
+            color: Colors.white70,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildVerticalDivider() {
+    return Container(
+      height: 24.h,
+      width: 1.w,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            const Color(0xFFD4AF37).withOpacity(0.1),
+            const Color(0xFFD4AF37).withOpacity(0.5),
+            const Color(0xFFD4AF37).withOpacity(0.1),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCorner() {
+    return Container(
+      width: 20.w,
+      height: 20.h,
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: const Color(0xFFD4AF37).withOpacity(0.4), width: 1.w),
+          left: BorderSide(color: const Color(0xFFD4AF37).withOpacity(0.4), width: 1.w),
+        ),
+      ),
+    );
+  }
 }
 
-class PremiumBackgroundPainter extends CustomPainter {
+class DiamondPatternPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.amber.withOpacity(0.03)
+    final pattern = Paint()
+      ..color = const Color(0xFFD4AF37).withOpacity(0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.5;
+
+    // Create diamond grid pattern
+    final diamondSize = size.width / 15;
+    final rows = (size.height / diamondSize).ceil() + 1;
+    final cols = (size.width / diamondSize).ceil() + 1;
+
+    for (int i = -1; i < rows; i++) {
+      for (int j = -1; j < cols; j++) {
+        final path = Path();
+        final centerX = j * diamondSize + (i % 2 == 0 ? 0 : diamondSize / 2);
+        final centerY = i * diamondSize;
+
+        path.moveTo(centerX, centerY - diamondSize / 2);
+        path.lineTo(centerX + diamondSize / 2, centerY);
+        path.lineTo(centerX, centerY + diamondSize / 2);
+        path.lineTo(centerX - diamondSize / 2, centerY);
+        path.close();
+
+        canvas.drawPath(path, pattern);
+      }
+    }
+
+    // Add some sparkle effects
+    final sparkle = Paint()
+      ..color = const Color(0xFFD4AF37).withOpacity(0.2)
       ..style = PaintingStyle.fill;
 
-    for (int i = 0; i < 4; i++) {
-      final offset = i * 80.0;
-      canvas.drawCircle(
-        Offset(offset, size.height + 30),
-        50,
-        paint,
-      );
+    final random = Random(42); // Fixed seed for consistent pattern
+    for (int i = 0; i < 20; i++) {
+      final x = random.nextDouble() * size.width;
+      final y = random.nextDouble() * size.height;
+      final radius = 0.8 + random.nextDouble() * 1.2;
+
+      canvas.drawCircle(Offset(x, y), radius, sparkle);
     }
 
-    final linePaint = Paint()
-      ..color = Colors.amber.withOpacity(0.02)
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
+    // Add subtle gold gradient glow
+    final gradientPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFD4AF37).withOpacity(0.08),
+          Colors.transparent,
+        ],
+        radius: 1.0,
+        center: Alignment.center,
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
-    for (int i = 0; i < 8; i++) {
-      final offset = i * 40.0;
-      canvas.drawLine(
-        Offset(offset, 0),
-        Offset(0, offset),
-        linePaint,
-      );
-      canvas.drawLine(
-        Offset(size.width - offset, size.height),
-        Offset(size.width, size.height - offset),
-        linePaint,
-      );
-    }
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      gradientPaint,
+    );
   }
 
   @override

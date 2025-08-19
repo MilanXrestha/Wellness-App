@@ -401,16 +401,16 @@ class QuoteCardState extends State<QuoteCard>
                                       return Transform.rotate(
                                         angle: _shakeAnimation.value,
                                         child: Icon(
-                                          FontAwesomeIcons.crown,
+                                          Icons.workspace_premium,
                                           size: 40.sp,
-                                            color: const Color(0xFFFFD700),
+                                          color: const Color(0xFFFFD700),
                                         ),
                                       );
                                     },
                                   ),
                                   SizedBox(height: 8.h),
                                   Text(
-                                    'Tap to Unlock',
+                                    'Tap to Reveal Words of Wisdom',
                                     style: TextStyle(
                                       fontSize: 14.sp,
                                       fontWeight: FontWeight.w600,

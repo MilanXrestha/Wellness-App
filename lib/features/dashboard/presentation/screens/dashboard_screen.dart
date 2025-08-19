@@ -29,6 +29,7 @@ import '../../../imageViewer/presentation/widgets/image_card.dart';
 import '../../../preferences/presentation/provider/user_preference_provider.dart';
 import '../../../profile/providers/user_provider.dart';
 import '../../../subscription/presentation/providers/premium_status_provider.dart';
+import '../providers/notification_count_provider.dart';
 import '../widgets/discover_by_category_widget.dart';
 import '../widgets/featured_quotes_widget.dart';
 import '../widgets/dashboard_shimmer.dart';
@@ -87,6 +88,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> with SingleTi
       _cachedData = _emptyDashboardData();
       log('No user ID found, skipping data fetch', name: 'UserDashboardScreen');
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<NotificationCountProvider>(context, listen: false)
+          .fetchUnreadNotificationCount();
+    });
   }
 
   void _listenToSubscriptionChanges(String userId) {
@@ -472,7 +478,7 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> with SingleTi
                                             gradient: LinearGradient(
                                               begin: Alignment.topLeft,
                                               end: Alignment.bottomRight,
-                                              colors: [Colors.yellow.shade700, Colors.amber.shade500],
+                                              colors: [Color(0xFFD4AF37), Colors.amber.shade500],
                                             ),
                                             boxShadow: [
                                               BoxShadow(
@@ -522,11 +528,11 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> with SingleTi
                                       ),
                                       if (isPremium)
                                         Positioned(
-                                          top: -16.h,
+                                          top: -17.h,
                                           child: FaIcon(
                                             FontAwesomeIcons.crown,
                                             size: 24.sp,
-                                            color: Colors.yellow.shade700,
+                                            color: Color(0xFFD4AF37),
                                             semanticLabel: 'Premium User',
                                           ),
                                         ),
@@ -606,33 +612,39 @@ class _UserDashboardScreenState extends State<UserDashboardScreen> with SingleTi
                               },
                             ),
                           ),
-                          if (data.notifications.where((n) => !n.isRead).isNotEmpty)
-                            Positioned(
-                              right: -4.w,
-                              top: -4.h,
-                              child: Container(
-                                padding: EdgeInsets.all(4.w),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: isDarkMode ? null : Colors.black,
-                                  gradient: isDarkMode
-                                      ? LinearGradient(
-                                    colors: [AppColors.primary, AppColors.primary.withOpacity(0.7)],
-                                  )
-                                      : null,
-                                ),
-                                child: Text(
-                                  data.notifications.where((n) => !n.isRead).length > 9
-                                      ? '9+'
-                                      : '${data.notifications.where((n) => !n.isRead).length}',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10.sp,
-                                    fontWeight: FontWeight.bold,
+                          Consumer<NotificationCountProvider>(
+                            builder: (context, notificationProvider, _) {
+                              if (notificationProvider.unreadCount > 0) {
+                                return Positioned(
+                                  right: -4.w,
+                                  top: -4.h,
+                                  child: Container(
+                                    padding: EdgeInsets.all(4.w),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isDarkMode ? null : Colors.black,
+                                      gradient: isDarkMode
+                                          ? LinearGradient(
+                                        colors: [AppColors.primary, AppColors.primary.withOpacity(0.7)],
+                                      )
+                                          : null,
+                                    ),
+                                    child: Text(
+                                      notificationProvider.unreadCount > 9
+                                          ? '9+'
+                                          : '${notificationProvider.unreadCount}',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            ),
+                                );
+                              }
+                              return SizedBox.shrink();
+                            },
+                          ),
                         ],
                       ),
                     ],

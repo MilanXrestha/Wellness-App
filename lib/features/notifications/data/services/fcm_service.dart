@@ -1,5 +1,6 @@
 import 'dart:developer';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,6 +19,8 @@ class FCMServices {
           alert: true,
           badge: true,
           sound: true,
+          provisional: false,
+          criticalAlert: true,
         ),
         FirebaseMessaging.instance.setAutoInitEnabled(true),
       ]);
@@ -168,9 +171,61 @@ class FCMServices {
     try {
       log('Received FCM message title: ${message.notification?.title}');
       log('Received FCM message body: ${message.notification?.body}');
-      await NotificationService.instance.showNotification(message: message);
+      log('Received FCM message data: ${message.data}');
+
+      // Add content type to data if it's missing
+      final data = Map<String, dynamic>.from(message.data);
+
+      // Ensure contentType is present for proper navigation
+      if (!data.containsKey('contentType')) {
+        if (data.containsKey('type')) {
+          data['contentType'] = data['type'];
+        } else if (data.containsKey('tipId')) {
+          // Try to get content type from Firestore if possible
+          try {
+            final tipId = data['tipId'];
+            final tipDoc = await FirebaseFirestore.instance.collection('tips').doc(tipId).get();
+            if (tipDoc.exists && tipDoc.data() != null) {
+              final tipType = tipDoc.data()!['tipsType'];
+              if (tipType != null) {
+                data['contentType'] = tipType;
+                log('Added contentType=$tipType from Firestore for tip $tipId');
+              }
+            }
+          } catch (e) {
+            log('Error getting tip type from Firestore: $e');
+          }
+        }
+
+        // If still no content type, use a default
+        if (!data.containsKey('contentType')) {
+          data['contentType'] = 'tip';
+          log('No content type found, defaulting to "tip"');
+        }
+      }
+
+      // Create a new message with the updated data
+      final updatedMessage = RemoteMessage(
+        senderId: message.senderId,
+        category: message.category,
+        collapseKey: message.collapseKey,
+        contentAvailable: message.contentAvailable,
+        data: data,
+        from: message.from,
+        messageId: message.messageId,
+        messageType: message.messageType,
+        mutableContent: message.mutableContent,
+        notification: message.notification,
+        sentTime: message.sentTime,
+        threadId: message.threadId,
+        ttl: message.ttl,
+      );
+
+      await NotificationService.instance.showNotification(message: updatedMessage);
     } catch (e, stackTrace) {
       log("Error handling foreground FCM message: $e", stackTrace: stackTrace);
+      // If we encounter an error with the enhanced version, fall back to the original
+      await NotificationService.instance.showNotification(message: message);
     }
   }
 

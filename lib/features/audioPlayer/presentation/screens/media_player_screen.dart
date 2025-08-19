@@ -61,9 +61,21 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
-    _currentTrackIndex = ValueNotifier<int>(
-      widget.featuredTips.indexWhere((t) => t.tipsId == widget.tip.tipsId),
-    );
+
+    // Safety check: if featuredTips is empty, add the current tip
+    if (widget.featuredTips.isEmpty) {
+      log('Warning: featuredTips was empty, adding current tip', name: 'MediaPlayerScreen');
+      widget.featuredTips.add(widget.tip);
+    }
+
+    // Find the current tip in the featuredTips list, default to 0 if not found
+    int initialIndex = widget.featuredTips.indexWhere((t) => t.tipsId == widget.tip.tipsId);
+    if (initialIndex < 0) {
+      initialIndex = 0;
+      log('Warning: current tip not found in featuredTips, defaulting to index 0', name: 'MediaPlayerScreen');
+    }
+
+    _currentTrackIndex = ValueNotifier<int>(initialIndex);
 
     _shakeController = AnimationController(
       duration: const Duration(milliseconds: 600),
@@ -126,11 +138,16 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
 
   Future<void> _initializeAudio() async {
     try {
-      if (widget.featuredTips[_currentTrackIndex.value].audioUrl != null &&
-          widget.featuredTips[_currentTrackIndex.value].audioUrl!.isNotEmpty) {
-        await _audioPlayer.setUrl(
-          widget.featuredTips[_currentTrackIndex.value].audioUrl!,
-        );
+      // Safety check to prevent index out of bounds
+      if (_currentTrackIndex.value >= widget.featuredTips.length) {
+        log('Warning: _currentTrackIndex out of bounds, resetting to 0', name: 'MediaPlayerScreen');
+        _currentTrackIndex.value = 0;
+      }
+
+      final currentTip = widget.featuredTips[_currentTrackIndex.value];
+
+      if (currentTip.audioUrl != null && currentTip.audioUrl!.isNotEmpty) {
+        await _audioPlayer.setUrl(currentTip.audioUrl!);
         _safeSetState(() {
           _isLoading = false;
         });
@@ -174,7 +191,7 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
         );
 
         log(
-          'Audio initialized for ${widget.featuredTips[_currentTrackIndex.value].tipsTitle}',
+          'Audio initialized for ${currentTip.tipsTitle}',
           name: 'MediaPlayerScreen',
         );
       } else {
@@ -184,7 +201,7 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
           _errorMessage = AppLocalizations.of(context)!.errorLoadingAudio;
         });
         log(
-          'No audio URL provided for ${widget.featuredTips[_currentTrackIndex.value].tipsTitle}',
+          'No audio URL provided for ${currentTip.tipsTitle}',
           name: 'MediaPlayerScreen',
         );
       }
@@ -259,15 +276,22 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   }
 
   void _shareTrack() {
-    final trackUrl = widget.featuredTips[_currentTrackIndex.value].audioUrl ?? '';
-    final trackTitle = widget.featuredTips[_currentTrackIndex.value].tipsTitle;
-    Share.share(
-      'Check out this track: $trackTitle\n$trackUrl',
-      subject: 'Share $trackTitle',
-    );
+    if (_currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length) {
+      final trackUrl = widget.featuredTips[_currentTrackIndex.value].audioUrl ?? '';
+      final trackTitle = widget.featuredTips[_currentTrackIndex.value].tipsTitle;
+      Share.share(
+        'Check out this track: $trackTitle\n$trackUrl',
+        subject: 'Share $trackTitle',
+      );
+    }
   }
 
   void _checkPremiumAccess(BuildContext context) {
+    if (_currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
+      log('Invalid track index: ${_currentTrackIndex.value}', name: 'MediaPlayerScreen');
+      return;
+    }
+
     final canAccessPremium = Provider.of<PremiumStatusProvider>(
       context,
       listen: false,
@@ -470,6 +494,12 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   }
 
   Future<void> _toggleFavorite(FavoritesProvider provider) async {
+    // Safety check before accessing the current track
+    if (_currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
+      log('Invalid track index for favorites: ${_currentTrackIndex.value}', name: 'MediaPlayerScreen');
+      return;
+    }
+
     final canAccessPremium = Provider.of<PremiumStatusProvider>(
       context,
       listen: false,
@@ -528,6 +558,12 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   }
 
   Widget _buildAlbumArt(bool isDarkMode) {
+    // Safety check
+    if (_currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
+      log('Invalid track index for album art: ${_currentTrackIndex.value}', name: 'MediaPlayerScreen');
+      return Container(); // Return empty container instead of crashing
+    }
+
     return Container(
       width: 280.w,
       height: 280.w,
@@ -626,9 +662,13 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   Widget _buildPlaybackControls(bool isDarkMode) {
     return Consumer<FavoritesProvider>(
       builder: (context, favoritesProvider, child) {
-        final isFavorite = favoritesProvider.favorites.any(
-              (f) => f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
-        );
+        // Safety check
+        bool isFavorite = false;
+        if (_currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length) {
+          isFavorite = favoritesProvider.favorites.any(
+                (f) => f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
+          );
+        }
 
         return Column(
           children: [
@@ -814,6 +854,14 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    // Safety check to prevent index out of bounds
+    if (widget.featuredTips.isEmpty || _currentTrackIndex.value < 0 ||
+        _currentTrackIndex.value >= widget.featuredTips.length) {
+      log('Error: Invalid featuredTips or index in didChangeDependencies', name: 'MediaPlayerScreen');
+      return;
+    }
+
     final canAccessPremium = Provider.of<PremiumStatusProvider>(
       context,
     ).canAccessPremium;
@@ -845,6 +893,14 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
+
+    // Safety check - if featuredTips is empty, add current tip
+    if (widget.featuredTips.isEmpty) {
+      widget.featuredTips.add(widget.tip);
+      log('Added current tip to empty featuredTips in build method', name: 'MediaPlayerScreen');
+      _currentTrackIndex.value = 0;
+    }
+
     final canAccessPremium = Provider.of<PremiumStatusProvider>(
       context,
       listen: false,
@@ -871,191 +927,197 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen>
                 padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 16.h),
                 child: Column(
                   children: [
-                // Header with back icon, category name, and share icon
-                Row(
-                children: [
-                IconButton(
-                icon: Icon(
-                  Icons.arrow_back_ios_rounded,
-                  size: 20.sp,
-                  color: isDarkMode
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
-                ),
-                onPressed: () => Navigator.pop(context),
-              ),
-              Expanded(
-                child: Center(
-                  child: Text(
-                    widget.categoryName,
-                    style: Theme.of(context).textTheme.labelMedium
-                        ?.copyWith(
-                      fontFamily: 'Poppins',
-                      fontSize: 18.sp,
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
-                      fontWeight: FontWeight.w700,
+                    // Header with back icon, category name, and share icon
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: Icon(
+                            Icons.arrow_back_ios_rounded,
+                            size: 20.sp,
+                            color: isDarkMode
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: Text(
+                              widget.categoryName,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                fontFamily: 'Poppins',
+                                fontSize: 18.sp,
+                                color: isDarkMode
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: SvgPicture.asset(
+                            'assets/icons/svg/ic_share.svg',
+                            width: 20.sp,
+                            height: 20.sp,
+                            color: isDarkMode
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
+                          ),
+                          onPressed: _shareTrack,
+                        ),
+                      ],
                     ),
-                    textAlign: TextAlign.center,
-                  ),
+                    SizedBox(height: 24.h),
+                    // Album Art
+                    _buildAlbumArt(isDarkMode),
+                    SizedBox(height: 32.h),
+                    // Title and Artist with Crown Icon for Premium
+                    Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                _currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length
+                                    ? widget.featuredTips[_currentTrackIndex.value].tipsTitle
+                                    : "Audio Track",
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                  fontFamily: 'Poppins',
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 22.sp,
+                                  color: isDarkMode
+                                      ? AppColors.darkTextPrimary
+                                      : AppColors.lightTextPrimary,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                            if (_currentTrackIndex.value >= 0 &&
+                                _currentTrackIndex.value < widget.featuredTips.length &&
+                                widget.featuredTips[_currentTrackIndex.value].isPremium &&
+                                !canAccessPremium)
+                              Padding(
+                                padding: EdgeInsets.only(left: 8.w),
+                                child: SvgPicture.asset(
+                                  'assets/icons/svg/ic_crown.svg',
+                                  width: 20.sp,
+                                  height: 20.sp,
+                                ),
+                              ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          _currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length
+                              ? widget.featuredTips[_currentTrackIndex.value].tipsAuthor
+                              : "Unknown Artist",
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontFamily: 'Poppins',
+                            fontSize: 15.sp,
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 32.h),
+                    // Loading, Error, or Playback Controls
+                    if (_isLoading)
+                      Container(
+                        height: 120.h,
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3.w,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      )
+                    else if (_hasError)
+                      Container(
+                        padding: EdgeInsets.all(20.r),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: AppColors.error.withOpacity(0.3),
+                            width: 1.w,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.error_outline_rounded,
+                              color: AppColors.error,
+                              size: 40.sp,
+                            ),
+                            SizedBox(height: 12.h),
+                            Text(
+                              _errorMessage ??
+                                  AppLocalizations.of(context)!.errorLoadingAudio,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                fontFamily: 'Poppins',
+                                fontSize: 13.sp,
+                                color: AppColors.error,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 12.h),
+                            Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12.r),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    AppColors.primary,
+                                    AppColors.primary.withOpacity(0.8),
+                                  ],
+                                ),
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: _initializeAudio,
+                                  borderRadius: BorderRadius.circular(12.r),
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 20.w,
+                                      vertical: 10.h,
+                                    ),
+                                    child: Text(
+                                      AppLocalizations.of(context)!.retry,
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 13.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      _buildPlaybackControls(isDarkMode),
+                    SizedBox(height: 20.h),
+                  ],
                 ),
               ),
-              IconButton(
-                icon: SvgPicture.asset(
-                  'assets/icons/svg/ic_share.svg',
-                  width: 20.sp,
-                  height: 20.sp,
-                  color: isDarkMode
-                      ? AppColors.darkTextPrimary
-                      : AppColors.lightTextPrimary,
-                ),
-                onPressed: _shareTrack,
-              ),
-              ],
             ),
-            SizedBox(height: 24.h),
-            // Album Art
-            _buildAlbumArt(isDarkMode),
-            SizedBox(height: 32.h),
-            // Title and Artist with Crown Icon for Premium
-            Column(
-                children: [
-                Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-            Flexible(
-            child: Text(
-            widget.featuredTips[_currentTrackIndex.value].tipsTitle,
-                style: Theme.of(context)
-                .textTheme
-                .titleLarge
-                ?.copyWith(
-              fontFamily: 'Poppins',
-              fontWeight: FontWeight.w700,
-              fontSize: 22.sp,
-              color: isDarkMode
-                  ? AppColors.darkTextPrimary
-                  : AppColors.lightTextPrimary,
-            ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
           ),
-        ),
-        if (widget.featuredTips[_currentTrackIndex.value].isPremium &&
-        !canAccessPremium)
-        Padding(
-        padding: EdgeInsets.only(left: 8.w),
-        child: SvgPicture.asset(
-        'assets/icons/svg/ic_crown.svg',
-        width: 20.sp,
-        height: 20.sp,
-        ),
-        ),
-        ],
-        ),
-        SizedBox(height: 8.h),
-        Text(
-        widget.featuredTips[_currentTrackIndex.value].tipsAuthor,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-        fontFamily: 'Poppins',
-        fontSize: 15.sp,
-        color: AppColors.primary,
-        fontWeight: FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        ),
-        ],
-        ),
-        SizedBox(height: 32.h),
-        // Loading, Error, or Playback Controls
-        if (_isLoading)
-        Container(
-        height: 120.h,
-        child: Center(
-        child: CircularProgressIndicator(
-        strokeWidth: 3.w,
-        color: AppColors.primary,
-        ),
-        ),
-        )
-        else if (_hasError)
-        Container(
-        padding: EdgeInsets.all(20.r),
-        decoration: BoxDecoration(
-        color: AppColors.error.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(
-        color: AppColors.error.withOpacity(0.3),
-        width: 1.w,
-        ),
-        ),
-        child: Column(
-        children: [
-        Icon(
-        Icons.error_outline_rounded,
-        color: AppColors.error,
-        size: 40.sp,
-        ),
-        SizedBox(height: 12.h),
-        Text(
-        _errorMessage ??
-        AppLocalizations.of(context)!.errorLoadingAudio,
-        style: Theme.of(context).textTheme.bodySmall
-            ?.copyWith(
-        fontFamily: 'Poppins',
-        fontSize: 13.sp,
-        color: AppColors.error,
-        ),
-        textAlign: TextAlign.center,
-        ),
-        SizedBox(height: 12.h),
-        Container(
-        decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12.r),
-        gradient: LinearGradient(
-        colors: [
-        AppColors.primary,
-        AppColors.primary.withOpacity(0.8),
-        ],
-        ),
-        ),
-        child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-        onTap: _initializeAudio,
-        borderRadius: BorderRadius.circular(12.r),
-        child: Padding(
-        padding: EdgeInsets.symmetric(
-        horizontal: 20.w,
-        vertical: 10.h,
-        ),
-        child: Text(
-        AppLocalizations.of(context)!.retry,
-        style: TextStyle(
-        fontFamily: 'Poppins',
-        fontSize: 13.sp,
-        fontWeight: FontWeight.w600,
-        color: Colors.white,
-        ),
-        ),
-        ),
-        ),
-        ),
-        ),
-        ],
-        ),
-        )
-        else
-        _buildPlaybackControls(isDarkMode),
-        SizedBox(height: 20.h),
-        ],
-        ),
-        ),
-        ),
-        ),
         );
       },
     );

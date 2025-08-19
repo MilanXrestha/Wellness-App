@@ -8,6 +8,7 @@ import 'package:wellness_app/features/subscription/presentation/providers/premiu
 import 'package:wellness_app/generated/app_localizations.dart';
 import 'package:wellness_app/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
+import '../features/dashboard/presentation/providers/notification_count_provider.dart';
 import '../features/preferences/presentation/provider/user_preference_provider.dart';
 import '../features/profile/providers/user_provider.dart';
 import 'services/data_repository.dart';
@@ -33,6 +34,8 @@ class WellnessApp extends StatelessWidget {
         ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
         ChangeNotifierProvider<PremiumStatusProvider>(create: (_) => PremiumStatusProvider()),
         ChangeNotifierProvider<UserPreferenceProvider>(create: (_) => UserPreferenceProvider()),
+
+        ChangeNotifierProvider(create: (_) => NotificationCountProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
@@ -58,6 +61,23 @@ class WellnessApp extends StatelessWidget {
                   Locale('en'),
                 ],
                 locale: const Locale('en'),
+                // Handle deep links from notifications when app is terminated
+                onGenerateInitialRoutes: (String initialRoute) {
+                  if (initialRoute != RoutesName.splashScreen) {
+                    // If we have a deep link, use it
+                    return [
+                      RouteConfig.generateRoute(
+                        RouteSettings(name: initialRoute),
+                      ),
+                    ];
+                  }
+                  // Otherwise, use the default route
+                  return [
+                    RouteConfig.generateRoute(
+                      const RouteSettings(name: RoutesName.splashScreen),
+                    ),
+                  ];
+                },
               );
             },
           );

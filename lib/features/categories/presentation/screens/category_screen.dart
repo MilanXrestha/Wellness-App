@@ -261,10 +261,12 @@ class _CategoryScreenState extends State<CategoryScreen> {
                             height: 56.h,
                             decoration: BoxDecoration(
                               color: isDarkMode
-                                  ? AppColors.darkSurface
+                                  ? Color(0xFF121212)
                                   : AppColors.lightBackground,
                               borderRadius: BorderRadius.circular(24.r),
-                              boxShadow: [
+                              boxShadow: isDarkMode
+                                  ? [] // no shadow in dark mode
+                                  : [
                                 BoxShadow(
                                   color: AppColors.shadow,
                                   blurRadius: 6.r,
