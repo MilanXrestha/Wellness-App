@@ -2,8 +2,10 @@ import 'dart:developer';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:wellness_app/core/config/firebase/firebase_options.dart';
 import 'package:wellness_app/features/notifications/data/services/notification_service.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -12,27 +14,72 @@ class FCMServices {
   static const String _vercelDomain = 'https://wellness-functions.vercel.app';
   static const String _fcmTokenKey = 'fcm_token';
 
+  bool _isInitialized = false;
+  FirebaseMessaging? _messaging;
+  FirebaseFirestore? _firestore;
+
+  // Ensure Firebase is initialized before using Firebase services
+  Future<void> _ensureFirebaseInitialized() async {
+    if (Firebase.apps.isEmpty) {
+      log('Firebase not initialized in FCMServices, initializing now');
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      log('Firebase initialized in FCMServices');
+    }
+  }
+
+  // Lazy getter for FirebaseMessaging
+  Future<FirebaseMessaging> get messaging async {
+    if (_messaging != null) return _messaging!;
+
+    await _ensureFirebaseInitialized();
+    _messaging = FirebaseMessaging.instance;
+    return _messaging!;
+  }
+
+  // Lazy getter for FirebaseFirestore
+  Future<FirebaseFirestore> get firestore async {
+    if (_firestore != null) return _firestore!;
+
+    await _ensureFirebaseInitialized();
+    _firestore = FirebaseFirestore.instance;
+    return _firestore!;
+  }
+
   Future<void> initializeCloudMessaging() async {
+    if (_isInitialized) {
+      log('FCM already initialized, skipping');
+      return;
+    }
+
     try {
+      // Get messaging instance (ensures Firebase is initialized)
+      final fcm = await messaging;
+
       await Future.wait([
-        FirebaseMessaging.instance.requestPermission(
+        fcm.requestPermission(
           alert: true,
           badge: true,
           sound: true,
           provisional: false,
           criticalAlert: true,
         ),
-        FirebaseMessaging.instance.setAutoInitEnabled(true),
+        fcm.setAutoInitEnabled(true),
       ]);
+
       final token = await getFCMToken();
       if (token != null) {
         await updateFcmToken(token);
       }
-      FirebaseMessaging.instance.onTokenRefresh.listen((token) async {
+
+      fcm.onTokenRefresh.listen((token) async {
         if (token.isNotEmpty) {
           await updateFcmToken(token);
         }
       });
+
+      _isInitialized = true;
       log("FCM initialized successfully");
     } catch (e, stackTrace) {
       log("Error initializing FCM: $e", stackTrace: stackTrace);
@@ -41,9 +88,11 @@ class FCMServices {
 
   Future<String?> getFCMToken() async {
     try {
-      final token = await FirebaseMessaging.instance.getToken();
+      final fcm = await messaging;
+      final token = await fcm.getToken();
+
       if (token != null && token.isNotEmpty) {
-        log("FCM token retrieved: $token");
+        log("FCM token retrieved: ${token.substring(0, 10)}...");
         return token;
       } else {
         log("No FCM token retrieved");
@@ -63,7 +112,7 @@ class FCMServices {
         log('No internet connection, skipping FCM token update');
         return;
       }
-      log('Starting FCM token update for token: $token');
+      log('Starting FCM token update for token: ${token.substring(0, 10)}...');
 
       final user = AuthService().getCurrentUser();
       if (user == null) {
@@ -75,7 +124,9 @@ class FCMServices {
       // Check cached token
       final prefs = await SharedPreferences.getInstance();
       final cachedToken = prefs.getString(_fcmTokenKey);
-      log('Cached token: $cachedToken, New token: $token');
+      log(
+        'Cached token: ${cachedToken?.substring(0, 10) ?? "null"}, New token: ${token.substring(0, 10)}...',
+      );
       if (cachedToken == token) {
         log('FCM token unchanged for user ${user.uid}, skipping update');
         return;
@@ -83,7 +134,7 @@ class FCMServices {
 
       // Get ID token with forced refresh
       final idToken = await user.getIdToken(true);
-      log('ID token: ${idToken ?? 'null'}');
+      log('ID token obtained: ${idToken != null}');
       if (idToken == null) {
         log('No ID token available for FCM update');
         return;
@@ -91,23 +142,19 @@ class FCMServices {
 
       // Send HTTP request
       log('Sending request to $_vercelDomain/api/updateFcmToken');
-      log('Request body: ${json.encode({'token': token, 'userId': user.uid})}');
       final response = await http.post(
         Uri.parse('$_vercelDomain/api/updateFcmToken'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $idToken',
         },
-        body: json.encode({
-          'token': token,
-          'userId': user.uid,
-        }),
+        body: json.encode({'token': token, 'userId': user.uid}),
       );
       log('HTTP response: ${response.statusCode}, ${response.body}');
 
       if (response.statusCode == 200) {
         await prefs.setString(_fcmTokenKey, token);
-        log('FCM token updated for user ${user.uid}: $token');
+        log('FCM token updated for user ${user.uid}');
       } else {
         log('Error updating FCM token: ${response.body}');
       }
@@ -150,15 +197,28 @@ class FCMServices {
 
   Future<void> listenFCMMessage(BackgroundMessageHandler? handler) async {
     try {
+      // Ensure Firebase is initialized
+      await _ensureFirebaseInitialized();
+
+      // Set up message handlers
       FirebaseMessaging.onMessage.listen(_handleFCMMessage);
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
-        log("Notification opened from FCM: title=${message.notification?.title}, data=${message.data}");
+
+      FirebaseMessaging.onMessageOpenedApp.listen((
+        RemoteMessage message,
+      ) async {
+        log(
+          "Notification opened from FCM: title=${message.notification?.title}, data=${message.data}",
+        );
         await NotificationService.instance.showNotification(message: message);
-        await NotificationService.instance.onClickToNotification(json.encode(message.data));
+        await NotificationService.instance.onClickToNotification(
+          json.encode(message.data),
+        );
       });
+
       if (handler != null) {
-        FirebaseMessaging.onBackgroundMessage(handler);
-        log("FCM background handler registered successfully");
+        // Note: The background handler is actually registered in main.dart before runApp()
+        // This line is kept for documentation purposes but doesn't actually work here
+        log("FCM background handler is registered in main.dart (not here)");
       } else {
         log("Warning: FCM background handler is null");
       }
@@ -184,7 +244,8 @@ class FCMServices {
           // Try to get content type from Firestore if possible
           try {
             final tipId = data['tipId'];
-            final tipDoc = await FirebaseFirestore.instance.collection('tips').doc(tipId).get();
+            final db = await firestore;
+            final tipDoc = await db.collection('tips').doc(tipId).get();
             if (tipDoc.exists && tipDoc.data() != null) {
               final tipType = tipDoc.data()!['tipsType'];
               if (tipType != null) {
@@ -221,7 +282,9 @@ class FCMServices {
         ttl: message.ttl,
       );
 
-      await NotificationService.instance.showNotification(message: updatedMessage);
+      await NotificationService.instance.showNotification(
+        message: updatedMessage,
+      );
     } catch (e, stackTrace) {
       log("Error handling foreground FCM message: $e", stackTrace: stackTrace);
       // If we encounter an error with the enhanced version, fall back to the original

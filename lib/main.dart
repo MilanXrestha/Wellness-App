@@ -1,13 +1,12 @@
-import 'dart:convert';
 import 'dart:developer';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:wellness_app/core/wellness_app.dart';
-import 'package:wellness_app/features/notifications/data/services/fcm_service.dart';
 import 'package:wellness_app/core/config/firebase/firebase_options.dart';
+import 'package:wellness_app/core/wellness_app.dart';
 import 'package:wellness_app/features/notifications/data/services/notification_service.dart';
 
 @pragma('vm:entry-point')
@@ -39,7 +38,9 @@ Future<void> firebaseBackgroundMessagingHandler(RemoteMessage message) async {
   final currentUserId = FirebaseAuth.instance.currentUser?.uid;
   final targetUserId = updatedMessage.data['userId'] ?? 'unknown';
   if (currentUserId != null && targetUserId != currentUserId) {
-    log('Skipping background notification for user $targetUserId (current user: $currentUserId)');
+    log(
+      'Skipping background notification for user $targetUserId (current user: $currentUserId)',
+    );
     return;
   }
 
@@ -48,63 +49,19 @@ Future<void> firebaseBackgroundMessagingHandler(RemoteMessage message) async {
 }
 
 void main() async {
+  // Basic Flutter initialization
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Set preferred orientations
+  // Set preferred orientations (this is quick and essential)
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  log('Firebase initialized successfully');
-
-  // Initialize NotificationService early
-  await NotificationService.instance.initLocalNotifications();
-
-  // Request notification permissions early
-  await NotificationService.instance.requestExactAlarmPermission();
-
-  // Register background handler
+  // Register background handler BEFORE running the app
+  // This is the recommended way to ensure all messages are caught
   FirebaseMessaging.onBackgroundMessage(firebaseBackgroundMessagingHandler);
 
-  // Initialize FCM
-  final FCMServices fcmServices = FCMServices();
-  await fcmServices.initializeCloudMessaging();
-  fcmServices.listenFCMMessage(firebaseBackgroundMessagingHandler);
-
-  // Handle auth-based token sync
-  FirebaseAuth.instance.authStateChanges().listen((User? user) async {
-    if (user != null) {
-      final token = await fcmServices.getFCMToken();
-      if (token != null) {
-        await fcmServices.updateFcmToken(token);
-      }
-    } else {
-      await fcmServices.clearFcmTokenOnSignOut();
-    }
-  });
-
-  // Handle initial and opened notifications
-  await NotificationService.instance.handleInitialNotification();
-  FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
-    log("Notification opened from FCM: title=${message.notification?.title}, data=${message.data}");
-
-    // Add content type if missing
-    final data = Map<String, dynamic>.from(message.data);
-    if (!data.containsKey('contentType') && data.containsKey('type')) {
-      data['contentType'] = data['type'];
-    }
-
-    await NotificationService.instance.showNotification(message: message);
-    await NotificationService.instance.onClickToNotification(json.encode(data));
-  });
-
-  // Check for pending notifications to sync
-  await NotificationService.instance.syncPendingNotifications();
-
-  // Test FCM token update
-  await fcmServices.testFcmTokenUpdate();
-
+  // Start the app immediately
   runApp(const WellnessApp());
 }
