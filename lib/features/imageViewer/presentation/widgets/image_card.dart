@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:wellness_app/core/resources/colors.dart';
@@ -8,7 +9,7 @@ import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/subscription/presentation/providers/premium_status_provider.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 
-class ImageCard extends StatelessWidget {
+class ImageCard extends StatefulWidget {
   final TipModel tip;
   final String categoryName;
   final List<TipModel> featuredTips;
@@ -19,6 +20,31 @@ class ImageCard extends StatelessWidget {
     required this.categoryName,
     required this.featuredTips,
   });
+
+  @override
+  _ImageCardState createState() => _ImageCardState();
+}
+
+class _ImageCardState extends State<ImageCard> {
+  static final CustomCacheManager _customCacheManager = CustomCacheManager();
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-cache images for featuredTips
+    _precacheImages();
+  }
+
+  void _precacheImages() {
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
+    for (var tip in widget.featuredTips) {
+      if (tip.imageUrl != null && tip.imageUrl!.isNotEmpty && (!tip.isPremium || canAccessPremium)) {
+        _customCacheManager.getSingleFile(tip.imageUrl!).catchError((e) {
+          debugPrint('Error precaching image ${tip.imageUrl}: $e');
+        });
+      }
+    }
+  }
 
   void _showPremiumDialog(BuildContext context) {
     showDialog(
@@ -143,28 +169,29 @@ class ImageCard extends StatelessWidget {
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
     final canAccessPremium = Provider.of<PremiumStatusProvider>(context).canAccessPremium;
+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
 
     return GestureDetector(
       onTap: () {
-        if (tip.isPremium && !canAccessPremium) {
+        if (widget.tip.isPremium && !canAccessPremium) {
           _showPremiumDialog(context);
         } else {
-          final index = featuredTips.indexOf(tip);
+          final index = widget.featuredTips.indexOf(widget.tip);
           Navigator.pushNamed(
             context,
             RoutesName.imageViewerScreen,
             arguments: {
-              'tip': tip,
-              'imageTips': featuredTips,
+              'tip': widget.tip,
+              'imageTips': widget.featuredTips,
               'initialIndex': index,
             },
           );
         }
       },
       child: Container(
-        width: 150.w, // Adjusted width
-        height: 210.h, // Adjusted height
-        margin: EdgeInsets.only(right: 16.w),
+        width: 150.w,
+        height: 210.h,
+        margin: EdgeInsets.only(right: 11.w),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16.r),
           child: Stack(
@@ -186,12 +213,11 @@ class ImageCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16.r),
-                  child: tip.imageUrl != null
+                  child: widget.tip.imageUrl != null
                       ? CachedNetworkImage(
-                    imageUrl: tip.imageUrl!,
+                    imageUrl: widget.tip.imageUrl!,
                     fit: BoxFit.cover,
-                    memCacheHeight: 210, // Adjusted to match container height
-                    memCacheWidth: 150, // Adjusted to match container width
+                    cacheManager: _customCacheManager,
                     placeholder: (context, url) => Center(
                       child: CircularProgressIndicator(
                         strokeWidth: 2.w,
@@ -222,7 +248,7 @@ class ImageCard extends StatelessWidget {
                 ),
               ),
               // Premium indicator
-              if (tip.isPremium)
+              if (widget.tip.isPremium)
                 Positioned(
                   top: 12.h,
                   left: 12.w,
@@ -283,4 +309,21 @@ class ImageCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class CustomCacheManager extends CacheManager {
+  static const key = 'customImageCache';
+  static final CustomCacheManager _instance = CustomCacheManager._();
+
+  factory CustomCacheManager() {
+    return _instance;
+  }
+
+  CustomCacheManager._()
+      : super(Config(
+    key,
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 200,
+    fileService: HttpFileService(),
+  ));
 }

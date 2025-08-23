@@ -50,5 +50,6 @@ class RoutesName {
 
   static const String mediaPlayerScreen = '/media-player-screen';
   static const String videoPlayerScreen = '/video-player-screen';
+  static const String shortVideoPlayerScreen = '/short-video-player-screen';
   static const String imageViewerScreen = '/image-viewer-screen';
 }

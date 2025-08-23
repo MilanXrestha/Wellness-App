@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -16,6 +15,7 @@ class CustomBottomNavBar extends StatelessWidget {
   final List<IconData> _icons = const [
     FontAwesomeIcons.house,
     FontAwesomeIcons.compass,
+    FontAwesomeIcons.video,
     FontAwesomeIcons.layerGroup,
     FontAwesomeIcons.heart,
   ];
@@ -23,6 +23,7 @@ class CustomBottomNavBar extends StatelessWidget {
   final List<String> _labels = const [
     'Home',
     'Explore',
+    'Shorts',
     'Category',
     'Favorite',
   ];
@@ -33,16 +34,16 @@ class CustomBottomNavBar extends StatelessWidget {
 
     final Color neonGreen = const Color(0xFF3FF37F);
     final Color chipBackground = const Color(0xFF1E1E1E);
-    final Color unselectedIconBg = const Color(0xFF262626); // Unchanged for both modes
-    final Color selectedIconBg = isDarkMode ? neonGreen : Colors.white; // White for light mode, neonGreen for dark mode
+    final Color unselectedIconBg = const Color(0xFF262626);
+    final Color selectedIconBg = neonGreen;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(24.r),
       child: Container(
         height: 56.h,
-        padding: EdgeInsets.symmetric(horizontal: 10.w),
+        padding: EdgeInsets.symmetric(horizontal: 1.w),
         decoration: BoxDecoration(
-          color: const Color(0xFF121212), // slightly lighter than full black
+          color: const Color(0xFF121212),
           borderRadius: BorderRadius.circular(24.r),
         ),
         child: Row(
@@ -69,13 +70,13 @@ class CustomBottomNavBar extends StatelessWidget {
                           height: 36.h,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: neonGreen, // White in light mode, neonGreen in dark mode
+                            color: selectedIconBg,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             _icons[index],
                             size: 18.sp,
-                            color: Colors.black, // Keep black for contrast
+                            color: Colors.black,
                           ),
                         ),
                         SizedBox(width: 8.w),
@@ -106,7 +107,7 @@ class CustomBottomNavBar extends StatelessWidget {
                       width: 36.w,
                       height: 36.h,
                       decoration: BoxDecoration(
-                        color: unselectedIconBg, // Keep original dark gray for both modes
+                        color: unselectedIconBg,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(

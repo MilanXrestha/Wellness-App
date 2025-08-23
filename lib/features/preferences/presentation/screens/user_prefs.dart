@@ -7,7 +7,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
-import 'package:lottie/lottie.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
@@ -122,12 +121,17 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
       await _authService.saveUserData(userModel);
       await _updateLastLoginTimestamp();
 
+      // Update SharedPreferences with preferenceCompleted
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('preferenceCompleted', true);
+
       // Update UserPreferenceProvider
       final updatedPreferences = UserPreferenceModel(
         userId: user.uid,
         preferences: preferences,
       );
-      Provider.of<UserPreferenceProvider>(context, listen: false).updateUserPreferences(updatedPreferences);
+      Provider.of<UserPreferenceProvider>(context, listen: false)
+          .updateUserPreferences(updatedPreferences);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -213,12 +217,9 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
           placeholderBuilder: (context) => SizedBox(
             width: 28.sp,
             height: 28.sp,
-            child: Lottie.asset(
-              'assets/animation/loading_animation.json',
-              width: 28.sp,
-              height: 28.sp,
-              fit: BoxFit.contain,
-              onWarning: (warning) => debugPrint('Lottie Warning: $warning'),
+            child: CircularProgressIndicator(
+              strokeWidth: 2.w,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
           fit: BoxFit.contain,
@@ -231,16 +232,14 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
           placeholder: (context, url) => SizedBox(
             width: 28.sp,
             height: 28.sp,
-            child: Lottie.asset(
-              'assets/animation/loading_animation.json',
-              width: 28.sp,
-              height: 28.sp,
-              fit: BoxFit.contain,
-              onWarning: (warning) => debugPrint('Lottie Warning: $warning'),
+            child: CircularProgressIndicator(
+              strokeWidth: 2.w,
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
           errorWidget: (context, url, error) => Icon(Icons.broken_image, size: 28.sp, color: color),
           color: color,
+          fit: BoxFit.contain,
         );
       }
     } else {
@@ -250,6 +249,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
         height: 28.sp,
         color: color,
         errorBuilder: (context, error, stackTrace) => Icon(Icons.broken_image, size: 28.sp, color: color),
+        fit: BoxFit.contain,
       );
     }
   }
@@ -495,6 +495,7 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
                                       ),
                                       shrinkWrap: true,
                                       physics: const NeverScrollableScrollPhysics(),
+                                      padding: EdgeInsets.symmetric(vertical: 8.h),
                                       itemBuilder: (context, index) {
                                         final pref = _preferences[index];
                                         final selected = selectedItems[index];
@@ -753,12 +754,9 @@ class _UserPreferenceScreenState extends State<UserPreferenceScreen> {
           Container(
             color: Colors.black54,
             child: Center(
-              child: Lottie.asset(
-                'assets/animations/loading_animation.json',
-                width: 150.sp,
-                height: 150.sp,
-                fit: BoxFit.contain,
-                onWarning: (warning) => debugPrint('Lottie Warning: $warning'),
+              child: CircularProgressIndicator(
+                strokeWidth: 4.w,
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
               ),
             ),
           ),

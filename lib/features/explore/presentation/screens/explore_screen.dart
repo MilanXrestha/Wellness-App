@@ -14,6 +14,7 @@ import 'dart:developer';
 import '../../../dashboard/presentation/widgets/quote_card.dart';
 import '../../../dashboard/presentation/widgets/tips_card.dart';
 import '../../../audioPlayer/presentation/widgets/audio_card.dart';
+import '../../../videoPlayer/presentation/widgets/short_video_card.dart';
 import '../../../videoPlayer/presentation/widgets/video_player_card.dart';
 import '../../../imageViewer/presentation/widgets/image_card.dart';
 
@@ -212,11 +213,20 @@ class FilteredContent extends StatelessWidget {
         featuredTips: categorySpecificTips,
       );
     } else if (tip.tipsType == 'video') {
-      return VideoPlayerCard(
-        tip: tip,
-        categoryName: categoryName,
-        featuredTips: categorySpecificTips,
-      );
+      // Check if the video is short (isShort is true or duration < 60 seconds)
+      if (tip.isShort || tip.durationInSeconds < 60) {
+        return ShortVideoCard(
+          tip: tip,
+          categoryName: categoryName,
+          relatedTips: featuredTips,
+        );
+      } else {
+        return VideoPlayerCard(
+          tip: tip,
+          categoryName: categoryName,
+          featuredTips: featuredTips,
+        );
+      }
     } else if (tip.tipsType == 'image') {
       return ImageCard(
         tip: tip,

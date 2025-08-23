@@ -216,7 +216,7 @@ class QuoteCardState extends State<QuoteCard>
           child: Container(
             width: 290.w,
             height: 150.h,
-            margin: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+            margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20.r),
               gradient: LinearGradient(
@@ -230,8 +230,8 @@ class QuoteCardState extends State<QuoteCard>
                 BoxShadow(
                   color: widget.isDarkMode ? AppColors.shadow : AppColors.shadow.withOpacity(0.3),
                   offset: Offset(0, 2.h),
-                  blurRadius: 6.r,
-                  spreadRadius: widget.isDarkMode ? 0.5.r : 0.r,
+                  blurRadius: 4.r,
+                  spreadRadius: widget.isDarkMode ? 0.3.r : 0.r,
                 ),
               ],
               border: Border.all(

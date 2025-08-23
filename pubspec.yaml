@@ -80,6 +80,8 @@ dependencies:
   file_picker: ^10.3.1
   just_audio: ^0.10.4
   better_player_plus: ^1.0.8
+  simple_animations: ^5.0.0
+  flutter_chrome_cast: ^1.2.2
 
   # State management & Reactive programming
   provider: ^6.1.2

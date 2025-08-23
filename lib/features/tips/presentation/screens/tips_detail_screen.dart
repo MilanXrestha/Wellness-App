@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:provider/provider.dart';
@@ -312,6 +313,7 @@ class _TipsDetailScreenState extends State<TipsDetailScreen> with TickerProvider
       dev.log('toggleFavorite: No tips available');
       return;
     }
+
     if (_userId == null || _userId!.isEmpty) {
       dev.log('toggleFavorite: Invalid userId, checking authentication');
       if (!await _tipsService.checkUserAuthentication(context)) {
@@ -335,6 +337,12 @@ class _TipsDetailScreenState extends State<TipsDetailScreen> with TickerProvider
       setState(() {
         _favoriteStatus[tipId] = !wasFavorite;
       });
+
+      // Add heart animation
+      if (!wasFavorite) {
+        _animateHearts();
+      }
+
       await _tipsService.toggleFavorite(_userId!, tipId, provider, wasFavorite);
       dev.log('toggleFavorite: Successfully toggled favorite for tip $tipId, userId: $_userId');
     } catch (e) {
@@ -348,6 +356,20 @@ class _TipsDetailScreenState extends State<TipsDetailScreen> with TickerProvider
         );
       }
     }
+  }
+
+  void _animateHearts() {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final random = Random();
+
+    for (int i = 0; i < 8; i++) {
+      _hearts.add(_HeartAnimation(
+        xOffset: random.nextDouble() * screenWidth * 0.8,
+        size: random.nextDouble() * 20 + 20,
+      ));
+    }
+
+    _heartAnimationController.forward(from: 0);
   }
 
   void _nextTip() {
@@ -827,6 +849,7 @@ class _TipsDetailScreenState extends State<TipsDetailScreen> with TickerProvider
                                         isFavorite: isFavorite,
                                       ),
                                     ],
+                                    // Premium content overlay - KEEPING ORIGINAL DESIGN
                                     if (tip.isPremium && !canAccessPremium) ...[
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(18.r),
@@ -1149,7 +1172,12 @@ class _HeartAnimation {
   final double xOffset;
   final double size;
 
-  _HeartAnimation(this.xOffset, this.size);
+  // Constructor with named parameters
+  _HeartAnimation({
+    required this.xOffset,
+    required this.size,
+  });
+
 }
 
 class _HeartWidget extends StatelessWidget {
@@ -1279,7 +1307,7 @@ class TipContentWidget extends StatelessWidget {
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
                       child: Text(
-                        '“',
+                        '"',
                         style: TextStyle(
                           fontFamily: 'PlayfairDisplay',
                           fontSize: isFullScreen ? 28.sp : 26.sp,
@@ -1302,7 +1330,7 @@ class TipContentWidget extends StatelessWidget {
                       alignment: PlaceholderAlignment.baseline,
                       baseline: TextBaseline.alphabetic,
                       child: Text(
-                        '”',
+                        '"',
                         style: TextStyle(
                           fontFamily: 'PlayfairDisplay',
                           fontSize: isFullScreen ? 28.sp : 26.sp,

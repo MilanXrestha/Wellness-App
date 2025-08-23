@@ -5,9 +5,8 @@ import 'colors.dart';
 
 /// Defines the application theme configurations for light and dark modes.
 class AppTheme {
-  /// ========================
+
   /// LIGHT THEME CONFIGURATION
-  /// ========================
   static ThemeData lightTheme() {
     return ThemeData(
       fontFamily: 'Poppins',
@@ -213,6 +212,9 @@ class AppTheme {
           fontFamily: 'Poppins',
           fontWeight: FontWeight.w600,
         ),
+
+
+
       ),
 
       // ---------- Bottom Sheet ----------

@@ -37,6 +37,7 @@ import '../../../features/admin/presentation/add_tips_screen.dart';
 import '../../../features/admin/presentation/manage_subscriptions_screen.dart';
 import '../../../features/main/presentation/screens/main_screen.dart';
 import '../../../features/onboarding/presentation/screens/onboarding_screen.dart';
+import '../../../features/videoPlayer/presentation/screens/short_player_screen.dart';
 import '../../../features/videoPlayer/presentation/screens/video_player_screen.dart';
 
 class RouteConfig {
@@ -309,6 +310,32 @@ class RouteConfig {
             tip: args['tip'] as TipModel,
             categoryName: args['categoryName'] as String,
             featuredTips: args['featuredTips'] as List<TipModel>,
+          ),
+          settings: settings,
+        );
+
+      case RoutesName.shortVideoPlayerScreen:
+        final args = settings.arguments as Map<String, dynamic>?;
+        if (args == null || !args.containsKey('tip') || !args.containsKey('categoryName') || !args.containsKey('featuredTips')) {
+          log('Invalid arguments for ${RoutesName.shortVideoPlayerScreen}', name: 'RouteGenerator');
+          return MaterialPageRoute(
+            builder: (_) => Scaffold(
+              body: Center(child: Text('Error: Invalid navigation arguments')),
+            ),
+            settings: settings,
+          );
+        }
+        final TipModel? initialTip = args['tip'] is TipModel ? args['tip'] as TipModel : null;
+        final String categoryName = args['categoryName'] is String ? args['categoryName'] as String : 'Unknown';
+        final List<TipModel> relatedTips = args['featuredTips'] is List<dynamic>
+            ? (args['featuredTips'] as List<dynamic>).whereType<TipModel>().toList()
+            : [];
+        return MaterialPageRoute(
+          builder: (_) => ShortsPlayerScreen(
+            initialTip: initialTip,
+            categoryName: categoryName,
+            relatedTips: relatedTips,
+            tabActive: true,
           ),
           settings: settings,
         );

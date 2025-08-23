@@ -401,6 +401,17 @@ const TipModel$json = {
       '10': 'imageUrl',
       '17': true
     },
+    {'1': 'viewCount', '3': 17, '4': 1, '5': 5, '10': 'viewCount'},
+    {'1': 'likeCount', '3': 18, '4': 1, '5': 5, '10': 'likeCount'},
+    {'1': 'commentCount', '3': 19, '4': 1, '5': 5, '10': 'commentCount'},
+    {
+      '1': 'durationInSeconds',
+      '3': 20,
+      '4': 1,
+      '5': 5,
+      '10': 'durationInSeconds'
+    },
+    {'1': 'isShort', '3': 21, '4': 1, '5': 8, '10': 'isShort'},
   ],
   '8': [
     {'1': '_authorIcon'},
@@ -424,9 +435,12 @@ final $typed_data.Uint8List tipModelDescriptor = $convert.base64Decode(
     'ZWF0dXJlZBIcCglpc1ByZW1pdW0YCyABKAhSCWlzUHJlbWl1bRIfCghhdWRpb1VybBgMIAEoCU'
     'gCUghhdWRpb1VybIgBARIfCgh2aWRlb1VybBgNIAEoCUgDUgh2aWRlb1VybIgBARInCgx0aHVt'
     'Ym5haWxVcmwYDiABKAlIBFIMdGh1bWJuYWlsVXJsiAEBEikKDW1lZGlhRHVyYXRpb24YDyABKA'
-    'lIBVINbWVkaWFEdXJhdGlvbogBARIfCghpbWFnZVVybBgQIAEoCUgGUghpbWFnZVVybIgBAUIN'
-    'CgtfYXV0aG9ySWNvbkIMCgpfY3JlYXRlZEF0QgsKCV9hdWRpb1VybEILCglfdmlkZW9VcmxCDw'
-    'oNX3RodW1ibmFpbFVybEIQCg5fbWVkaWFEdXJhdGlvbkILCglfaW1hZ2VVcmw=');
+    'lIBVINbWVkaWFEdXJhdGlvbogBARIfCghpbWFnZVVybBgQIAEoCUgGUghpbWFnZVVybIgBARIc'
+    'Cgl2aWV3Q291bnQYESABKAVSCXZpZXdDb3VudBIcCglsaWtlQ291bnQYEiABKAVSCWxpa2VDb3'
+    'VudBIiCgxjb21tZW50Q291bnQYEyABKAVSDGNvbW1lbnRDb3VudBIsChFkdXJhdGlvbkluU2Vj'
+    'b25kcxgUIAEoBVIRZHVyYXRpb25JblNlY29uZHMSGAoHaXNTaG9ydBgVIAEoCFIHaXNTaG9ydE'
+    'INCgtfYXV0aG9ySWNvbkIMCgpfY3JlYXRlZEF0QgsKCV9hdWRpb1VybEILCglfdmlkZW9VcmxC'
+    'DwoNX3RodW1ibmFpbFVybEIQCg5fbWVkaWFEdXJhdGlvbkILCglfaW1hZ2VVcmw=');
 
 @$core.Deprecated('Use userModelDescriptor instead')
 const UserModel$json = {
@@ -536,3 +550,54 @@ final $typed_data.Uint8List userPreferenceModelDescriptor = $convert.base64Decod
     'ChNVc2VyUHJlZmVyZW5jZU1vZGVsEhYKBnVzZXJJZBgBIAEoCVIGdXNlcklkEj8KC3ByZWZlcm'
     'VuY2VzGAIgAygLMh0ud2VsbG5lc3MuVXNlclByZWZlcmVuY2VFbnRyeVILcHJlZmVyZW5jZXMS'
     'IQoJdXBkYXRlZEF0GAMgASgJSABSCXVwZGF0ZWRBdIgBAUIMCgpfdXBkYXRlZEF0');
+
+@$core.Deprecated('Use commentModelDescriptor instead')
+const CommentModel$json = {
+  '1': 'CommentModel',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'tipsId', '3': 2, '4': 1, '5': 9, '10': 'tipsId'},
+    {'1': 'userId', '3': 3, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'userName', '3': 4, '4': 1, '5': 9, '10': 'userName'},
+    {'1': 'userPhotoUrl', '3': 5, '4': 1, '5': 9, '10': 'userPhotoUrl'},
+    {'1': 'text', '3': 6, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'createdAt', '3': 7, '4': 1, '5': 9, '10': 'createdAt'},
+    {
+      '1': 'parentId',
+      '3': 8,
+      '4': 1,
+      '5': 9,
+      '9': 0,
+      '10': 'parentId',
+      '17': true
+    },
+    {'1': 'likeCount', '3': 9, '4': 1, '5': 5, '10': 'likeCount'},
+  ],
+  '8': [
+    {'1': '_parentId'},
+  ],
+};
+
+/// Descriptor for `CommentModel`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List commentModelDescriptor = $convert.base64Decode(
+    'CgxDb21tZW50TW9kZWwSDgoCaWQYASABKAlSAmlkEhYKBnRpcHNJZBgCIAEoCVIGdGlwc0lkEh'
+    'YKBnVzZXJJZBgDIAEoCVIGdXNlcklkEhoKCHVzZXJOYW1lGAQgASgJUgh1c2VyTmFtZRIiCgx1'
+    'c2VyUGhvdG9VcmwYBSABKAlSDHVzZXJQaG90b1VybBISCgR0ZXh0GAYgASgJUgR0ZXh0EhwKCW'
+    'NyZWF0ZWRBdBgHIAEoCVIJY3JlYXRlZEF0Eh8KCHBhcmVudElkGAggASgJSABSCHBhcmVudElk'
+    'iAEBEhwKCWxpa2VDb3VudBgJIAEoBVIJbGlrZUNvdW50QgsKCV9wYXJlbnRJZA==');
+
+@$core.Deprecated('Use likeModelDescriptor instead')
+const LikeModel$json = {
+  '1': 'LikeModel',
+  '2': [
+    {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
+    {'1': 'tipsId', '3': 2, '4': 1, '5': 9, '10': 'tipsId'},
+    {'1': 'userId', '3': 3, '4': 1, '5': 9, '10': 'userId'},
+    {'1': 'createdAt', '3': 4, '4': 1, '5': 9, '10': 'createdAt'},
+  ],
+};
+
+/// Descriptor for `LikeModel`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List likeModelDescriptor = $convert.base64Decode(
+    'CglMaWtlTW9kZWwSDgoCaWQYASABKAlSAmlkEhYKBnRpcHNJZBgCIAEoCVIGdGlwc0lkEhYKBn'
+    'VzZXJJZBgDIAEoCVIGdXNlcklkEhwKCWNyZWF0ZWRBdBgEIAEoCVIJY3JlYXRlZEF0');

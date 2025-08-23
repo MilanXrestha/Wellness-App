@@ -17,6 +17,7 @@ import 'package:wellness_app/features/dashboard/presentation/widgets/tips_card.d
 import 'package:wellness_app/features/audioPlayer/presentation/widgets/audio_card.dart';
 import 'package:wellness_app/features/videoPlayer/presentation/widgets/video_player_card.dart';
 import 'package:wellness_app/features/imageViewer/presentation/widgets/image_card.dart';
+import 'package:wellness_app/features/videoPlayer/presentation/widgets/short_video_card.dart';
 
 class FavoriteScreen extends StatefulWidget {
   final ValueChanged<bool>? onSearchActiveChanged;
@@ -56,10 +57,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     final authService = AuthService();
     final user = authService.getCurrentUser();
     if (user == null) {
-      log(
-        'No authenticated user found, redirecting to login',
-        name: 'FavoriteScreen',
-      );
+      log('No authenticated user found, redirecting to login', name: 'FavoriteScreen');
       Navigator.pushReplacementNamed(context, RoutesName.loginScreen);
       return;
     }
@@ -74,10 +72,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       final provider = Provider.of<FavoritesProvider>(context, listen: false);
       await provider.loadFavorites(_userId!);
       if (provider.favorites.isEmpty) {
-        log(
-          'No favorites found for user $_userId, triggering sync',
-          name: 'FavoriteScreen',
-        );
+        log('No favorites found for user $_userId, triggering sync', name: 'FavoriteScreen');
         await DataRepository.instance.syncAllData(_userId!);
         await provider.loadFavorites(_userId!);
       }
@@ -96,10 +91,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         _isSearchActive.value = _searchFocusNode.hasFocus;
         widget.onSearchActiveChanged?.call(!_searchFocusNode.hasFocus);
       });
-      log(
-        'Search focus changed: ${_searchFocusNode.hasFocus}',
-        name: 'FavoriteScreen',
-      );
+      log('Search focus changed: ${_searchFocusNode.hasFocus}', name: 'FavoriteScreen');
     }
   }
 
@@ -115,10 +107,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
       } else {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _searchFocusNode.requestFocus();
-          log(
-            'Search activated via toggle, opening keyboard',
-            name: 'FavoriteScreen',
-          );
+          log('Search activated via toggle, opening keyboard', name: 'FavoriteScreen');
         });
       }
     });
@@ -135,9 +124,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20.r),
           ),
-          backgroundColor: isDarkMode
-              ? AppColors.darkSurface
-              : AppColors.lightBackground,
+          backgroundColor: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
             child: Column(
@@ -150,9 +137,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     Text(
                       'Filter Favorites',
                       style: theme.textTheme.titleLarge?.copyWith(
-                        color: isDarkMode
-                            ? AppColors.darkTextPrimary
-                            : AppColors.lightTextPrimary,
+                        color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                         fontSize: 20.sp,
                         fontWeight: FontWeight.bold,
                       ),
@@ -162,9 +147,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                         'assets/icons/svg/ic_clear.svg',
                         width: 22.sp,
                         height: 22.sp,
-                        color: isDarkMode
-                            ? AppColors.darkTextSecondary
-                            : AppColors.lightTextPrimary,
+                        color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextPrimary,
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -174,9 +157,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                 Text(
                   'Select Content Type',
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: isDarkMode
-                        ? AppColors.darkTextSecondary
-                        : AppColors.lightTextSecondary,
+                    color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                     fontSize: 14.sp,
                   ),
                 ),
@@ -185,9 +166,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   title: Text(
                     'All',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       fontSize: 16.sp,
                     ),
                   ),
@@ -199,9 +178,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  activeColor: isDarkMode
-                      ? AppColors.primary
-                      : AppColors.lightTextPrimary,
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -209,9 +186,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   title: Text(
                     'Quote',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       fontSize: 16.sp,
                     ),
                   ),
@@ -223,9 +198,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  activeColor: isDarkMode
-                      ? AppColors.primary
-                      : AppColors.lightTextPrimary,
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -233,9 +206,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   title: Text(
                     'Tip',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       fontSize: 16.sp,
                     ),
                   ),
@@ -247,9 +218,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  activeColor: isDarkMode
-                      ? AppColors.primary
-                      : AppColors.lightTextPrimary,
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -257,9 +226,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   title: Text(
                     'Audio',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       fontSize: 16.sp,
                     ),
                   ),
@@ -271,9 +238,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  activeColor: isDarkMode
-                      ? AppColors.primary
-                      : AppColors.lightTextPrimary,
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -281,9 +246,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   title: Text(
                     'Video',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       fontSize: 16.sp,
                     ),
                   ),
@@ -295,9 +258,28 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  activeColor: isDarkMode
-                      ? AppColors.primary
-                      : AppColors.lightTextPrimary,
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+                // Add Shorts filter option
+                RadioListTile<String>(
+                  title: Text(
+                    'Shorts',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      fontSize: 16.sp,
+                    ),
+                  ),
+                  value: 'shorts',
+                  groupValue: _selectedFilter,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedFilter = value;
+                    });
+                    Navigator.pop(context);
+                  },
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -305,9 +287,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                   title: Text(
                     'Image',
                     style: theme.textTheme.bodyLarge?.copyWith(
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.lightTextPrimary,
+                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
                       fontSize: 16.sp,
                     ),
                   ),
@@ -319,9 +299,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                     });
                     Navigator.pop(context);
                   },
-                  activeColor: isDarkMode
-                      ? AppColors.primary
-                      : AppColors.lightTextPrimary,
+                  activeColor: isDarkMode ? AppColors.primary : AppColors.lightTextPrimary,
                   contentPadding: EdgeInsets.zero,
                   dense: true,
                 ),
@@ -363,28 +341,19 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     final isDarkMode = theme.brightness == Brightness.dark;
 
     return SliverPadding(
-      padding: EdgeInsets.symmetric(
-        horizontal: 16.w,
-        vertical: 8.h,
-      ).copyWith(bottom: 80.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h).copyWith(bottom: 80.h),
       sliver: SliverList(
         delegate: SliverChildBuilderDelegate((context, index) {
           return Padding(
             padding: EdgeInsets.only(bottom: 12.h),
             child: Shimmer.fromColors(
-              baseColor: isDarkMode
-                  ? AppColors.darkSurface
-                  : AppColors.lightBackground,
-              highlightColor: isDarkMode
-                  ? AppColors.darkSecondary
-                  : AppColors.lightTextPrimary,
+              baseColor: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
+              highlightColor: isDarkMode ? AppColors.darkSecondary : AppColors.lightTextPrimary,
               child: Container(
-                width: 280.w,
+                width: double.infinity,
                 height: 160.h,
                 decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? AppColors.darkSurface
-                      : AppColors.lightBackground,
+                  color: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
                   borderRadius: BorderRadius.circular(16.r),
                 ),
               ),
@@ -395,33 +364,72 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     );
   }
 
+  // Fixed filter logic to properly separate shorts from regular videos
   List<TipModel> _filterTips(List<TipModel> tips) {
     final query = _searchQuery.value;
-    return tips.where((tip) {
-      final matchesSearch =
-          query.isEmpty ||
-          tip.tipsTitle.toLowerCase().contains(query) ||
-          tip.tipsAuthor.toLowerCase().contains(query);
-      final matchesFilter =
-          _selectedFilter == null || tip.tipsType == _selectedFilter;
-      return matchesSearch && matchesFilter;
-    }).toList();
+
+    if (_selectedFilter == 'shorts') {
+      // For shorts filter, we need to find videos that are shorts
+      return tips.where((tip) {
+        final isShort = tip.tipsType == 'video' && (tip.isShort || tip.durationInSeconds < 60);
+        final matchesSearch = query.isEmpty ||
+            tip.tipsTitle.toLowerCase().contains(query) ||
+            tip.tipsAuthor.toLowerCase().contains(query);
+        return isShort && matchesSearch;
+      }).toList();
+    } else if (_selectedFilter == 'video') {
+      // For video filter, explicitly exclude shorts
+      return tips.where((tip) {
+        final isRegularVideo = tip.tipsType == 'video' &&
+            !(tip.isShort || tip.durationInSeconds < 60);
+        final matchesSearch = query.isEmpty ||
+            tip.tipsTitle.toLowerCase().contains(query) ||
+            tip.tipsAuthor.toLowerCase().contains(query);
+        return isRegularVideo && matchesSearch;
+      }).toList();
+    } else {
+      // For other filters
+      return tips.where((tip) {
+        final matchesSearch = query.isEmpty ||
+            tip.tipsTitle.toLowerCase().contains(query) ||
+            tip.tipsAuthor.toLowerCase().contains(query);
+        final matchesFilter = _selectedFilter == null || tip.tipsType == _selectedFilter;
+        return matchesSearch && matchesFilter;
+      }).toList();
+    }
   }
 
-  Widget _buildTipCard(
-    TipModel tip,
-    ThemeData theme,
-    bool isDarkMode,
-    List<TipModel> filteredTips,
-  ) {
+  // Get a list of only tips of the same type for consistent swiping
+  List<TipModel> _getSimilarContentList(TipModel currentTip, List<TipModel> allTips) {
+    if (currentTip.tipsType == 'video' && (currentTip.isShort || currentTip.durationInSeconds < 60)) {
+      // For shorts, get all shorts
+      return allTips.where((tip) =>
+      tip.tipsType == 'video' && (tip.isShort || tip.durationInSeconds < 60)
+      ).toList();
+    } else if (currentTip.tipsType == 'video') {
+      // For videos (but not shorts), get only regular videos
+      return allTips.where((tip) =>
+      tip.tipsType == 'video' && !(tip.isShort || tip.durationInSeconds < 60)
+      ).toList();
+    } else {
+      // For other content types, filter by the same type
+      return allTips.where((tip) => tip.tipsType == currentTip.tipsType).toList();
+    }
+  }
+
+  Widget _buildTipCard(TipModel tip, ThemeData theme, bool isDarkMode, List<TipModel> allFavoriteTips) {
     final categoryName = 'Favorites';
+
+    // Get similar content for consistent swiping
+    final similarTips = _getSimilarContentList(tip, allFavoriteTips);
+
     if (tip.tipsType == 'quote') {
       return QuoteCard(
         tip: tip,
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: categoryName,
-        featuredTips: filteredTips,
+        featuredTips: similarTips,
       );
     } else if (tip.tipsType == 'audio') {
       return AudioCard(
@@ -429,19 +437,27 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: categoryName,
-        featuredTips: filteredTips,
+        featuredTips: similarTips,
       );
     } else if (tip.tipsType == 'video') {
-      return VideoPlayerCard(
-        tip: tip,
-        categoryName: categoryName,
-        featuredTips: filteredTips,
-      );
+      if (tip.isShort || tip.durationInSeconds < 60) {
+        return ShortVideoCard(
+          tip: tip,
+          categoryName: categoryName,
+          relatedTips: similarTips,
+        );
+      } else {
+        return VideoPlayerCard(
+          tip: tip,
+          categoryName: categoryName,
+          featuredTips: similarTips,
+        );
+      }
     } else if (tip.tipsType == 'image') {
       return ImageCard(
         tip: tip,
         categoryName: categoryName,
-        featuredTips: filteredTips,
+        featuredTips: similarTips,
       );
     } else {
       return TipCard(
@@ -449,9 +465,214 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: categoryName,
-        featuredTips: filteredTips,
+        featuredTips: similarTips,
       );
     }
+  }
+
+  // New method to build section header - removed divider line
+  Widget _buildSectionHeader(String title, ThemeData theme, bool isDarkMode) {
+    return Padding(
+      padding: EdgeInsets.only(top: 16.h, bottom: 8.h),
+      child: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+          fontSize: 18.sp,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  // Method to organize content by type - fixed to avoid duplicating shorts
+  List<Widget> _organizeContentByType(List<TipModel> tips, ThemeData theme, bool isDarkMode) {
+    final List<Widget> organizedContent = [];
+
+    // Separate shorts from regular videos
+    List<TipModel> quotes = [];
+    List<TipModel> tipItems = [];
+    List<TipModel> audioItems = [];
+    List<TipModel> regularVideos = [];
+    List<TipModel> shorts = [];
+    List<TipModel> imageItems = [];
+    List<TipModel> others = [];
+
+    // Group tips by type
+    for (var tip in tips) {
+      if (tip.tipsType == 'video') {
+        if (tip.isShort || tip.durationInSeconds < 60) {
+          shorts.add(tip);
+        } else {
+          regularVideos.add(tip);
+        }
+      } else if (tip.tipsType == 'quote') {
+        quotes.add(tip);
+      } else if (tip.tipsType == 'tip') {
+        tipItems.add(tip);
+      } else if (tip.tipsType == 'audio') {
+        audioItems.add(tip);
+      } else if (tip.tipsType == 'image') {
+        imageItems.add(tip);
+      } else {
+        others.add(tip);
+      }
+    }
+
+    // Add quotes section
+    if (quotes.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Quotes', theme, isDarkMode));
+      for (var tip in quotes) {
+        organizedContent.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: _buildTipCard(tip, theme, isDarkMode, tips),
+          ),
+        );
+      }
+    }
+
+    // Add tips section
+    if (tipItems.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Tips', theme, isDarkMode));
+      for (var tip in tipItems) {
+        organizedContent.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: _buildTipCard(tip, theme, isDarkMode, tips),
+          ),
+        );
+      }
+    }
+
+    // Add audio section
+    if (audioItems.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Audio', theme, isDarkMode));
+      for (var tip in audioItems) {
+        organizedContent.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: _buildTipCard(tip, theme, isDarkMode, tips),
+          ),
+        );
+      }
+    }
+
+    // Add videos section (only regular videos, not shorts)
+    if (regularVideos.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Videos', theme, isDarkMode));
+      for (var tip in regularVideos) {
+        organizedContent.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: _buildTipCard(tip, theme, isDarkMode, tips),
+          ),
+        );
+      }
+    }
+
+    // Add shorts section
+    if (shorts.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Shorts', theme, isDarkMode));
+
+      // Handle shorts in pairs
+      for (int i = 0; i < shorts.length; i += 2) {
+        if (i + 1 < shorts.length) {
+          // Pair of shorts
+          organizedContent.add(
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _buildTipCard(shorts[i], theme, isDarkMode, tips),
+                  ),
+                  SizedBox(width: 12.w),
+                  Flexible(
+                    child: _buildTipCard(shorts[i + 1], theme, isDarkMode, tips),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else {
+          // Single short
+          organizedContent.add(
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _buildTipCard(shorts[i], theme, isDarkMode, tips),
+                  ),
+                  SizedBox(width: 12.w),
+                  Flexible(child: Container()),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+    }
+
+    // Add images section
+    if (imageItems.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Images', theme, isDarkMode));
+
+      // Handle images in pairs
+      for (int i = 0; i < imageItems.length; i += 2) {
+        if (i + 1 < imageItems.length) {
+          // Pair of images
+          organizedContent.add(
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _buildTipCard(imageItems[i], theme, isDarkMode, tips),
+                  ),
+                  SizedBox(width: 12.w),
+                  Flexible(
+                    child: _buildTipCard(imageItems[i + 1], theme, isDarkMode, tips),
+                  ),
+                ],
+              ),
+            ),
+          );
+        } else {
+          // Single image
+          organizedContent.add(
+            Padding(
+              padding: EdgeInsets.only(bottom: 12.h),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: _buildTipCard(imageItems[i], theme, isDarkMode, tips),
+                  ),
+                  SizedBox(width: 12.w),
+                  Flexible(child: Container()),
+                ],
+              ),
+            ),
+          );
+        }
+      }
+    }
+
+    // Add other content types if any
+    if (others.isNotEmpty) {
+      organizedContent.add(_buildSectionHeader('Other', theme, isDarkMode));
+      for (var tip in others) {
+        organizedContent.add(
+          Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: _buildTipCard(tip, theme, isDarkMode, tips),
+          ),
+        );
+      }
+    }
+
+    return organizedContent;
   }
 
   @override
@@ -503,22 +724,17 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                         expandedHeight: 64.h,
                         flexibleSpace: FlexibleSpaceBar(
                           background: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 16.w,
-                              vertical: 8.h,
-                            ),
+                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                             child: ValueListenableBuilder<bool>(
                               valueListenable: _isSearchActive,
                               builder: (context, isSearchActive, child) {
                                 return Container(
                                   height: 56.h,
                                   decoration: BoxDecoration(
-                                    color: isDarkMode
-                                        ? Color(0xFF121212)
-                                        : AppColors.lightBackground,
+                                    color: isDarkMode ? Color(0xFF121212) : AppColors.lightBackground,
                                     borderRadius: BorderRadius.circular(24.r),
                                     boxShadow: isDarkMode
-                                        ? [] // no shadow in dark mode
+                                        ? []
                                         : [
                                       BoxShadow(
                                         color: AppColors.shadow,
@@ -528,132 +744,96 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                                     ],
                                   ),
                                   child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
                                     children: [
                                       Padding(
                                         padding: EdgeInsets.only(left: 12.w),
                                         child: IconButton(
                                           icon: isSearchActive
                                               ? Icon(
-                                                  Icons.chevron_left,
-                                                  size: 30.sp,
-                                                  color: isDarkMode
-                                                      ? AppColors
-                                                            .darkTextSecondary
-                                                      : AppColors
-                                                            .lightTextPrimary,
-                                                )
+                                            Icons.chevron_left,
+                                            size: 30.sp,
+                                            color: isDarkMode
+                                                ? AppColors.darkTextSecondary
+                                                : AppColors.lightTextPrimary,
+                                          )
                                               : SvgPicture.asset(
-                                                  'assets/icons/svg/ic_search.svg',
-                                                  width: 24.sp,
-                                                  height: 24.sp,
-                                                  color: isDarkMode
-                                                      ? AppColors
-                                                            .darkTextSecondary
-                                                      : AppColors
-                                                            .lightTextPrimary,
-                                                ),
+                                            'assets/icons/svg/ic_search.svg',
+                                            width: 24.sp,
+                                            height: 24.sp,
+                                            color: isDarkMode
+                                                ? AppColors.darkTextSecondary
+                                                : AppColors.lightTextPrimary,
+                                          ),
                                           onPressed: _toggleSearch,
-                                          tooltip: isSearchActive
-                                              ? 'Close Search'
-                                              : 'Search',
+                                          tooltip: isSearchActive ? 'Close Search' : 'Search',
                                         ),
                                       ),
                                       Expanded(
                                         child: isSearchActive
                                             ? TextField(
-                                                controller: _searchController,
-                                                focusNode: _searchFocusNode,
-                                                enabled: isSearchActive,
-                                                autofocus: isSearchActive,
-                                                style: theme
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(
-                                                      fontSize: 16.sp,
-                                                      color: isDarkMode
-                                                          ? AppColors
-                                                                .darkTextPrimary
-                                                          : AppColors
-                                                                .lightTextPrimary,
-                                                    ),
-                                                decoration: InputDecoration(
-                                                  hintText:
-                                                      'Search favorites...',
-                                                  hintStyle: theme
-                                                      .textTheme
-                                                      .bodyMedium
-                                                      ?.copyWith(
-                                                        fontSize: 16.sp,
-                                                        color: isDarkMode
-                                                            ? AppColors
-                                                                  .darkTextHint
-                                                            : AppColors
-                                                                  .lightTextHint,
-                                                      ),
-                                                  border: InputBorder.none,
-                                                  enabledBorder:
-                                                      InputBorder.none,
-                                                  focusedBorder:
-                                                      InputBorder.none,
-                                                  disabledBorder:
-                                                      InputBorder.none,
-                                                  filled: false,
-                                                  contentPadding:
-                                                      EdgeInsets.symmetric(
-                                                        vertical: 12.h,
-                                                        horizontal: 4.w,
-                                                      ),
-                                                  suffixIcon: ValueListenableBuilder<String>(
-                                                    valueListenable:
-                                                        _searchQuery,
-                                                    builder: (context, searchQuery, child) {
-                                                      return searchQuery
-                                                              .isNotEmpty
-                                                          ? IconButton(
-                                                              icon: SvgPicture.asset(
-                                                                'assets/icons/svg/ic_clear.svg',
-                                                                width: 20.sp,
-                                                                height: 20.sp,
-                                                                color:
-                                                                    isDarkMode
-                                                                    ? AppColors
-                                                                          .darkTextSecondary
-                                                                    : AppColors
-                                                                          .lightTextPrimary,
-                                                              ),
-                                                              onPressed: () {
-                                                                _searchController
-                                                                    .clear();
-                                                                _searchQuery
-                                                                        .value =
-                                                                    '';
-                                                              },
-                                                            )
-                                                          : const SizedBox.shrink();
-                                                    },
+                                          controller: _searchController,
+                                          focusNode: _searchFocusNode,
+                                          enabled: isSearchActive,
+                                          autofocus: isSearchActive,
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            fontSize: 16.sp,
+                                            color: isDarkMode
+                                                ? AppColors.darkTextPrimary
+                                                : AppColors.lightTextPrimary,
+                                          ),
+                                          decoration: InputDecoration(
+                                            hintText: 'Search favorites...',
+                                            hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                              fontSize: 16.sp,
+                                              color: isDarkMode
+                                                  ? AppColors.darkTextHint
+                                                  : AppColors.lightTextHint,
+                                            ),
+                                            border: InputBorder.none,
+                                            enabledBorder: InputBorder.none,
+                                            focusedBorder: InputBorder.none,
+                                            disabledBorder: InputBorder.none,
+                                            filled: false,
+                                            contentPadding: EdgeInsets.symmetric(
+                                              vertical: 12.h,
+                                              horizontal: 4.w,
+                                            ),
+                                            suffixIcon: ValueListenableBuilder<String>(
+                                              valueListenable: _searchQuery,
+                                              builder: (context, searchQuery, child) {
+                                                return searchQuery.isNotEmpty
+                                                    ? IconButton(
+                                                  icon: SvgPicture.asset(
+                                                    'assets/icons/svg/ic_clear.svg',
+                                                    width: 20.sp,
+                                                    height: 20.sp,
+                                                    color: isDarkMode
+                                                        ? AppColors.darkTextSecondary
+                                                        : AppColors.lightTextPrimary,
                                                   ),
-                                                ),
-                                              )
+                                                  onPressed: () {
+                                                    _searchController.clear();
+                                                    _searchQuery.value = '';
+                                                  },
+                                                )
+                                                    : const SizedBox.shrink();
+                                              },
+                                            ),
+                                          ),
+                                        )
                                             : Center(
-                                                child: Text(
-                                                  'Favorites',
-                                                  style: theme
-                                                      .textTheme
-                                                      .headlineSmall
-                                                      ?.copyWith(
-                                                        color: isDarkMode
-                                                            ? AppColors
-                                                                  .darkTextPrimary
-                                                            : AppColors
-                                                                  .lightTextPrimary,
-                                                        fontSize: 18.sp,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                ),
-                                              ),
+                                          child: Text(
+                                            'Favorites',
+                                            style: theme.textTheme.headlineSmall?.copyWith(
+                                              color: isDarkMode
+                                                  ? AppColors.darkTextPrimary
+                                                  : AppColors.lightTextPrimary,
+                                              fontSize: 18.sp,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
                                       ),
                                       if (!isSearchActive)
                                         IconButton(
@@ -665,8 +845,7 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                                                 ? AppColors.darkTextSecondary
                                                 : AppColors.lightTextPrimary,
                                           ),
-                                          onPressed: () =>
-                                              _showFilterDialog(context),
+                                          onPressed: () => _showFilterDialog(context),
                                           tooltip: 'Filter Favorites',
                                         ),
                                     ],
@@ -678,19 +857,152 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                         ),
                       ),
                       SliverPadding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 16.w,
-                          vertical: 8.h,
-                        ).copyWith(bottom: 80.h),
+                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h).copyWith(bottom: 80.h),
                         sliver: _isLoading
                             ? _buildShimmerUI(context)
                             : Consumer<FavoritesProvider>(
-                                builder: (context, provider, child) {
-                                  if (provider.error != null) {
-                                    return SliverToBoxAdapter(
+                          builder: (context, provider, child) {
+                            if (provider.error != null) {
+                              return SliverToBoxAdapter(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Lottie.asset(
+                                      'assets/animations/no_fav.json',
+                                      width: 300.w,
+                                      height: 300.h,
+                                      fit: BoxFit.contain,
+                                    ),
+                                    SizedBox(height: 8.h),
+                                    Text(
+                                      'Error loading favorites: ${provider.error}',
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        fontSize: 16.sp,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextSecondary,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                    SizedBox(height: 8.h),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        provider.loadFavorites(_userId!);
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12.r),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Retry',
+                                        style: theme.textTheme.labelLarge?.copyWith(
+                                          fontSize: 14.sp,
+                                          color: AppColors.lightBackground,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+                            if (provider.favorites.isEmpty) {
+                              return SliverToBoxAdapter(
+                                child: Container(
+                                  padding: EdgeInsets.all(10.w),
+                                  margin: EdgeInsets.symmetric(vertical: 5.h),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Lottie.asset(
+                                        'assets/animations/no_fav.json',
+                                        width: 300.w,
+                                        height: 300.h,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      SizedBox(height: 5.h),
+                                      Text(
+                                        'No favorite tips available.\nTo add to favorites, please click the heart icon.',
+                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                          fontSize: 16.sp,
+                                          color: isDarkMode
+                                              ? AppColors.darkTextSecondary
+                                              : AppColors.lightTextSecondary,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }
+                            return FutureBuilder<List<TipModel>>(
+                              future: Future.wait(
+                                provider.favorites.map((favorite) async {
+                                  final tip = await DataRepository.instance.getTip(favorite.tipId);
+                                  return tip;
+                                }).toList(),
+                              ).then((tips) => tips.where((tip) => tip != null).cast<TipModel>().toList()),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return _buildShimmerUI(context);
+                                }
+                                if (snapshot.hasError) {
+                                  log('Error loading favorites: ${snapshot.error}', name: 'FavoriteScreen');
+                                  return SliverToBoxAdapter(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Lottie.asset(
+                                          'assets/animations/no_fav.json',
+                                          width: 300.w,
+                                          height: 300.h,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        SizedBox(height: 8.h),
+                                        Text(
+                                          'Error loading favorites',
+                                          style: theme.textTheme.bodyMedium?.copyWith(
+                                            fontSize: 16.sp,
+                                            color: isDarkMode
+                                                ? AppColors.darkTextSecondary
+                                                : AppColors.lightTextSecondary,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        SizedBox(height: 8.h),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            provider.loadFavorites(_userId!);
+                                          },
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(12.r),
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Retry',
+                                            style: theme.textTheme.labelLarge?.copyWith(
+                                              fontSize: 14.sp,
+                                              color: AppColors.lightBackground,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }
+                                final favoriteTips = snapshot.data ?? [];
+                                final filteredTips = _filterTips(favoriteTips);
+                                if (filteredTips.isEmpty) {
+                                  return SliverToBoxAdapter(
+                                    child: Container(
+                                      padding: EdgeInsets.all(10.w),
+                                      margin: EdgeInsets.symmetric(vertical: 5.h),
                                       child: Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
+                                        mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
                                           Lottie.asset(
                                             'assets/animations/no_fav.json',
@@ -698,235 +1010,38 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
                                             height: 300.h,
                                             fit: BoxFit.contain,
                                           ),
-                                          SizedBox(height: 8.h),
+                                          SizedBox(height: 5.h),
                                           Text(
-                                            'Error loading favorites: ${provider.error}',
-                                            style: theme.textTheme.bodyMedium
-                                                ?.copyWith(
-                                                  fontSize: 16.sp,
-                                                  color: isDarkMode
-                                                      ? AppColors
-                                                            .darkTextSecondary
-                                                      : AppColors
-                                                            .lightTextSecondary,
-                                                ),
+                                            'No favorite tips available.\nTo add to favorites, please click the heart icon.',
+                                            style: theme.textTheme.bodyMedium?.copyWith(
+                                              fontSize: 16.sp,
+                                              color: isDarkMode
+                                                  ? AppColors.darkTextSecondary
+                                                  : AppColors.lightTextSecondary,
+                                            ),
                                             textAlign: TextAlign.center,
-                                          ),
-                                          SizedBox(height: 8.h),
-                                          ElevatedButton(
-                                            onPressed: () {
-                                              provider.loadFavorites(_userId!);
-                                            },
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  AppColors.primary,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12.r),
-                                              ),
-                                            ),
-                                            child: Text(
-                                              'Retry',
-                                              style: theme.textTheme.labelLarge
-                                                  ?.copyWith(
-                                                    fontSize: 14.sp,
-                                                    color: AppColors
-                                                        .lightBackground,
-                                                  ),
-                                            ),
                                           ),
                                         ],
                                       ),
-                                    );
-                                  }
-                                  if (provider.favorites.isEmpty) {
-                                    return SliverToBoxAdapter(
-                                      child: Container(
-                                        padding: EdgeInsets.all(10.w),
-                                        margin: EdgeInsets.symmetric(
-                                          vertical: 5.h,
-                                        ),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Lottie.asset(
-                                              'assets/animations/no_fav.json',
-                                              width: 300.w,
-                                              height: 300.h,
-                                              fit: BoxFit.contain,
-                                            ),
-                                            SizedBox(height: 5.h),
-                                            Text(
-                                              'No favorite tips available.\nTo add to favorites, please click the heart icon.',
-                                              style: theme.textTheme.bodyMedium
-                                                  ?.copyWith(
-                                                    fontSize: 16.sp,
-                                                    color: isDarkMode
-                                                        ? AppColors
-                                                              .darkTextSecondary
-                                                        : AppColors
-                                                              .lightTextSecondary,
-                                                  ),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                  }
-                                  return FutureBuilder<List<TipModel>>(
-                                    future:
-                                        Future.wait(
-                                          provider.favorites.map((
-                                            favorite,
-                                          ) async {
-                                            final tip = await DataRepository
-                                                .instance
-                                                .getTip(favorite.tipId);
-                                            return tip;
-                                          }).toList(),
-                                        ).then(
-                                          (tips) => tips
-                                              .where((tip) => tip != null)
-                                              .cast<TipModel>()
-                                              .toList(),
-                                        ),
-                                    builder: (context, snapshot) {
-                                      if (snapshot.connectionState ==
-                                          ConnectionState.waiting) {
-                                        return _buildShimmerUI(context);
-                                      }
-                                      if (snapshot.hasError) {
-                                        log(
-                                          'Error loading favorites: ${snapshot.error}',
-                                          name: 'FavoriteScreen',
-                                        );
-                                        return SliverToBoxAdapter(
-                                          child: Column(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            children: [
-                                              Lottie.asset(
-                                                'assets/animations/no_fav.json',
-                                                width: 300.w,
-                                                height: 300.h,
-                                                fit: BoxFit.contain,
-                                              ),
-                                              SizedBox(height: 8.h),
-                                              Text(
-                                                'Error loading favorites',
-                                                style: theme
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(
-                                                      fontSize: 16.sp,
-                                                      color: isDarkMode
-                                                          ? AppColors
-                                                                .darkTextSecondary
-                                                          : AppColors
-                                                                .lightTextSecondary,
-                                                    ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                              SizedBox(height: 8.h),
-                                              ElevatedButton(
-                                                onPressed: () {
-                                                  provider.loadFavorites(
-                                                    _userId!,
-                                                  );
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor:
-                                                      AppColors.primary,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                          12.r,
-                                                        ),
-                                                  ),
-                                                ),
-                                                child: Text(
-                                                  'Retry',
-                                                  style: theme
-                                                      .textTheme
-                                                      .labelLarge
-                                                      ?.copyWith(
-                                                        fontSize: 14.sp,
-                                                        color: AppColors
-                                                            .lightBackground,
-                                                      ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                      final favoriteTips = snapshot.data ?? [];
-                                      final filteredTips = _filterTips(
-                                        favoriteTips,
-                                      );
-                                      if (filteredTips.isEmpty) {
-                                        return SliverToBoxAdapter(
-                                          child: Container(
-                                            padding: EdgeInsets.all(10.w),
-                                            margin: EdgeInsets.symmetric(
-                                              vertical: 5.h,
-                                            ),
-                                            child: Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Lottie.asset(
-                                                  'assets/animations/no_fav.json',
-                                                  width: 300.w,
-                                                  height: 300.h,
-                                                  fit: BoxFit.contain,
-                                                ),
-                                                SizedBox(height: 5.h),
-                                                Text(
-                                                  'No favorite tips available.\nTo add to favorites, please click the heart icon.',
-                                                  style: theme
-                                                      .textTheme
-                                                      .bodyMedium
-                                                      ?.copyWith(
-                                                        fontSize: 16.sp,
-                                                        color: isDarkMode
-                                                            ? AppColors
-                                                                  .darkTextSecondary
-                                                            : AppColors
-                                                                  .lightTextSecondary,
-                                                      ),
-                                                  textAlign: TextAlign.center,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      }
-                                      return SliverList(
-                                        delegate: SliverChildBuilderDelegate((
-                                          context,
-                                          index,
-                                        ) {
-                                          final tip = filteredTips[index];
-                                          return Padding(
-                                            padding: EdgeInsets.only(
-                                              bottom: 12.h,
-                                            ),
-                                            child: _buildTipCard(
-                                              tip,
-                                              theme,
-                                              isDarkMode,
-                                              filteredTips,
-                                            ),
-                                          );
-                                        }, childCount: filteredTips.length),
-                                      );
-                                    },
+                                    ),
                                   );
-                                },
-                              ),
+                                }
+
+                                // Organize content by type with section headers
+                                final organizedContent = _organizeContentByType(filteredTips, theme, isDarkMode);
+
+                                return SliverList(
+                                  delegate: SliverChildBuilderDelegate(
+                                        (context, index) {
+                                      return organizedContent[index];
+                                    },
+                                    childCount: organizedContent.length,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ),
                     ],
                   );
@@ -954,5 +1069,12 @@ class _FavoriteScreenState extends State<FavoriteScreen> {
     _searchQuery.dispose();
     _isSearchActive.dispose();
     super.dispose();
+  }
+}
+
+// Extension method to capitalize first letter of a string
+extension StringExtension on String {
+  String capitalize() {
+    return this.isEmpty ? this : '${this[0].toUpperCase()}${this.substring(1)}';
   }
 }

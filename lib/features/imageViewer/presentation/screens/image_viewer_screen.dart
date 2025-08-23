@@ -16,8 +16,27 @@ import 'package:carousel_slider/carousel_slider.dart';
 import 'dart:io';
 import 'dart:developer';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
 import '../../../subscription/presentation/providers/premium_status_provider.dart';
+
+class CustomCacheManager extends CacheManager {
+  static const key = 'customImageCache';
+  static final CustomCacheManager _instance = CustomCacheManager._();
+
+  factory CustomCacheManager() {
+    return _instance;
+  }
+
+  CustomCacheManager._()
+      : super(Config(
+    key,
+    stalePeriod: const Duration(days: 30),
+    maxNrOfCacheObjects: 200,
+    fileService: HttpFileService(),
+  ));
+}
 
 class ImageViewerScreen extends StatefulWidget {
   final TipModel tip;
@@ -40,11 +59,11 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   int _currentIndex = 0;
-  bool _isFavorite = false;
   bool _showControls = true;
   bool _isDownloading = false;
   bool _isFullScreen = false;
   String? _categoryName;
+  final CustomCacheManager _cacheManager = CustomCacheManager();
 
   @override
   void initState() {
@@ -60,24 +79,31 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
       curve: Curves.easeInOut,
     );
     _animationController.forward();
-    _initializeFavorite();
+
+    // Load favorites initially
+    _loadFavorites();
     _fetchCategoryName();
+
+    // Precache images for better performance
+    _precacheImages();
   }
 
-  void _initializeFavorite() {
+  void _precacheImages() {
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
+    for (var tip in widget.imageTips) {
+      if (tip.imageUrl != null && tip.imageUrl!.isNotEmpty && (!tip.isPremium || canAccessPremium)) {
+        _cacheManager.getSingleFile(tip.imageUrl!).catchError((e) {
+          debugPrint('Error precaching image ${tip.imageUrl}: $e');
+        });
+      }
+    }
+  }
+
+  void _loadFavorites() {
     final userId = AuthService().getCurrentUser()?.uid ?? '';
     if (userId.isNotEmpty) {
-      final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
-      favoritesProvider.loadFavorites(userId).then((_) {
-        if (mounted) {
-          setState(() {
-            _isFavorite = favoritesProvider.isFavorite(
-              widget.imageTips[_currentIndex].tipsId,
-              userId,
-            );
-          });
-        }
-      });
+      // Load favorites but don't set state here, we'll use Consumer to react to changes
+      Provider.of<FavoritesProvider>(context, listen: false).loadFavorites(userId);
     }
   }
 
@@ -110,31 +136,39 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
 
   void _toggleFavorite() {
     final userId = AuthService().getCurrentUser()?.uid ?? '';
-    if (userId.isNotEmpty) {
-      final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
-
-      HapticFeedback.lightImpact();
-
-      if (_isFavorite) {
-        final favorite = favoritesProvider.favorites.firstWhere(
-              (f) => f.tipId == widget.imageTips[_currentIndex].tipsId && f.userId == userId,
-          orElse: () => FavoriteModel(id: '', tipId: widget.imageTips[_currentIndex].tipsId, userId: userId),
-        );
-        favoritesProvider.deleteFavorite(favorite.id);
-      } else {
-        final favorite = FavoriteModel(
-          id: '${userId}_${widget.imageTips[_currentIndex].tipsId}',
-          tipId: widget.imageTips[_currentIndex].tipsId,
-          userId: userId,
-        );
-        favoritesProvider.addFavorite(favorite);
-      }
-
-      setState(() {
-        _isFavorite = !_isFavorite;
-      });
-    } else {
+    if (userId.isEmpty) {
       _showSnackBar('Please log in to add favorites', isError: true);
+      return;
+    }
+
+    // Check for premium status if current tip is premium
+    final isPremiumContent = widget.imageTips[_currentIndex].isPremium ?? false;
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
+
+    if (isPremiumContent && !canAccessPremium) {
+      _showSnackBar('Subscription required to favorite premium content', isError: true);
+      return;
+    }
+
+    final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+    final currentTipId = widget.imageTips[_currentIndex].tipsId;
+    final isFavorite = favoritesProvider.isFavorite(currentTipId, userId);
+
+    HapticFeedback.lightImpact();
+
+    if (isFavorite) {
+      final favorite = favoritesProvider.favorites.firstWhere(
+            (f) => f.tipId == currentTipId && f.userId == userId,
+        orElse: () => FavoriteModel(id: '', tipId: currentTipId, userId: userId),
+      );
+      favoritesProvider.deleteFavorite(favorite.id);
+    } else {
+      final favorite = FavoriteModel(
+        id: '${userId}_$currentTipId',
+        tipId: currentTipId,
+        userId: userId,
+      );
+      favoritesProvider.addFavorite(favorite);
     }
   }
 
@@ -177,11 +211,18 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
         ),
       );
 
-      final response = await http.get(Uri.parse(currentTip.imageUrl!));
-      final bytes = response.bodyBytes;
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/image_${currentTip.tipsId}.jpg');
-      await file.writeAsBytes(bytes);
+      // Try to get cached file first
+      File file;
+      try {
+        file = await _cacheManager.getSingleFile(currentTip.imageUrl!);
+      } catch (e) {
+        // If cache fails, download directly
+        final response = await http.get(Uri.parse(currentTip.imageUrl!));
+        final bytes = response.bodyBytes;
+        final directory = await getTemporaryDirectory();
+        file = File('${directory.path}/image_${currentTip.tipsId}.jpg');
+        await file.writeAsBytes(bytes);
+      }
 
       if (mounted) Navigator.pop(context);
 
@@ -190,11 +231,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
         subject: 'Check out this image!',
       );
 
-      Future.delayed(const Duration(seconds: 5), () {
-        file.delete().catchError((e) {
-          log('Failed to delete shared file: $e', name: 'ImageViewerScreen');
-        });
-      });
+      // Don't delete cached files, keep them for future use
     } catch (e) {
       if (mounted) Navigator.pop(context);
       _showSnackBar('Failed to share image', isError: true);
@@ -203,9 +240,11 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
   }
 
   Future<void> _downloadImage() async {
+    final isPremiumContent = widget.imageTips[_currentIndex].isPremium ?? false;
     final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
-    if (!canAccessPremium) {
-      _showSnackBar('Subscription required to download', isError: true);
+
+    if (isPremiumContent && !canAccessPremium) {
+      _showSnackBar('Subscription required to download premium content', isError: true);
       return;
     }
 
@@ -237,11 +276,21 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
         ),
       );
 
-      final response = await http.get(Uri.parse(currentTip.imageUrl!)).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () => throw Exception('Download timeout'),
-      );
-      final bytes = response.bodyBytes;
+      // Try to get cached file first
+      File sourceFile;
+      try {
+        sourceFile = await _cacheManager.getSingleFile(currentTip.imageUrl!);
+      } catch (e) {
+        // If cache fails, download directly
+        final response = await http.get(Uri.parse(currentTip.imageUrl!)).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () => throw Exception('Download timeout'),
+        );
+        final bytes = response.bodyBytes;
+        final tempDir = await getTemporaryDirectory();
+        sourceFile = File('${tempDir.path}/temp_image_${currentTip.tipsId}.jpg');
+        await sourceFile.writeAsBytes(bytes);
+      }
 
       Directory saveDir;
       if (Platform.isAndroid) {
@@ -254,13 +303,13 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
         await saveDir.create(recursive: true);
       }
 
-      final file = File('${saveDir.path}/wellness_image_${currentTip.tipsId}.jpg');
-      await file.writeAsBytes(bytes);
+      final destFile = File('${saveDir.path}/wellness_image_${currentTip.tipsId}.jpg');
+      await sourceFile.copy(destFile.path);
 
       if (mounted) Navigator.pop(context);
 
       _showSnackBar('Image downloaded to Pictures/Wellness', isError: false);
-      log('Image downloaded to: ${file.path}', name: 'ImageViewerScreen');
+      log('Image downloaded to: ${destFile.path}', name: 'ImageViewerScreen');
     } catch (e) {
       if (mounted) Navigator.pop(context);
       _showSnackBar('Failed to download image', isError: true);
@@ -273,7 +322,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
   void _toggleFullScreen() {
     setState(() {
       _showControls = !_showControls;
-      _isFullScreen = !_showControls; // Updated to sync with showControls
+      _isFullScreen = !_showControls;
       if (_showControls) {
         _animationController.forward();
       } else {
@@ -291,175 +340,220 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final currentTip = widget.imageTips[_currentIndex];
+    final userId = AuthService().getCurrentUser()?.uid ?? '';
 
     return Scaffold(
       backgroundColor: Colors.black,
       extendBodyBehindAppBar: true,
       extendBody: true,
-      appBar: _showControls
-          ? AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true, // Center the title
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.7),
-                Colors.transparent,
-              ],
-            ),
-          ),
-        ),
-        leading: Padding(
-          padding: EdgeInsets.only(left: 16.w),
-          child: IconButton(
-            onPressed: () => Navigator.pop(context),
-            padding: EdgeInsets.zero, // remove default IconButton padding
-            constraints: BoxConstraints(), // remove default size constraints
-            icon: Container(
-              padding: EdgeInsets.all(12.r), // size of background
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(16.r),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
-                  width: 1, // border width
-                ),
-              ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                color: Colors.white,
-                size: 20.sp,
-              ),
-            ),
-          ),
-        ),
+      body: Stack(
+        children: [
+          GestureDetector(
+            onTap: _showControls ? null : _toggleFullScreen,
+            child: CarouselSlider.builder(
+              carouselController: _carouselController,
+              itemCount: widget.imageTips.length,
+              itemBuilder: (context, index, realIndex) {
+                final tip = widget.imageTips[index];
 
-
-        title: Text(
-          _categoryName ?? 'Loading...',
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 16.sp,
-            fontWeight: FontWeight.w600,
-            color: Colors.white,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          Padding(
-            padding: EdgeInsets.only(right: 16.w),
-            child: _buildChipButton(
-              label: '${_currentIndex + 1}/${widget.imageTips.length}',
-            ),
-          ),
-        ],
-      )
-          : null,
-      body: GestureDetector(
-        onTap: _showControls ? null : _toggleFullScreen,
-        child: CarouselSlider.builder(
-          carouselController: _carouselController,
-          itemCount: widget.imageTips.length,
-          itemBuilder: (context, index, realIndex) {
-            final tip = widget.imageTips[index];
-            final isCurrent = index == _currentIndex;
-
-            return Container(
-              height: double.infinity,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                image: tip.imageUrl != null
-                    ? DecorationImage(
-                  image: NetworkImage(tip.imageUrl!),
-                  fit: BoxFit.cover,
-                  onError: (exception, stackTrace) {
-                    // Handle image load error
-                  },
-                )
-                    : null,
-                color: tip.imageUrl == null ? Colors.grey.shade900 : null,
-              ),
-              child: tip.imageUrl == null
-                  ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.image_not_supported_rounded,
-                      size: 48.sp,
-                      color: Colors.white54,
-                    ),
-                    SizedBox(height: 16.h),
-                    Text(
-                      'No image available',
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 14.sp,
-                        color: Colors.white54,
+                return tip.imageUrl != null
+                    ? CachedNetworkImage(
+                  imageUrl: tip.imageUrl!,
+                  cacheManager: _cacheManager,
+                  imageBuilder: (context, imageProvider) => Container(
+                    height: double.infinity,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      image: DecorationImage(
+                        image: imageProvider,
+                        fit: BoxFit.cover,
                       ),
                     ),
-                  ],
-                ),
-              )
-                  : null,
-            );
-          },
-          options: CarouselOptions(
-            initialPage: _currentIndex,
-            viewportFraction: 1.0,
-            height: double.infinity,
-            enableInfiniteScroll: false,
-            scrollDirection: Axis.vertical,
-            pageSnapping: true,
-            onPageChanged: (index, reason) {
-              setState(() {
-                _currentIndex = index;
-                _initializeFavorite();
-                _fetchCategoryName();
-              });
-            },
+                  ),
+                  placeholder: (context, url) => Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primary,
+                        strokeWidth: 2.w,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Container(
+                    color: Colors.grey.shade900,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.image_not_supported_rounded,
+                            size: 48.sp,
+                            color: Colors.white54,
+                          ),
+                          SizedBox(height: 16.h),
+                          Text(
+                            'Failed to load image',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 14.sp,
+                              color: Colors.white54,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+                    : Container(
+                  color: Colors.grey.shade900,
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_rounded,
+                          size: 48.sp,
+                          color: Colors.white54,
+                        ),
+                        SizedBox(height: 16.h),
+                        Text(
+                          'No image available',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 14.sp,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+              options: CarouselOptions(
+                initialPage: _currentIndex,
+                viewportFraction: 1.0,
+                height: double.infinity,
+                enableInfiniteScroll: false,
+                scrollDirection: Axis.vertical,
+                pageSnapping: true,
+                onPageChanged: (index, reason) {
+                  setState(() {
+                    _currentIndex = index;
+                    _fetchCategoryName();
+                  });
+                },
+              ),
+            ),
           ),
-        ),
+          if (_showControls)
+            Positioned(
+              top: 30,
+              left: 0,
+              right: 0,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Container(
+                  height: 50.h,
+                  color: Colors.transparent, // Matches Scaffold background
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          color: Colors.white,
+                          size: 20.sp,
+                        ),
+                        padding: EdgeInsets.all(8.r),
+                        constraints: BoxConstraints(),
+                      ),
+                      Expanded(
+                        child: Text(
+                          _categoryName ?? 'Loading...',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      _buildChipButton(
+                        label: '${_currentIndex + 1}/${widget.imageTips.length}',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (_showControls)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.7),
+                        Colors.transparent,
+                      ],
+                      stops: [0.0, 1.0],
+                    ),
+                  ),
+                  padding: EdgeInsets.only(bottom: 30.h, top: 20.h),
+                  child: Consumer2<FavoritesProvider, PremiumStatusProvider>(
+                    builder: (context, favoritesProvider, premiumProvider, _) {
+                      final currentTipId = widget.imageTips[_currentIndex].tipsId;
+                      final isFavorite = favoritesProvider.isFavorite(currentTipId, userId);
+                      final isPremiumContent = widget.imageTips[_currentIndex].isPremium ?? false;
+                      final canAccessPremium = premiumProvider.canAccessPremium;
+
+                      return Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildActionButton(
+                            onPressed: _toggleFavorite,
+                            icon: isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            isActive: isFavorite,
+                            activeColor: Colors.red,
+                            label: 'Favorite',
+                            isPremium: isPremiumContent && !canAccessPremium,
+                          ),
+                          _buildActionButton(
+                            onPressed: _shareImage,
+                            icon: Icons.share_rounded,
+                            label: 'Share',
+                          ),
+                          _buildActionButton(
+                            onPressed: _isDownloading ? null : _downloadImage,
+                            icon: Icons.download_rounded,
+                            label: 'Download',
+                            isLoading: _isDownloading,
+                            isPremium: isPremiumContent && !canAccessPremium,
+                          ),
+                          _buildActionButton(
+                            onPressed: _toggleFullScreen,
+                            icon: _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                            label: _isFullScreen ? 'Exit' : 'Fullscreen',
+                            isActive: false,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
-      bottomNavigationBar: _showControls
-          ? Container(
-        padding: EdgeInsets.symmetric(vertical: 10.h),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _buildActionButton(
-              onPressed: _toggleFavorite,
-              icon: _isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-              isActive: _isFavorite,
-              activeColor: Colors.red,
-              label: 'Favorite',
-            ),
-            _buildActionButton(
-              onPressed: _shareImage,
-              icon: Icons.share_rounded,
-              label: 'Share',
-            ),
-            _buildActionButton(
-              onPressed: _isDownloading ? null : _downloadImage,
-              icon: Icons.download_rounded,
-              label: 'Download',
-              isLoading: _isDownloading,
-            ),
-            _buildActionButton(
-              onPressed: _toggleFullScreen,
-              icon: _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
-              label: _isFullScreen ? 'Exit' : 'Fullscreen',
-              isActive: false,
-            ),
-          ],
-        ),
-      )
-          : null,
     );
   }
 
@@ -470,6 +564,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
     bool isActive = false,
     Color? activeColor,
     bool isLoading = false,
+    bool isPremium = false,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -482,7 +577,6 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
             child: Container(
               padding: EdgeInsets.all(12.r),
               decoration: BoxDecoration(
-                // Neutral styles only - no active background, border, or shadow changes
                 color: Colors.white.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(16.r),
                 border: Border.all(
@@ -497,24 +591,39 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
                   ),
                 ],
               ),
-              child: isLoading
-                  ? SizedBox(
-                width: 24.sp,
-                height: 24.sp,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withOpacity(0.8),
-                  ),
-                ),
-              )
-                  : Icon(
-                icon,
-                // Only apply active color to the icon when active
-                color: isActive
-                    ? (activeColor ?? AppColors.primary)
-                    : Colors.white,
-                size: 24.sp,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  if (isLoading)
+                    SizedBox(
+                      width: 24.sp,
+                      height: 24.sp,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white.withOpacity(0.8),
+                        ),
+                      ),
+                    )
+                  else
+                    Icon(
+                      icon,
+                      color: isActive
+                          ? (activeColor ?? AppColors.primary)
+                          : Colors.white,
+                      size: 24.sp,
+                    ),
+                  if (isPremium)
+                    Positioned(
+                      right: -4,
+                      top: -4,
+                      child: Icon(
+                        Icons.lock,
+                        color: Colors.amber,
+                        size: 14.sp,
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -526,7 +635,7 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
             fontFamily: 'Poppins',
             fontSize: 11.sp,
             fontWeight: FontWeight.w600,
-            color: Colors.white.withOpacity(0.7), // Removed active color for label
+            color: Colors.white.withOpacity(0.7),
           ),
         ),
       ],
@@ -534,72 +643,30 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
   }
 
   Widget _buildChipButton({required String label}) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w),
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: EdgeInsets.all(8.r),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 12.sp,
-              fontWeight: FontWeight.w500,
-              color: Colors.white,
-            ),
-          ),
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+          width: 1.5,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 8,
+            spreadRadius: 0,
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildFullScreenButton() {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: _toggleFullScreen,
-        borderRadius: BorderRadius.circular(16.r),
-        child: Container(
-          padding: EdgeInsets.all(12.r),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
-                spreadRadius: 0,
-              ),
-            ],
-          ),
-          child: Tooltip(
-            message: _isFullScreen ? "Exit Fullscreen" : "Fullscreen",
-            child: Icon(
-              _isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
-              color: Colors.white,
-              size: 24.sp,
-            ),
-          ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontFamily: 'Poppins',
+          fontSize: 12.sp,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
         ),
       ),
     );

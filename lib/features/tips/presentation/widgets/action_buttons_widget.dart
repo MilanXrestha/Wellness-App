@@ -33,22 +33,25 @@ class ActionButtonsWidget extends StatelessWidget {
 
   Widget _buildActionButton({
     required IconData icon,
-    required Color color,
+    required Color iconColor,
     required VoidCallback onPressed,
     required String tooltip,
     Widget? child,
+    Color? borderColor,
   }) {
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: Colors.transparent,
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: borderColor ??
+              (isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary)
+                  .withOpacity(0.3),
           width: 1.5.w,
         ),
       ),
       child: IconButton(
-        icon: child ?? Icon(icon, size: 28.sp, color: color),
+        icon: child ?? Icon(icon, size: 28.sp, color: iconColor),
         onPressed: onPressed,
         tooltip: tooltip,
       ),
@@ -66,7 +69,7 @@ class ActionButtonsWidget extends StatelessWidget {
         children: [
           _buildActionButton(
             icon: isFavorite ? Icons.favorite : Icons.favorite_border,
-            color: isFavorite
+            iconColor: isFavorite
                 ? Colors.redAccent
                 : (isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary),
             onPressed: onToggleFavorite,
@@ -75,14 +78,14 @@ class ActionButtonsWidget extends StatelessWidget {
           SizedBox(width: 20.w),
           _buildActionButton(
             icon: Icons.share,
-            color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            iconColor: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
             onPressed: onShare,
             tooltip: 'Share',
           ),
           SizedBox(width: 20.w),
           _buildActionButton(
             icon: isSlideshowEnabled ? Icons.pause : Icons.play_arrow,
-            color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+            iconColor: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
             onPressed: onToggleSlideshow,
             tooltip: isSlideshowEnabled ? 'Pause Slideshow' : 'Start Slideshow',
             child: isSlideshowEnabled
@@ -112,7 +115,7 @@ class ActionButtonsWidget extends StatelessWidget {
                 SizedBox(width: 20.w),
                 _buildActionButton(
                   icon: isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
-                  color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                  iconColor: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
                   onPressed: onToggleFullScreen,
                   tooltip: isFullScreen ? 'Exit Full Screen' : 'Enter Full Screen',
                 ),

@@ -100,6 +100,12 @@ message TipModel {
     optional string thumbnailUrl = 14;
     optional string mediaDuration = 15;
     optional string imageUrl = 16;
+    // New fields for video stats and classification
+    int32 viewCount = 17;
+    int32 likeCount = 18;
+    int32 commentCount = 19;
+    int32 durationInSeconds = 20;
+    bool isShort = 21;
 }
 
 // UserModel represents a user's profile information.
@@ -126,4 +132,25 @@ message UserPreferenceModel {
     string userId = 1;
     repeated UserPreferenceEntry preferences = 2;
     optional string updatedAt = 3; // ISO 8601 string
+}
+
+// CommentModel represents a comment on a video or content
+message CommentModel {
+    string id = 1;
+    string tipsId = 2;
+    string userId = 3;
+    string userName = 4;
+    string userPhotoUrl = 5;
+    string text = 6;
+    string createdAt = 7; // ISO 8601 string
+    optional string parentId = 8; // For replies, null for top-level comments
+    int32 likeCount = 9;
+}
+
+// LikeModel represents a user's like on a video or content
+message LikeModel {
+    string id = 1; // Usually formatted as userId_tipId
+    string tipsId = 2;
+    string userId = 3;
+    string createdAt = 4; // ISO 8601 string
 }

@@ -2,12 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
-
 import '../../../subscription/presentation/providers/premium_status_provider.dart';
 
 class TipCard extends StatefulWidget {
@@ -54,9 +52,7 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final canAccessPremium = Provider.of<PremiumStatusProvider>(
-      context,
-    ).canAccessPremium;
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(context).canAccessPremium;
     if (widget.tip.isPremium && !canAccessPremium) {
       _shakeController.repeat();
     } else {
@@ -198,165 +194,130 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
         final canAccessPremium = premiumStatus.canAccessPremium;
         final isPremiumLocked = widget.tip.isPremium && !canAccessPremium;
 
-        return Container(
-          width: 295.w,
-          height: 150.h,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12.r),
-            boxShadow: [
-              BoxShadow(
-                color: widget.isDarkMode
-                    ? AppColors.darkSurface.withOpacity(0.1)
-                    : Colors.black.withAlpha(6),
-                blurRadius: 5.r,
-                spreadRadius: 0.5.r,
-                offset: Offset(0, 1.h),
+        return GestureDetector(
+          onTap: () {
+            if (isPremiumLocked) {
+              _showPremiumDialog(context);
+            } else {
+              Navigator.pushNamed(
+                context,
+                RoutesName.tipsDetailScreen,
+                arguments: {
+                  'tip': widget.tip,
+                  'categoryName': widget.categoryName,
+                  'featuredTips': widget.featuredTips,
+                  'allHealthTips': false,
+                  'allQuotes': false,
+                },
+              );
+            }
+          },
+          child: Container(
+            width: 290.w,
+            height: 150.h,
+            margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20.r),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: widget.isDarkMode
+                    ? [AppColors.darkSurface, AppColors.darkSecondary.withOpacity(0.9)]
+                    : [AppColors.lightBackground, AppColors.lightSurface],
               ),
-              BoxShadow(
+              boxShadow: [
+                BoxShadow(
+                  color: widget.isDarkMode ? AppColors.shadow : AppColors.shadow.withOpacity(0.3),
+                  offset: Offset(0, 2.h),
+                  blurRadius: 4.r,
+                  spreadRadius: widget.isDarkMode ? 0.3.r : 0.r,
+                ),
+              ],
+              border: Border.all(
                 color: widget.isDarkMode
-                    ? AppColors.darkSurface.withOpacity(0.1)
-                    : Colors.black.withAlpha(6),
-                blurRadius: 5.r,
-                spreadRadius: 0.5.r,
-                offset: Offset(1.w, 0),
-              ),
-            ],
-          ),
-          child: Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12.r),
-              side: BorderSide(
-                color: widget.isDarkMode
-                    ? Colors.grey.shade600
-                    : Colors.grey.shade400,
-                width: 1.w,
+                    ? AppColors.darkTextSecondary.withOpacity(0.3)
+                    : AppColors.lightTextSecondary.withOpacity(0.2),
+                width: widget.isDarkMode ? 1.5.w : 1.w,
               ),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    color: widget.isDarkMode ? null : Colors.white,
-                    gradient: widget.isDarkMode
-                        ? LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              AppColors.darkSurface,
-                              AppColors.darkSurface.withOpacity(0.7),
-                            ],
-                          )
-                        : null,
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Stack(
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          if (widget.tip.isPremium && !canAccessPremium) {
-                            _showPremiumDialog(context);
-                          } else {
-                            Navigator.pushNamed(
-                              context,
-                              RoutesName.tipsDetailScreen,
-                              arguments: {
-                                'tip': widget.tip,
-                                'categoryName': widget.categoryName,
-                                'featuredTips': widget.featuredTips,
-                                'allHealthTips': false,
-                                'allQuotes': false,
-                              },
-                            );
-                          }
-                        },
-                        child: Padding(
-                          padding: EdgeInsets.all(12.w),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20.r),
+              child: Stack(
+                children: [
+                  // Main content
+                  Padding(
+                    padding: EdgeInsets.all(12.w),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: EdgeInsets.only(bottom: 6.h),
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: AppColors.darkSecondary.withOpacity(0.1),
+                                width: 1.w,
+                              ),
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              Container(
-                                padding: EdgeInsets.only(bottom: 6.h),
-                                decoration: BoxDecoration(
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: AppColors.darkSecondary
-                                          .withOpacity(0.1),
-                                      width: 1.w,
-                                    ),
+                              Padding(
+                                padding: EdgeInsets.only(right: 8.w),
+                                child: SvgPicture.asset(
+                                  'assets/icons/svg/ic_inspiration.svg',
+                                  width: 24.r,
+                                  height: 24.r,
+                                  colorFilter: ColorFilter.mode(
+                                    widget.isDarkMode ? AppColors.primary : Colors.black,
+                                    BlendMode.srcIn,
                                   ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Padding(
-                                      padding: EdgeInsets.only(right: 8.w),
-                                      child: SvgPicture.asset(
-                                        'assets/icons/svg/ic_inspiration.svg',
-                                        width: 24.r,
-                                        height: 24.r,
-                                        colorFilter: ColorFilter.mode(
-                                          widget.isDarkMode
-                                              ? AppColors.primary
-                                              : Colors.black,
-                                          BlendMode.srcIn,
-                                        ),
-                                        semanticsLabel: 'Inspiration icon',
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Text(
-                                        widget.tip.tipsTitle,
-                                        style: widget.theme.textTheme.bodyMedium
-                                            ?.copyWith(
-                                              fontSize: 14.sp,
-                                              fontFamily: 'Poppins',
-                                              color: widget.isDarkMode
-                                                  ? AppColors.darkTextPrimary
-                                                  : AppColors.lightTextPrimary,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
+                                  semanticsLabel: 'Inspiration icon',
                                 ),
                               ),
-                              SizedBox(height: 6.h),
-                              Flexible(
+                              Expanded(
                                 child: Text(
-                                  widget.tip.tipsDescription,
-                                  style: widget.theme.textTheme.bodySmall
-                                      ?.copyWith(
-                                        fontSize: 14.sp,
-                                        fontFamily: 'Poppins',
-                                        color: widget.isDarkMode
-                                            ? AppColors.darkTextSecondary
-                                            : AppColors.lightTextSecondary,
-                                      ),
-                                  maxLines: 10,
+                                  widget.tip.tipsTitle,
+                                  style: widget.theme.textTheme.bodyMedium?.copyWith(
+                                    fontSize: 14.sp,
+                                    fontFamily: 'Poppins',
+                                    color: widget.isDarkMode
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  textAlign: TextAlign.justify,
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                    ],
+                        SizedBox(height: 6.h),
+                        Flexible(
+                          child: Text(
+                            widget.tip.tipsDescription,
+                            style: widget.theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 14.sp,
+                              fontFamily: 'Poppins',
+                              color: widget.isDarkMode
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary,
+                            ),
+                            maxLines: 10,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.justify,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
 
-                // Premium locked overlay
-                if (isPremiumLocked)
-                  Positioned.fill(
-                    child: GestureDetector(
-                      onTap: () {
-                        _showPremiumDialog(context);
-                      },
+                  // Premium locked overlay
+                  if (isPremiumLocked)
+                    Positioned.fill(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12.r),
+                        borderRadius: BorderRadius.circular(20.r),
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 4.0, sigmaY: 4.0),
                           child: Container(
@@ -398,52 +359,67 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                         ),
                       ),
                     ),
-                  ),
 
-                // Premium indicator badge
-                if (widget.tip.isPremium)
-                  Positioned(
-                    top: 6.h,
-                    right: 8.w,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 10.w,
-                        vertical: 6.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.yellow,
-                        borderRadius: BorderRadius.circular(10.r),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 4.r,
-                            offset: Offset(0, 2.h),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.workspace_premium,
-                            size: 14.sp,
-                            color: Colors.black87,
-                          ),
-                          SizedBox(width: 4.w),
-                          Text(
-                            'PREMIUM',
-                            style: TextStyle(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                              letterSpacing: 0.5,
+                  // Premium indicator badge
+                  if (widget.tip.isPremium)
+                    Positioned(
+                      top: 6.h,
+                      right: 8.w,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10.w,
+                          vertical: 6.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.yellow,
+                          borderRadius: BorderRadius.circular(10.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 4.r,
+                              offset: Offset(0, 2.h),
                             ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.workspace_premium,
+                              size: 14.sp,
+                              color: Colors.black87,
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'PREMIUM',
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Subtle border highlight
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20.r),
+                          border: Border.all(
+                            color: AppColors.darkSecondary.withOpacity(0.1),
+                            width: 1.w,
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-              ],
+                ],
+              ),
             ),
           ),
         );

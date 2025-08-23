@@ -59,7 +59,7 @@ class FeaturedQuotesWidgetState extends State<FeaturedQuotesWidget> {
   void _startAutoScroll() {
     _autoScrollTimer?.cancel();
     if (widget.featuredTips.isNotEmpty) {
-      _autoScrollTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
         if (mounted && _pageController.hasClients) {
           setState(() {
             // Move to the next quote, looping back to the start if at the end.

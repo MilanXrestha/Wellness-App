@@ -979,6 +979,11 @@ class TipModel extends $pb.GeneratedMessage {
     $core.String? thumbnailUrl,
     $core.String? mediaDuration,
     $core.String? imageUrl,
+    $core.int? viewCount,
+    $core.int? likeCount,
+    $core.int? commentCount,
+    $core.int? durationInSeconds,
+    $core.bool? isShort,
   }) {
     final result = create();
     if (tipsId != null) result.tipsId = tipsId;
@@ -997,6 +1002,11 @@ class TipModel extends $pb.GeneratedMessage {
     if (thumbnailUrl != null) result.thumbnailUrl = thumbnailUrl;
     if (mediaDuration != null) result.mediaDuration = mediaDuration;
     if (imageUrl != null) result.imageUrl = imageUrl;
+    if (viewCount != null) result.viewCount = viewCount;
+    if (likeCount != null) result.likeCount = likeCount;
+    if (commentCount != null) result.commentCount = commentCount;
+    if (durationInSeconds != null) result.durationInSeconds = durationInSeconds;
+    if (isShort != null) result.isShort = isShort;
     return result;
   }
 
@@ -1031,6 +1041,17 @@ class TipModel extends $pb.GeneratedMessage {
     ..aOS(15, _omitFieldNames ? '' : 'mediaDuration',
         protoName: 'mediaDuration')
     ..aOS(16, _omitFieldNames ? '' : 'imageUrl', protoName: 'imageUrl')
+    ..a<$core.int>(17, _omitFieldNames ? '' : 'viewCount', $pb.PbFieldType.O3,
+        protoName: 'viewCount')
+    ..a<$core.int>(18, _omitFieldNames ? '' : 'likeCount', $pb.PbFieldType.O3,
+        protoName: 'likeCount')
+    ..a<$core.int>(
+        19, _omitFieldNames ? '' : 'commentCount', $pb.PbFieldType.O3,
+        protoName: 'commentCount')
+    ..a<$core.int>(
+        20, _omitFieldNames ? '' : 'durationInSeconds', $pb.PbFieldType.O3,
+        protoName: 'durationInSeconds')
+    ..aOB(21, _omitFieldNames ? '' : 'isShort', protoName: 'isShort')
     ..hasRequiredFields = false;
 
   @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
@@ -1189,6 +1210,52 @@ class TipModel extends $pb.GeneratedMessage {
   $core.bool hasImageUrl() => $_has(15);
   @$pb.TagNumber(16)
   void clearImageUrl() => $_clearField(16);
+
+  /// New fields for video stats and classification
+  @$pb.TagNumber(17)
+  $core.int get viewCount => $_getIZ(16);
+  @$pb.TagNumber(17)
+  set viewCount($core.int value) => $_setSignedInt32(16, value);
+  @$pb.TagNumber(17)
+  $core.bool hasViewCount() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearViewCount() => $_clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.int get likeCount => $_getIZ(17);
+  @$pb.TagNumber(18)
+  set likeCount($core.int value) => $_setSignedInt32(17, value);
+  @$pb.TagNumber(18)
+  $core.bool hasLikeCount() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearLikeCount() => $_clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.int get commentCount => $_getIZ(18);
+  @$pb.TagNumber(19)
+  set commentCount($core.int value) => $_setSignedInt32(18, value);
+  @$pb.TagNumber(19)
+  $core.bool hasCommentCount() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearCommentCount() => $_clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.int get durationInSeconds => $_getIZ(19);
+  @$pb.TagNumber(20)
+  set durationInSeconds($core.int value) => $_setSignedInt32(19, value);
+  @$pb.TagNumber(20)
+  $core.bool hasDurationInSeconds() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearDurationInSeconds() => $_clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.bool get isShort => $_getBF(20);
+  @$pb.TagNumber(21)
+  set isShort($core.bool value) => $_setBool(20, value);
+  @$pb.TagNumber(21)
+  $core.bool hasIsShort() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearIsShort() => $_clearField(21);
 }
 
 /// UserModel represents a user's profile information.
@@ -1476,6 +1543,251 @@ class UserPreferenceModel extends $pb.GeneratedMessage {
   $core.bool hasUpdatedAt() => $_has(2);
   @$pb.TagNumber(3)
   void clearUpdatedAt() => $_clearField(3);
+}
+
+/// CommentModel represents a comment on a video or content
+class CommentModel extends $pb.GeneratedMessage {
+  factory CommentModel({
+    $core.String? id,
+    $core.String? tipsId,
+    $core.String? userId,
+    $core.String? userName,
+    $core.String? userPhotoUrl,
+    $core.String? text,
+    $core.String? createdAt,
+    $core.String? parentId,
+    $core.int? likeCount,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (tipsId != null) result.tipsId = tipsId;
+    if (userId != null) result.userId = userId;
+    if (userName != null) result.userName = userName;
+    if (userPhotoUrl != null) result.userPhotoUrl = userPhotoUrl;
+    if (text != null) result.text = text;
+    if (createdAt != null) result.createdAt = createdAt;
+    if (parentId != null) result.parentId = parentId;
+    if (likeCount != null) result.likeCount = likeCount;
+    return result;
+  }
+
+  CommentModel._();
+
+  factory CommentModel.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory CommentModel.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'CommentModel',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'wellness'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'tipsId', protoName: 'tipsId')
+    ..aOS(3, _omitFieldNames ? '' : 'userId', protoName: 'userId')
+    ..aOS(4, _omitFieldNames ? '' : 'userName', protoName: 'userName')
+    ..aOS(5, _omitFieldNames ? '' : 'userPhotoUrl', protoName: 'userPhotoUrl')
+    ..aOS(6, _omitFieldNames ? '' : 'text')
+    ..aOS(7, _omitFieldNames ? '' : 'createdAt', protoName: 'createdAt')
+    ..aOS(8, _omitFieldNames ? '' : 'parentId', protoName: 'parentId')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'likeCount', $pb.PbFieldType.O3,
+        protoName: 'likeCount')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommentModel clone() => CommentModel()..mergeFromMessage(this);
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  CommentModel copyWith(void Function(CommentModel) updates) =>
+      super.copyWith((message) => updates(message as CommentModel))
+          as CommentModel;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static CommentModel create() => CommentModel._();
+  @$core.override
+  CommentModel createEmptyInstance() => create();
+  static $pb.PbList<CommentModel> createRepeated() =>
+      $pb.PbList<CommentModel>();
+  @$core.pragma('dart2js:noInline')
+  static CommentModel getDefault() => _defaultInstance ??=
+      $pb.GeneratedMessage.$_defaultFor<CommentModel>(create);
+  static CommentModel? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get tipsId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set tipsId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTipsId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTipsId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get userId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set userId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUserId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUserId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get userName => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set userName($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasUserName() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUserName() => $_clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get userPhotoUrl => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set userPhotoUrl($core.String value) => $_setString(4, value);
+  @$pb.TagNumber(5)
+  $core.bool hasUserPhotoUrl() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearUserPhotoUrl() => $_clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get text => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set text($core.String value) => $_setString(5, value);
+  @$pb.TagNumber(6)
+  $core.bool hasText() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearText() => $_clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get createdAt => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set createdAt($core.String value) => $_setString(6, value);
+  @$pb.TagNumber(7)
+  $core.bool hasCreatedAt() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCreatedAt() => $_clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get parentId => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set parentId($core.String value) => $_setString(7, value);
+  @$pb.TagNumber(8)
+  $core.bool hasParentId() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearParentId() => $_clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get likeCount => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set likeCount($core.int value) => $_setSignedInt32(8, value);
+  @$pb.TagNumber(9)
+  $core.bool hasLikeCount() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearLikeCount() => $_clearField(9);
+}
+
+/// LikeModel represents a user's like on a video or content
+class LikeModel extends $pb.GeneratedMessage {
+  factory LikeModel({
+    $core.String? id,
+    $core.String? tipsId,
+    $core.String? userId,
+    $core.String? createdAt,
+  }) {
+    final result = create();
+    if (id != null) result.id = id;
+    if (tipsId != null) result.tipsId = tipsId;
+    if (userId != null) result.userId = userId;
+    if (createdAt != null) result.createdAt = createdAt;
+    return result;
+  }
+
+  LikeModel._();
+
+  factory LikeModel.fromBuffer($core.List<$core.int> data,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromBuffer(data, registry);
+  factory LikeModel.fromJson($core.String json,
+          [$pb.ExtensionRegistry registry = $pb.ExtensionRegistry.EMPTY]) =>
+      create()..mergeFromJson(json, registry);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(
+      _omitMessageNames ? '' : 'LikeModel',
+      package: const $pb.PackageName(_omitMessageNames ? '' : 'wellness'),
+      createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'id')
+    ..aOS(2, _omitFieldNames ? '' : 'tipsId', protoName: 'tipsId')
+    ..aOS(3, _omitFieldNames ? '' : 'userId', protoName: 'userId')
+    ..aOS(4, _omitFieldNames ? '' : 'createdAt', protoName: 'createdAt')
+    ..hasRequiredFields = false;
+
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikeModel clone() => LikeModel()..mergeFromMessage(this);
+  @$core.Deprecated('See https://github.com/google/protobuf.dart/issues/998.')
+  LikeModel copyWith(void Function(LikeModel) updates) =>
+      super.copyWith((message) => updates(message as LikeModel)) as LikeModel;
+
+  @$core.override
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LikeModel create() => LikeModel._();
+  @$core.override
+  LikeModel createEmptyInstance() => create();
+  static $pb.PbList<LikeModel> createRepeated() => $pb.PbList<LikeModel>();
+  @$core.pragma('dart2js:noInline')
+  static LikeModel getDefault() =>
+      _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LikeModel>(create);
+  static LikeModel? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get id => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set id($core.String value) => $_setString(0, value);
+  @$pb.TagNumber(1)
+  $core.bool hasId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearId() => $_clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get tipsId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set tipsId($core.String value) => $_setString(1, value);
+  @$pb.TagNumber(2)
+  $core.bool hasTipsId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTipsId() => $_clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get userId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set userId($core.String value) => $_setString(2, value);
+  @$pb.TagNumber(3)
+  $core.bool hasUserId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearUserId() => $_clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get createdAt => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set createdAt($core.String value) => $_setString(3, value);
+  @$pb.TagNumber(4)
+  $core.bool hasCreatedAt() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCreatedAt() => $_clearField(4);
 }
 
 const $core.bool _omitFieldNames =

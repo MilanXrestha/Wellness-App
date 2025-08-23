@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
 import 'package:wellness_app/features/categories/data/models/category_model.dart';
 import 'package:wellness_app/features/categories/presentation/screens/category_screen.dart';
 import 'package:wellness_app/features/dashboard/presentation/screens/dashboard_screen.dart';
@@ -11,6 +12,8 @@ import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/common/widgets/custom_alert_dialog.dart';
 import 'package:wellness_app/common/widgets/custom_bottom_nav_bar.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
+import 'package:wellness_app/features/main/presentation/screens/tab_switch_notification.dart';
+import 'package:wellness_app/features/videoPlayer/presentation/screens/short_player_screen.dart';
 import 'dart:developer';
 
 class MainScreen extends StatefulWidget {
@@ -20,7 +23,8 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateMixin {
+class _MainScreenState extends State<MainScreen>
+    with SingleTickerProviderStateMixin {
   int _selectedIndex = 0;
   CategoryModel? _selectedCategory;
   late AnimationController _animationController;
@@ -29,10 +33,12 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   String? _userId;
   bool _isNavBarVisible = true;
   bool _isSearchActive = false;
+  final GlobalKey<ShortsPlayerScreenState> _shortsPlayerKey =
+  GlobalKey<ShortsPlayerScreenState>();
 
   void _setNavBarVisibility(bool isVisible) {
     setState(() {
-      _isSearchActive = !isVisible; // Track search state
+      _isSearchActive = !isVisible;
       _isNavBarVisible = isVisible;
       if (isVisible) {
         _animationController.reverse();
@@ -54,7 +60,8 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
       duration: const Duration(milliseconds: 300),
     );
 
-    _navBarOffset = Tween<Offset>(begin: Offset.zero, end: const Offset(0, 2.0)).animate(
+    _navBarOffset = Tween<Offset>(begin: Offset.zero, end: const Offset(0, 2.0))
+        .animate(
       CurvedAnimation(
         parent: _animationController,
         curve: Curves.easeInOut,
@@ -62,28 +69,39 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     );
 
     _screens = [
-      UserDashboardScreen(
-        onViewAllCategories: _onViewAllCategories,
-      ),
-      ExploreScreen(
-        onSearchActiveChanged: _setNavBarVisibility,
+      UserDashboardScreen(onViewAllCategories: _onViewAllCategories),
+      ExploreScreen(onSearchActiveChanged: _setNavBarVisibility),
+      ShortsPlayerScreen(
+        key: _shortsPlayerKey,
+        categoryName: 'Shorts',
+        tabActive: _selectedIndex == 2,
+        onFullScreenChanged: _setNavBarVisibility,
       ),
       CategoryScreen(
         selectedCategory: _selectedCategory,
         onSearchActiveChanged: _setNavBarVisibility,
       ),
-      FavoriteScreen(
-        onSearchActiveChanged: _setNavBarVisibility,
-      ),
+      FavoriteScreen(onSearchActiveChanged: _setNavBarVisibility),
     ];
   }
 
   void _onItemTapped(int index) {
+    if (_selectedIndex == 2 && index != 2) {
+      _shortsPlayerKey.currentState?.pauseVideo();
+      log('Paused video when switching from Shorts tab', name: 'MainScreen');
+    }
+
     setState(() {
       _selectedIndex = index;
-      if (index == 2) {
+      _screens[2] = ShortsPlayerScreen(
+        key: _shortsPlayerKey,
+        categoryName: 'Shorts',
+        tabActive: index == 2,
+        onFullScreenChanged: _setNavBarVisibility,
+      );
+      if (index == 3) {
         _selectedCategory = null;
-        _screens[2] = CategoryScreen(
+        _screens[3] = CategoryScreen(
           selectedCategory: _selectedCategory,
           onSearchActiveChanged: _setNavBarVisibility,
         );
@@ -96,10 +114,21 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   }
 
   void _onViewAllCategories() {
+    if (_selectedIndex == 2) {
+      _shortsPlayerKey.currentState?.pauseVideo();
+      log('Paused video when navigating to Category tab via View All', name: 'MainScreen');
+    }
+
     setState(() {
-      _selectedIndex = 2;
+      _selectedIndex = 3;
       _selectedCategory = null;
-      _screens[2] = CategoryScreen(
+      _screens[2] = ShortsPlayerScreen(
+        key: _shortsPlayerKey,
+        categoryName: 'Shorts',
+        tabActive: false,
+        onFullScreenChanged: _setNavBarVisibility,
+      );
+      _screens[3] = CategoryScreen(
         selectedCategory: _selectedCategory,
         onSearchActiveChanged: _setNavBarVisibility,
       );
@@ -110,60 +139,81 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
     log('Navigated to Category tab via View All', name: 'MainScreen');
   }
 
-  Future<bool> _onWillPop() async {
+  Future<void> _handlePop(bool didPop, dynamic result) async {
+    if (didPop) {
+      log('Pop already handled, skipping', name: 'MainScreen');
+      return;
+    }
+
+    log('Back button pressed, current tab: $_selectedIndex', name: 'MainScreen');
+
+    // Case 1: Not on dashboard → navigate to dashboard
     if (_selectedIndex != 0) {
+      if (_selectedIndex == 2) {
+        _shortsPlayerKey.currentState?.pauseVideo();
+        log('Paused video when navigating back to Dashboard', name: 'MainScreen');
+      }
       setState(() {
         _selectedIndex = 0;
+        _screens[2] = ShortsPlayerScreen(
+          key: _shortsPlayerKey,
+          categoryName: 'Shorts',
+          tabActive: false,
+          onFullScreenChanged: _setNavBarVisibility,
+        );
         _isNavBarVisible = true;
         _isSearchActive = false;
         _animationController.reverse();
       });
-      return false;
+      log('Navigated to dashboard tab', name: 'MainScreen');
+      return;
+    }
+
+    // Case 2: On dashboard → show exit dialog
+    log('On dashboard, showing exit dialog', name: 'MainScreen');
+
+    final bool exitConfirmed = await CustomAlertDialog.show(
+      context: context,
+      title: 'Exit App',
+      message: 'Do you really want to exit the app?',
+      confirmText: 'Exit',
+      cancelText: 'Cancel',
+    );
+
+    if (exitConfirmed) {
+      log('User confirmed exit, closing app', name: 'MainScreen');
+      SystemNavigator.pop();
     } else {
-      final bool shouldExit = await CustomAlertDialog.show(
-        context: context,
-        title: 'Exit App',
-        message: 'Do you really want to exit the app?',
-        confirmText: 'Exit',
-        cancelText: 'Cancel',
-      );
-      if (shouldExit) {
-        SystemNavigator.pop();
-      }
-      return false;
+      log('User cancelled exit', name: 'MainScreen');
     }
   }
 
-  void _navigateToProfile() {
-    Navigator.pushNamed(context, RoutesName.profileScreen).then((_) {
-      if (mounted) setState(() {});
-    });
-  }
-
-  // Handle scroll notifications to show/hide nav bar
   bool _handleScrollNotification(ScrollNotification notification) {
-    if (_isSearchActive) {
-      // Ignore scroll events when search is active
+    if (_isSearchActive || _selectedIndex == 2) {
       return false;
     }
 
     if (notification is UserScrollNotification) {
-      if (notification.direction == ScrollDirection.reverse && _isNavBarVisible) {
-        setState(() {
-          _isNavBarVisible = false;
-          _animationController.forward();
-        });
-        log('Nav bar hidden due to downward scroll', name: 'MainScreen');
-      } else if (notification.direction == ScrollDirection.forward && !_isNavBarVisible) {
-        setState(() {
-          _isNavBarVisible = true;
-          _animationController.reverse();
-        });
-        log('Nav bar shown due to upward scroll', name: 'MainScreen');
+      // Only react to vertical scrolls
+      if (notification.metrics.axis == Axis.vertical) {
+        if (notification.direction == ScrollDirection.reverse && _isNavBarVisible) {
+          setState(() {
+            _isNavBarVisible = false;
+            _animationController.forward();
+          });
+          log('Nav bar hidden due to downward scroll', name: 'MainScreen');
+        } else if (notification.direction == ScrollDirection.forward && !_isNavBarVisible) {
+          setState(() {
+            _isNavBarVisible = true;
+            _animationController.reverse();
+          });
+          log('Nav bar shown due to upward scroll', name: 'MainScreen');
+        }
       }
     }
     return false;
   }
+
 
   @override
   void dispose() {
@@ -172,45 +222,53 @@ class _MainScreenState extends State<MainScreen> with SingleTickerProviderStateM
   }
 
   @override
-  Widget build(BuildContext context) { // Corrected parameter type from Context to BuildContext
+  Widget build(BuildContext context) {
+    log('Building MainScreen, userId: $_userId', name: 'MainScreen');
     if (_userId == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        log('No userId, redirecting to login screen', name: 'MainScreen');
         Navigator.pushReplacementNamed(context, RoutesName.loginScreen);
       });
       return const Center(child: CircularProgressIndicator());
     }
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
-      child: Scaffold(
-        resizeToAvoidBottomInset: false,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        extendBody: true,
-        body: Stack(
-          children: [
-            NotificationListener<ScrollNotification>(
-              onNotification: _handleScrollNotification,
-              child: IndexedStack(
-                index: _selectedIndex,
-                children: _screens,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        await _handlePop(didPop, result);
+      },
+      child: NotificationListener<TabSwitchNotification>(
+        onNotification: (notification) {
+          _onItemTapped(notification.tabIndex);
+          return true;
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          extendBody: true,
+          body: Stack(
+            children: [
+              NotificationListener<ScrollNotification>(
+                onNotification: _handleScrollNotification,
+                child: IndexedStack(index: _selectedIndex, children: _screens),
               ),
-            ),
-            Positioned(
-              left: 16.w,
-              right: 16.w,
-              bottom: 14.h,
-              child: SlideTransition(
-                position: _navBarOffset,
-                child: Visibility(
-                  visible: _isNavBarVisible,
-                  child: CustomBottomNavBar(
-                    selectedIndex: _selectedIndex,
-                    onItemTapped: _onItemTapped,
+              Positioned(
+                left: 16.w,
+                right: 16.w,
+                bottom: 7.h,
+                child: SlideTransition(
+                  position: _navBarOffset,
+                  child: Visibility(
+                    visible: _isNavBarVisible,
+                    child: CustomBottomNavBar(
+                      selectedIndex: _selectedIndex,
+                      onItemTapped: _onItemTapped,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

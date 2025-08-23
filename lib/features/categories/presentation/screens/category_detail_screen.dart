@@ -1,5 +1,3 @@
-import 'dart:developer';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -10,9 +8,12 @@ import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/core/services/data_repository.dart';
+import 'dart:developer';
+import 'dart:async';
 import '../../../dashboard/presentation/widgets/quote_card.dart';
 import '../../../dashboard/presentation/widgets/tips_card.dart';
 import '../../../audioPlayer/presentation/widgets/audio_card.dart';
+import '../../../videoPlayer/presentation/widgets/short_video_card.dart';
 import '../../../videoPlayer/presentation/widgets/video_player_card.dart';
 import '../../../imageViewer/presentation/widgets/image_card.dart';
 
@@ -74,7 +75,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16.r),
           ),
-          backgroundColor: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface,
+          backgroundColor: isDarkMode
+              ? AppColors.darkSurface
+              : AppColors.lightSurface,
           child: Padding(
             padding: EdgeInsets.all(16.w),
             child: Column(
@@ -89,7 +92,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.bold,
-                        color: isDarkMode ? AppColors.darkTextPrimary : AppColors.primary,
+                        color: isDarkMode
+                            ? AppColors.darkTextPrimary
+                            : AppColors.primary,
                       ),
                     ),
                     IconButton(
@@ -97,7 +102,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                         'assets/icons/svg/ic_clear.svg',
                         width: 22.sp,
                         height: 22.sp,
-                        color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextPrimary,
+                        color: isDarkMode
+                            ? AppColors.darkTextSecondary
+                            : AppColors.lightTextPrimary,
                       ),
                       onPressed: () => Navigator.pop(context),
                     ),
@@ -109,7 +116,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'All',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: null,
@@ -127,7 +136,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'Quote',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: 'quote',
@@ -145,7 +156,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'Health Tips',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: 'healthTips',
@@ -163,7 +176,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'Tips',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: 'tip',
@@ -181,7 +196,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'Audio',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: 'audio',
@@ -199,7 +216,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'Video',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: 'video',
@@ -217,7 +236,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     'Image',
                     style: TextStyle(
                       fontSize: 16.sp,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   value: 'image',
@@ -270,30 +291,33 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     return SliverPadding(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-              (context, index) {
-            return Padding(
-              padding: EdgeInsets.only(bottom: 12.h),
-              child: Shimmer.fromColors(
-                baseColor: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
-                highlightColor: isDarkMode ? AppColors.darkSecondary : AppColors.lightTextPrimary,
-                child: Container(
-                  height: 160.h,
-                  width: 280.w,
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? AppColors.darkSurface : AppColors.lightBackground,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: AppColors.primary.withOpacity(0.3),
-                      width: 1.w,
-                    ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: 12.h),
+            child: Shimmer.fromColors(
+              baseColor: isDarkMode
+                  ? AppColors.darkSurface
+                  : AppColors.lightBackground,
+              highlightColor: isDarkMode
+                  ? AppColors.darkSecondary
+                  : AppColors.lightTextPrimary,
+              child: Container(
+                height: 160.h,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? AppColors.darkSurface
+                      : AppColors.lightBackground,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(
+                    color: AppColors.primary.withOpacity(0.3),
+                    width: 1.w,
                   ),
                 ),
               ),
-            );
-          },
-          childCount: 5,
-        ),
+            ),
+          );
+        }, childCount: 5),
       ),
     );
   }
@@ -301,40 +325,56 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   List<TipModel> _filterTips(List<TipModel> tips) {
     final query = _searchQuery.value;
     final filtered = tips.where((tip) {
-      final matchesSearch = query.isEmpty ||
-          tip.tipsTitle.toLowerCase().contains(query) ||
-          tip.tipsDescription.toLowerCase().contains(query) ||
-          tip.tipsType.toLowerCase().contains(query) ||
-          tip.tipsAuthor.toLowerCase().contains(query);
-      final matchesTipsType = _selectedTipsType == null || tip.tipsType == _selectedTipsType;
+      final matchesSearch =
+          query.isEmpty ||
+              tip.tipsTitle.toLowerCase().contains(query) ||
+              tip.tipsDescription.toLowerCase().contains(query) ||
+              tip.tipsType.toLowerCase().contains(query) ||
+              tip.tipsAuthor.toLowerCase().contains(query);
+      final matchesTipsType =
+          _selectedTipsType == null || tip.tipsType == _selectedTipsType;
       return matchesSearch && matchesTipsType;
     }).toList();
-    log('Filtered tips: ${filtered.length}, Premium filtered: ${filtered.where((t) => t.isPremium).length}', name: 'CategoryDetailScreen');
+    log(
+      'Filtered tips: ${filtered.length}, Premium filtered: ${filtered.where((t) => t.isPremium).length}',
+      name: 'CategoryDetailScreen',
+    );
     return filtered;
   }
 
   Future<Map<String, dynamic>> _fetchCategoryTips() async {
     final user = await _authService.getCurrentUser();
-    final canAccessPremium = user != null ? await _dataRepository.canAccessPremiumContent(user.uid) : false;
+    final canAccessPremium = user != null
+        ? await _dataRepository.canAccessPremiumContent(user.uid)
+        : false;
     final tips = await _dataRepository.getTipsByCategory(
       widget.category.categoryId,
       includePremium: true,
     );
-    log('Fetched ${tips.length} tips for category ${widget.category.categoryId}, canAccessPremium: $canAccessPremium',
-        name: 'CategoryDetailScreen');
-    log('Premium tips: ${tips.where((t) => t.isPremium).map((t) => "${t.tipsId}: ${t.tipsType}").toList()}', name: 'CategoryDetailScreen');
+    log(
+      'Fetched ${tips.length} tips for category ${widget.category.categoryId}, canAccessPremium: $canAccessPremium',
+      name: 'CategoryDetailScreen',
+    );
+    log(
+      'Premium tips: ${tips.where((t) => t.isPremium).map((t) => "${t.tipsId}: ${t.tipsType}").toList()}',
+      name: 'CategoryDetailScreen',
+    );
     return {'tips': tips, 'canAccessPremium': canAccessPremium};
   }
 
   Widget _buildTipCard(TipModel tip, ThemeData theme, bool isDarkMode) {
-    final categorySpecificTips = _filterTips((tip.categoryId == widget.category.categoryId) ? [tip] : []);
+    final categorySpecificTips = _filterTips(
+      (tip.categoryId == widget.category.categoryId) ? [tip] : [],
+    );
     if (tip.tipsType == 'quote') {
       return QuoteCard(
         tip: tip,
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty ? categorySpecificTips : [tip],
+        featuredTips: categorySpecificTips.isNotEmpty
+            ? categorySpecificTips
+            : [tip],
       );
     } else if (tip.tipsType == 'audio') {
       return AudioCard(
@@ -342,19 +382,35 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty ? categorySpecificTips : [tip],
+        featuredTips: categorySpecificTips.isNotEmpty
+            ? categorySpecificTips
+            : [tip],
       );
     } else if (tip.tipsType == 'video') {
-      return VideoPlayerCard(
-        tip: tip,
-        categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty ? categorySpecificTips : [tip],
-      );
+      if (tip.isShort || tip.durationInSeconds < 60) {
+        return ShortVideoCard(
+          tip: tip,
+          categoryName: widget.category.categoryName,
+          relatedTips: categorySpecificTips.isNotEmpty
+              ? categorySpecificTips
+              : [tip],
+        );
+      } else {
+        return VideoPlayerCard(
+          tip: tip,
+          categoryName: widget.category.categoryName,
+          featuredTips: categorySpecificTips.isNotEmpty
+              ? categorySpecificTips
+              : [tip],
+        );
+      }
     } else if (tip.tipsType == 'image') {
       return ImageCard(
         tip: tip,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty ? categorySpecificTips : [tip],
+        featuredTips: categorySpecificTips.isNotEmpty
+            ? categorySpecificTips
+            : [tip],
       );
     } else {
       return TipCard(
@@ -362,7 +418,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty ? categorySpecificTips : [tip],
+        featuredTips: categorySpecificTips.isNotEmpty
+            ? categorySpecificTips
+            : [tip],
       );
     }
   }
@@ -390,7 +448,10 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [theme.colorScheme.surface, theme.scaffoldBackgroundColor],
+              colors: [
+                theme.colorScheme.surface,
+                theme.scaffoldBackgroundColor,
+              ],
             ),
           ),
           child: Scaffold(
@@ -409,17 +470,22 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     expandedHeight: 64.h,
                     flexibleSpace: FlexibleSpaceBar(
                       background: Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 16.w,
+                          vertical: 8.h,
+                        ),
                         child: ValueListenableBuilder<bool>(
                           valueListenable: _isSearchActive,
                           builder: (context, isSearchActive, child) {
                             return Container(
                               height: 56.h,
                               decoration: BoxDecoration(
-                                color: isDarkMode ? Color(0xFF121212) : AppColors.lightBackground,
+                                color: isDarkMode
+                                    ? Color(0xFF121212)
+                                    : AppColors.lightBackground,
                                 borderRadius: BorderRadius.circular(24.r),
                                 boxShadow: isDarkMode
-                                    ? [] // no shadow in dark mode
+                                    ? []
                                     : [
                                   BoxShadow(
                                     color: AppColors.shadow,
@@ -437,12 +503,16 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                           ? Icon(
                                         Icons.chevron_left,
                                         size: 30.sp,
-                                        color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextPrimary,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextPrimary,
                                       )
                                           : Icon(
                                         Icons.chevron_left,
                                         size: 30.sp,
-                                        color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextPrimary,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextPrimary,
                                       ),
                                       onPressed: () {
                                         if (isSearchActive) {
@@ -451,7 +521,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                           Navigator.pop(context);
                                         }
                                       },
-                                      tooltip: isSearchActive ? 'Close Search' : 'Back',
+                                      tooltip: isSearchActive
+                                          ? 'Close Search'
+                                          : 'Back',
                                     ),
                                   ),
                                   Expanded(
@@ -459,24 +531,39 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                         ? TextField(
                                       controller: _searchController,
                                       autofocus: true,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
                                         fontSize: 16.sp,
-                                        color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextPrimary
+                                            : AppColors.lightTextPrimary,
                                       ),
                                       decoration: InputDecoration(
-                                        hintText: 'Search ${widget.category.categoryName}...',
-                                        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                        hintText:
+                                        'Search ${widget.category.categoryName}...',
+                                        hintStyle: theme
+                                            .textTheme
+                                            .bodyMedium
+                                            ?.copyWith(
                                           fontSize: 16.sp,
-                                          color: isDarkMode ? AppColors.darkTextHint : AppColors.lightTextHint,
+                                          color: isDarkMode
+                                              ? AppColors.darkTextHint
+                                              : AppColors.lightTextHint,
                                         ),
                                         border: InputBorder.none,
                                         enabledBorder: InputBorder.none,
                                         focusedBorder: InputBorder.none,
                                         filled: false,
-                                        contentPadding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 4.w),
-                                        suffixIcon: ValueListenableBuilder<String>(
+                                        contentPadding:
+                                        EdgeInsets.symmetric(
+                                          vertical: 12.h,
+                                          horizontal: 4.w,
+                                        ),
+                                        suffixIcon:
+                                        ValueListenableBuilder<String>(
                                           valueListenable: _searchQuery,
-                                          builder: (context, searchQuery, child) {
+                                          builder:
+                                              (context, searchQuery, child) {
                                             return searchQuery.isNotEmpty
                                                 ? IconButton(
                                               icon: SvgPicture.asset(
@@ -484,13 +571,19 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                                 width: 20.sp,
                                                 height: 20.sp,
                                                 color: isDarkMode
-                                                    ? AppColors.darkTextSecondary
-                                                    : AppColors.lightTextPrimary,
+                                                    ? AppColors
+                                                    .darkTextSecondary
+                                                    : AppColors
+                                                    .lightTextPrimary,
                                               ),
                                               onPressed: () {
-                                                _searchController.clear();
-                                                _searchQuery.value = '';
-                                                FocusScope.of(context).unfocus();
+                                                _searchController
+                                                    .clear();
+                                                _searchQuery.value =
+                                                '';
+                                                FocusScope.of(
+                                                    context)
+                                                    .unfocus();
                                               },
                                             )
                                                 : const SizedBox.shrink();
@@ -503,14 +596,23 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                         Expanded(
                                           child: Center(
                                             child: Text(
-                                              widget.category.categoryName,
-                                              style: theme.textTheme.titleLarge?.copyWith(
-                                                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                                              widget
+                                                  .category.categoryName,
+                                              style: theme
+                                                  .textTheme
+                                                  .titleLarge
+                                                  ?.copyWith(
+                                                color: isDarkMode
+                                                    ? AppColors
+                                                    .darkTextPrimary
+                                                    : AppColors
+                                                    .lightTextPrimary,
                                                 fontSize: 20.sp,
                                                 fontWeight: FontWeight.bold,
                                               ),
                                               maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
+                                              overflow:
+                                              TextOverflow.ellipsis,
                                             ),
                                           ),
                                         ),
@@ -519,7 +621,11 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                             'assets/icons/svg/ic_search.svg',
                                             width: 24.sp,
                                             height: 24.sp,
-                                            color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextPrimary,
+                                            color: isDarkMode
+                                                ? AppColors
+                                                .darkTextSecondary
+                                                : AppColors
+                                                .lightTextPrimary,
                                           ),
                                           onPressed: _toggleSearch,
                                           tooltip: 'Search',
@@ -533,9 +639,12 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                         'assets/icons/svg/ic_filter.svg',
                                         width: 24.sp,
                                         height: 24.sp,
-                                        color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextPrimary,
+                                        color: isDarkMode
+                                            ? AppColors.darkTextSecondary
+                                            : AppColors.lightTextPrimary,
                                       ),
-                                      onPressed: () => _showFilterDialog(context),
+                                      onPressed: () =>
+                                          _showFilterDialog(context),
                                       tooltip: 'Filter Content',
                                     ),
                                 ],
@@ -547,26 +656,33 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     ),
                   ),
                   SliverPadding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 8.h,
+                    ),
                     sliver: ValueListenableBuilder<String>(
                       valueListenable: _searchQuery,
                       builder: (context, searchQuery, child) {
                         return FutureBuilder<Map<String, dynamic>>(
                           future: _fetchCategoryTips(),
                           builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
                               return _buildShimmerUI(context);
                             }
 
                             if (snapshot.hasError) {
-                              log('Error loading tips: ${snapshot.error}', name: 'CategoryDetailScreen');
+                              log(
+                                'Error loading tips: ${snapshot.error}',
+                                name: 'CategoryDetailScreen',
+                              );
                               return SliverToBoxAdapter(
                                 child: Center(
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Lottie.asset(
-                                        'assets/animations/no_fav.json',
+                                        'assets/animations/no_data.json',
                                         width: 300.w,
                                         height: 300.h,
                                         fit: BoxFit.contain,
@@ -574,10 +690,13 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                       SizedBox(height: 8.h),
                                       Text(
                                         'Error loading tips',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
                                           fontSize: 16.sp,
                                           fontFamily: 'Poppins',
-                                          color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                          color: isDarkMode
+                                              ? AppColors.darkTextSecondary
+                                              : AppColors.lightTextSecondary,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -587,7 +706,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: AppColors.primary,
                                           shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(12.r),
+                                            borderRadius:
+                                            BorderRadius.circular(12.r),
                                           ),
                                         ),
                                         child: Text(
@@ -605,14 +725,20 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                               );
                             }
 
-                            final data = snapshot.data ?? {'tips': [], 'canAccessPremium': false};
+                            final data = snapshot.data ??
+                                {'tips': [], 'canAccessPremium': false};
                             final tips = data['tips'] as List<TipModel>;
-                            final canAccessPremium = data['canAccessPremium'] as bool;
+                            final canAccessPremium =
+                            data['canAccessPremium'] as bool;
                             final filteredTips = _filterTips(tips);
 
                             if (filteredTips.isEmpty) {
-                              final hasHealthTips = tips.any((tip) => tip.tipsType == 'healthTips');
-                              final hasTips = tips.any((tip) => tip.tipsType == 'tip');
+                              final hasHealthTips = tips.any(
+                                    (tip) => tip.tipsType == 'healthTips',
+                              );
+                              final hasTips = tips.any(
+                                    (tip) => tip.tipsType == 'tip',
+                              );
                               return SliverToBoxAdapter(
                                 child: Container(
                                   padding: EdgeInsets.all(10.w),
@@ -621,7 +747,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Lottie.asset(
-                                        'assets/animations/no_fav.json',
+                                        'assets/animations/no_data.json',
                                         width: 300.w,
                                         height: 300.h,
                                         fit: BoxFit.contain,
@@ -631,9 +757,12 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                                         hasHealthTips || hasTips
                                             ? 'No tips match your filter or search'
                                             : 'No tips available in this category',
-                                        style: theme.textTheme.bodyMedium?.copyWith(
+                                        style: theme.textTheme.bodyMedium
+                                            ?.copyWith(
                                           fontSize: 16.sp,
-                                          color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                          color: isDarkMode
+                                              ? AppColors.darkTextSecondary
+                                              : AppColors.lightTextSecondary,
                                         ),
                                         textAlign: TextAlign.center,
                                       ),
@@ -643,16 +772,78 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                               );
                             }
 
+                            // Process tips in pairs for short videos and images
+                            final List<Widget> cardRows = [];
+                            for (int i = 0; i < filteredTips.length; i++) {
+                              final tip = filteredTips[i];
+                              if (tip.tipsType == 'video' &&
+                                  (tip.isShort || tip.durationInSeconds < 60) ||
+                                  tip.tipsType == 'image') {
+                                // Handle short videos and images in pairs
+                                if (i + 1 < filteredTips.length &&
+                                    (filteredTips[i + 1].tipsType == 'video' &&
+                                        (filteredTips[i + 1].isShort ||
+                                            filteredTips[i + 1]
+                                                .durationInSeconds <
+                                                60) ||
+                                        filteredTips[i + 1].tipsType == 'image')) {
+                                  // Pair two short videos or images
+                                  cardRows.add(
+                                    Padding(
+                                      padding: EdgeInsets.only(bottom: 12.h),
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: _buildTipCard(
+                                                tip, theme, isDarkMode),
+                                          ),
+                                          SizedBox(width: 12.w),
+                                          Flexible(
+                                            child: _buildTipCard(
+                                                filteredTips[i + 1],
+                                                theme,
+                                                isDarkMode),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                  i++; // Skip the next item since it's paired
+                                } else {
+                                  // Single short video or image
+                                  cardRows.add(
+                                    Padding(
+                                      padding: EdgeInsets.only(bottom: 12.h),
+                                      child: Row(
+                                        children: [
+                                          Flexible(
+                                            child: _buildTipCard(
+                                                tip, theme, isDarkMode),
+                                          ),
+                                          SizedBox(width: 12.w),
+                                          Flexible(child: Container()),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                // Other tip types as single full-width cards
+                                cardRows.add(
+                                  Padding(
+                                    padding: EdgeInsets.only(bottom: 12.h),
+                                    child: _buildTipCard(tip, theme, isDarkMode),
+                                  ),
+                                );
+                              }
+                            }
+
                             return SliverList(
                               delegate: SliverChildBuilderDelegate(
                                     (context, index) {
-                                  final tip = filteredTips[index];
-                                  return Padding(
-                                    padding: EdgeInsets.only(bottom: 12.h),
-                                    child: _buildTipCard(tip, theme, isDarkMode),
-                                  );
+                                  return cardRows[index];
                                 },
-                                childCount: filteredTips.length,
+                                childCount: cardRows.length,
                               ),
                             );
                           },

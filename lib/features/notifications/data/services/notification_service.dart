@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
@@ -14,6 +15,7 @@ import 'package:uuid/uuid.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'dart:developer';
+import 'package:wellness_app/core/config/firebase/firebase_options.dart';
 
 import '../../../../core/config/routes/route_name.dart';
 import '../../../../core/db/database_helper.dart';
@@ -30,9 +32,33 @@ class NotificationService {
   static const String _hasRequestedExactAlarmKey = 'has_requested_exact_alarm';
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore? _firestore;
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   bool _isInitialized = false;
+  bool _isFirestoreInitialized = false;
+
+  // Lazy getter for Firestore to ensure Firebase is initialized first
+  Future<FirebaseFirestore> get firestore async {
+    if (_firestore != null && _isFirestoreInitialized) {
+      return _firestore!;
+    }
+
+    try {
+      // Ensure Firebase is initialized
+      if (Firebase.apps.isEmpty) {
+        log('Firebase not initialized in NotificationService, initializing now');
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      }
+
+      _firestore = FirebaseFirestore.instance;
+      _isFirestoreInitialized = true;
+      log('Firestore initialized in NotificationService');
+      return _firestore!;
+    } catch (e) {
+      log('Error initializing Firestore: $e');
+      throw Exception('Failed to initialize Firestore: $e');
+    }
+  }
 
   Future<void> initLocalNotifications() async {
     if (_isInitialized) {
@@ -321,14 +347,14 @@ class NotificationService {
       // Schedule the notification based on frequency
       if (reminder.frequency == 'daily') {
         await flutterLocalNotificationsPlugin.zonedSchedule(
-          notificationId,
-          title,
-          body,
-          scheduledDate,
-          notificationDetails,
-          androidScheduleMode: scheduleMode,
-          matchDateTimeComponents: DateTimeComponents.time,
-          payload: payloadJson
+            notificationId,
+            title,
+            body,
+            scheduledDate,
+            notificationDetails,
+            androidScheduleMode: scheduleMode,
+            matchDateTimeComponents: DateTimeComponents.time,
+            payload: payloadJson
         );
         log('Scheduled daily notification $notificationId for reminder ${reminder.id} at ${reminder.time} with mode $scheduleMode');
       } else if (reminder.frequency == 'weekly' && reminder.dayOfWeek != null) {
@@ -339,14 +365,14 @@ class NotificationService {
         log('Adjusted weekly scheduled date: $scheduledDate');
 
         await flutterLocalNotificationsPlugin.zonedSchedule(
-          notificationId,
-          title,
-          body,
-          scheduledDate,
-          notificationDetails,
-          androidScheduleMode: scheduleMode,
-          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-          payload: payloadJson
+            notificationId,
+            title,
+            body,
+            scheduledDate,
+            notificationDetails,
+            androidScheduleMode: scheduleMode,
+            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+            payload: payloadJson
         );
         log('Scheduled weekly notification $notificationId for reminder ${reminder.id} on day ${reminder.dayOfWeek} at ${reminder.time} with mode $scheduleMode');
       }
@@ -447,7 +473,8 @@ class NotificationService {
 
       if (tipId != null && tipId.isNotEmpty) {
         // Fetch the tip from Firestore
-        final tipDoc = await _firestore.collection('tips').doc(tipId).get();
+        final db = await firestore; // Use the async getter
+        final tipDoc = await db.collection('tips').doc(tipId).get();
         if (!tipDoc.exists) {
           log('Tip not found for tipId: $tipId');
           return;
@@ -473,7 +500,8 @@ class NotificationService {
             );
 
             await DatabaseHelper.instance.insertNotification(notificationModel);
-            await _firestore
+            final db = await firestore; // Use the async getter
+            await db
                 .collection('notifications')
                 .doc(notificationModel.id)
                 .set(notificationModel.toFirestore());

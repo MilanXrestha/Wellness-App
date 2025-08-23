@@ -169,7 +169,7 @@ class AudioCard extends StatelessWidget {
           child: Container(
             width: 280.w,
             height: 135.h,
-            margin: EdgeInsets.symmetric(horizontal: 8.w, vertical: 8.h),
+            margin: EdgeInsets.symmetric(horizontal: 4.w, vertical: 8.h),
 
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20.r),
