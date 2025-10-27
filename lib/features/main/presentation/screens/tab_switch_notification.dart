@@ -1,4 +1,3 @@
-// tab_switch_notification.dart
 import 'package:flutter/material.dart';
 
 class TabSwitchNotification extends Notification {

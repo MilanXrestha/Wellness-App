@@ -35,6 +35,9 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   String? _selectedTipsType;
   Timer? _debounce;
 
+  // Store all category tips for later use
+  List<TipModel> _allCategoryTips = [];
+
   @override
   void initState() {
     super.initState();
@@ -351,6 +354,10 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       widget.category.categoryId,
       includePremium: true,
     );
+
+    // Store all tips for later use
+    _allCategoryTips = tips;
+
     log(
       'Fetched ${tips.length} tips for category ${widget.category.categoryId}, canAccessPremium: $canAccessPremium',
       name: 'CategoryDetailScreen',
@@ -363,18 +370,28 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
   }
 
   Widget _buildTipCard(TipModel tip, ThemeData theme, bool isDarkMode) {
+    // Get all tips from the current category that match the same type as the current tip
     final categorySpecificTips = _filterTips(
-      (tip.categoryId == widget.category.categoryId) ? [tip] : [],
+        _allCategoryTips.where((t) => t.tipsType == tip.tipsType).toList()
     );
+
+    // Always include the current tip at minimum
+    final tipsToPass = categorySpecificTips.isNotEmpty
+        ? categorySpecificTips
+        : [tip];
+
+    log(
+      'Building card for ${tip.tipsId} (${tip.tipsType}), passing ${tipsToPass.length} related tips',
+      name: 'CategoryDetailScreen',
+    );
+
     if (tip.tipsType == 'quote') {
       return QuoteCard(
         tip: tip,
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty
-            ? categorySpecificTips
-            : [tip],
+        featuredTips: tipsToPass,
       );
     } else if (tip.tipsType == 'audio') {
       return AudioCard(
@@ -382,35 +399,27 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty
-            ? categorySpecificTips
-            : [tip],
+        featuredTips: tipsToPass,
       );
     } else if (tip.tipsType == 'video') {
       if (tip.isShort || tip.durationInSeconds < 60) {
         return ShortVideoCard(
           tip: tip,
           categoryName: widget.category.categoryName,
-          relatedTips: categorySpecificTips.isNotEmpty
-              ? categorySpecificTips
-              : [tip],
+          relatedTips: tipsToPass,
         );
       } else {
         return VideoPlayerCard(
           tip: tip,
           categoryName: widget.category.categoryName,
-          featuredTips: categorySpecificTips.isNotEmpty
-              ? categorySpecificTips
-              : [tip],
+          featuredTips: tipsToPass,
         );
       }
     } else if (tip.tipsType == 'image') {
       return ImageCard(
         tip: tip,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty
-            ? categorySpecificTips
-            : [tip],
+        featuredTips: tipsToPass,
       );
     } else {
       return TipCard(
@@ -418,9 +427,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         theme: theme,
         isDarkMode: isDarkMode,
         categoryName: widget.category.categoryName,
-        featuredTips: categorySpecificTips.isNotEmpty
-            ? categorySpecificTips
-            : [tip],
+        featuredTips: tipsToPass,
       );
     }
   }

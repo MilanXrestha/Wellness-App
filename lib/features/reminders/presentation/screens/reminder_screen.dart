@@ -1,9 +1,16 @@
+import 'dart:convert';
 import 'dart:developer';
 import 'dart:async';
+import 'dart:math' as math;
+import 'package:flutter/scheduler.dart' hide Priority;
 
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'package:uuid/uuid.dart';
 import 'package:wellness_app/features/categories/data/models/category_model.dart';
 import 'package:wellness_app/features/reminders/data/models/reminder_model.dart';
@@ -11,9 +18,9 @@ import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/core/services/data_repository.dart';
 import 'package:wellness_app/features/notifications/data/services/notification_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
+import '../../../../core/db/database_helper.dart';
+import '../../../notifications/data/models/notification_model.dart';
 import 'reminder_history_screen.dart';
 
 class ReminderScreen extends StatefulWidget {
@@ -36,6 +43,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
   bool isLoadingCategories = true;
   bool isSaving = false;
   bool includePremium = false;
+  bool _hasShownNoContentWarning = false;
 
   // Content type options with their display names
   final Map<String, String> contentTypes = {
@@ -99,42 +107,56 @@ class _ReminderScreenState extends State<ReminderScreen> {
       log('Fetched ${fetchedCategories.length} categories and ${fetchedTips.length} tips');
       log('Tip types: ${fetchedTips.map((tip) => tip.tipsType).toSet().toList()}');
 
-      setState(() {
-        categories = fetchedCategories;
-        tips = fetchedTips;
-        includePremium = canAccessPremium;
-        isLoadingCategories = false;
+      if (mounted) {
+        setState(() {
+          categories = fetchedCategories;
+          tips = fetchedTips;
+          includePremium = canAccessPremium;
+          isLoadingCategories = false;
 
-        // Validate selected category still exists
-        if (selectedCategoryId != null &&
-            selectedCategoryId != 'all' &&
-            !categories.any((c) => c.categoryId == selectedCategoryId)) {
-          selectedCategoryId = 'all';
-          if (widget.reminder != null) {
+          // Validate selected category still exists
+          if (selectedCategoryId != null &&
+              selectedCategoryId != 'all' &&
+              !categories.any((c) => c.categoryId == selectedCategoryId)) {
+            selectedCategoryId = 'all';
+
+            // Use post-frame callback to show SnackBar
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && widget.reminder != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text(
+                      'Selected category no longer exists. Reset to All.',
+                    ),
+                    backgroundColor: AppColors.error,
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+              }
+            });
+          }
+        });
+      }
+    } catch (e, stackTrace) {
+      log('Error fetching data: $e', stackTrace: stackTrace);
+      if (mounted) {
+        setState(() {
+          isLoadingCategories = false;
+        });
+
+        // Use post-frame callback to show SnackBar
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: const Text(
-                  'Selected category no longer exists. Reset to All.',
-                ),
+                content: Text('Error fetching data: $e'),
                 backgroundColor: AppColors.error,
                 duration: const Duration(seconds: 3),
               ),
             );
           }
-        }
-      });
-    } catch (e, stackTrace) {
-      log('Error fetching data: $e', stackTrace: stackTrace);
-      setState(() {
-        isLoadingCategories = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching data: $e'),
-          backgroundColor: AppColors.error,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+        });
+      }
     }
   }
 
@@ -168,7 +190,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
         );
       },
     );
-    if (picked != null) {
+    if (picked != null && mounted) {
       setState(() {
         selectedTime = picked;
       });
@@ -224,7 +246,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
         ),
       ),
     );
-    if (selected != null) {
+    if (selected != null && mounted) {
       setState(() {
         selectedDayOfWeek = selected;
       });
@@ -260,62 +282,21 @@ class _ReminderScreenState extends State<ReminderScreen> {
     }
   }
 
-  Future<void> _saveReminder() async {
-    if (isSaving) return;
-    setState(() => isSaving = true);
-
+  void _saveReminder() {
+    // Basic validation - don't show loading indicator
     final userId = AuthService().getCurrentUser()?.uid;
     if (userId == null ||
         selectedType == null ||
         selectedFrequency == null ||
         selectedTime == null ||
         (selectedFrequency == 'weekly' && selectedDayOfWeek == null)) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please fill all fields'),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        setState(() => isSaving = false);
-      }
-      return;
-    }
-
-    // Validate content availability
-    final hasValidContent = await _validateReminderContent();
-    if (!hasValidContent) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'No ${selectedType == 'all' ? 'content' : selectedType} available for the selected category.',
-            ),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        setState(() => isSaving = false);
-      }
-      return;
-    }
-
-    // Request exact alarm permission
-    final exactAlarmPermitted = await NotificationService.instance.requestExactAlarmPermission();
-    if (!exactAlarmPermitted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text(
-              'Exact alarm permission is required for reliable reminders',
-            ),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        setState(() => isSaving = false);
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Please fill all fields'),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
       return;
     }
 
@@ -326,96 +307,237 @@ class _ReminderScreenState extends State<ReminderScreen> {
       type: selectedType!,
       categoryId: selectedCategoryId ?? 'all',
       frequency: selectedFrequency!,
-      time:
-      '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}',
+      time: '${selectedTime!.hour.toString().padLeft(2, '0')}:${selectedTime!.minute.toString().padLeft(2, '0')}',
       dayOfWeek: selectedFrequency == 'weekly' ? selectedDayOfWeek : null,
       createdAt: widget.reminder?.createdAt ?? DateTime.now(),
       notificationId: widget.reminder?.notificationId,
     );
 
-    bool saveSuccess = false;
-    bool isOnline = false;
-
-    // Show initial saving message
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Saving reminder...'),
-          backgroundColor: AppColors.primary,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
-
-    // Check online status
-    try {
-      isOnline = await DataRepository.instance.isOnline();
-      log('Online status: $isOnline');
-    } catch (e) {
-      log('Error checking online status: $e');
-      isOnline = false;
-    }
-
-    try {
-      // First save to local database
+    // Check online status in background
+    Future(() async {
+      try {
+        final isOnline = await DataRepository.instance.isOnline();
+        log('Online status: $isOnline');
+        return isOnline;
+      } catch (e) {
+        log('Error checking online status: $e');
+        return false;
+      }
+    }).then((isOnline) {
+      // Save to database directly - no async/await here to avoid UI blocking
       if (widget.reminder != null) {
-        await DataRepository.instance.updateReminder(reminder);
+        DataRepository.instance.updateReminder(reminder);
         log('Updated reminder in local database: ${reminder.id}');
       } else {
-        await DataRepository.instance.addReminder(reminder);
+        DataRepository.instance.addReminder(reminder);
         log('Added reminder to local database: ${reminder.id}');
       }
 
-      // Cancel existing notification if updating
-      if (widget.reminder != null && widget.reminder!.notificationId != null) {
-        await NotificationService.instance.cancelReminderNotification(reminder.id);
-        log('Cancelled existing notification for reminder: ${reminder.id}');
-      }
+      // Schedule local notification directly - no waiting
+      _scheduleOfflineNotification(reminder);
 
-      // Schedule notification
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.reminder != null
+                ? 'Reminder updated${isOnline ? '' : ' (offline)'}'
+                : 'Reminder saved${isOnline ? '' : ' (offline)'}',
+          ),
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    });
+
+    // Navigate back immediately without waiting
+    Navigator.pop(context);
+  }
+
+  // Simple method to schedule notification without waiting
+  void _scheduleOfflineNotification(ReminderModel reminder) {
+    // Function executes in background, doesn't block UI
+    Future(() async {
       try {
-        await NotificationService.instance.scheduleReminderNotification(reminder);
+        await NotificationService.instance.initLocalNotifications();
+
+        // Generate notification ID
+        final notificationId = const Uuid().v4().hashCode.abs();
+
+        // Parse the time
+        final timeParts = reminder.time.split(':');
+        final hour = int.parse(timeParts[0]);
+        final minute = int.parse(timeParts[1]);
+
+        // Calculate scheduled date
+        final now = tz.TZDateTime.now(tz.local);
+        var scheduledDate = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        );
+
+        // If time has already passed today, schedule for tomorrow
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
+
+        // For weekly, adjust to the next occurrence of that day
+        if (reminder.frequency == 'weekly' && reminder.dayOfWeek != null) {
+          while (scheduledDate.weekday != reminder.dayOfWeek) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+        }
+
+        // Check if we can get real content from database
+        bool isOnline = await DataRepository.instance.isOnline();
+        String title = 'Your ${StringExtension(reminder.type).capitalize()} Reminder';
+        String body = 'Check out your wellness content for today';
+        String? tipId;
+
+        // Try to find appropriate content based on reminder type and category
+        try {
+          List<TipModel> tips = [];
+
+          if (isOnline) {
+            // Online mode - fetch fresh content
+            tips = await DataRepository.instance.getTipsByCategory(
+              reminder.categoryId == 'all' ? 'all' : reminder.categoryId,
+              includePremium: await DataRepository.instance.canAccessPremiumContent(reminder.userId),
+            );
+          } else {
+            // Offline mode - use cached content
+            final allTips = await DatabaseHelper.instance.getAllTips();
+            if (reminder.categoryId == 'all') {
+              tips = allTips;
+            } else {
+              tips = allTips.where((tip) => tip.categoryId == reminder.categoryId).toList();
+            }
+          }
+
+          // Filter tips by content type if specified
+          if (reminder.type != 'all' && tips.isNotEmpty) {
+            final filteredTips = tips.where((tip) => tip.tipsType == reminder.type).toList();
+            if (filteredTips.isNotEmpty) {
+              tips = filteredTips;
+            }
+          }
+
+          // Select a random tip if available
+          if (tips.isNotEmpty) {
+            final random = math.Random();
+            final selectedTip = tips[random.nextInt(tips.length)];
+
+            title = 'Your ${StringExtension(selectedTip.tipsType).capitalize()} Reminder';
+            body = selectedTip.tipsTitle;
+            tipId = selectedTip.tipsId;
+
+            log('Selected real content for notification: ${selectedTip.tipsId}');
+          } else {
+            log('No matching content found, using generic reminder');
+          }
+        } catch (e) {
+          log('Error finding content for notification: $e');
+          // Continue with generic content if there's an error
+        }
+
+        // Create notification details
+        const androidDetails = AndroidNotificationDetails(
+          'wellness_channel',
+          'Wellness Reminders',
+          channelDescription: 'Notifications for wellness reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+          showWhen: true,
+          enableVibration: true,
+          fullScreenIntent: true,
+        );
+        const iosDetails = DarwinNotificationDetails();
+        const notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: iosDetails,
+        );
+
+        // Create notification payload
+        final payload = {
+          'userId': reminder.userId,
+          'type': reminder.type,
+          'tipId': tipId,
+          'isFromReminder': true,
+          'contentType': reminder.type,
+        };
+
+        // Schedule the notification
+        await NotificationService.instance.flutterLocalNotificationsPlugin.zonedSchedule(
+          notificationId,
+          title,
+          body,
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: reminder.frequency == 'daily'
+              ? DateTimeComponents.time
+              : DateTimeComponents.dayOfWeekAndTime,
+          payload: jsonEncode(payload),
+        );
+
+        // IMPORTANT: Create a notification record for the notification screen
+        final notificationId2 = const Uuid().v4();
+        final notificationModel = NotificationModel(
+          id: notificationId2,
+          userId: reminder.userId,
+          title: title,
+          body: body,
+          type: reminder.type,
+          isRead: false,
+          payload: payload,
+          timestamp: DateTime.now(),
+        );
+
+        // Save notification to database
+        await DatabaseHelper.instance.insertNotification(notificationModel);
+
+        // Try to save to Firestore if online
+        if (isOnline) {
+          try {
+            final db = FirebaseFirestore.instance;
+            await db
+                .collection('notifications')
+                .doc(notificationId2)
+                .set(notificationModel.toFirestore());
+          } catch (e) {
+            log('Error saving notification to Firestore: $e');
+            // Ignore Firestore errors - notification is still in local DB
+          }
+        } else {
+          // Add to pending operations for later sync
+          await DatabaseHelper.instance.insertPendingNotification(notificationModel);
+        }
+
+        // Update the reminder with notification ID
+        final updatedReminder = ReminderModel(
+          id: reminder.id,
+          userId: reminder.userId,
+          type: reminder.type,
+          categoryId: reminder.categoryId,
+          frequency: reminder.frequency,
+          time: reminder.time,
+          dayOfWeek: reminder.dayOfWeek,
+          createdAt: reminder.createdAt,
+          notificationId: notificationId,
+        );
+
+        // Save updated reminder with notification ID
+        await DataRepository.instance.updateReminder(updatedReminder);
         log('Successfully scheduled notification for reminder: ${reminder.id}');
-      } catch (e) {
-        log('Error scheduling notification, queuing for later: $e');
-        await NotificationService.instance.queueNotification(reminder);
+      } catch (e, stackTrace) {
+        log('Error scheduling notification: $e', stackTrace: stackTrace);
+        // Don't rethrow - this runs in background
       }
-
-      // Check if reminder was saved successfully in local database
-      saveSuccess = await _isReminderInLocalCache(reminder.id);
-      log('Reminder saved successfully in local database: $saveSuccess');
-
-    } catch (e, stackTrace) {
-      log('Error saving reminder: $e', stackTrace: stackTrace);
-      saveSuccess = await _isReminderInLocalCache(reminder.id);
-    }
-
-    // Final snackbar and navigation
-    if (mounted) {
-      if (saveSuccess) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.reminder != null
-                  ? 'Reminder updated successfully${isOnline ? '' : ' (offline)'}'
-                  : 'Reminder saved successfully${isOnline ? '' : ' (offline)'}',
-            ),
-            backgroundColor: AppColors.primary,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        Navigator.pop(context);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Failed to save reminder'),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-      setState(() => isSaving = false);
-    }
+    });
   }
 
   Future<void> _deleteReminder(ReminderModel reminder) async {
@@ -526,16 +648,10 @@ class _ReminderScreenState extends State<ReminderScreen> {
           categoryMap[category.categoryId] = category.categoryName;
         }
 
-        if (mounted && selectedType != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'No ${contentTypes[selectedType!] ?? StringExtension(selectedType!).capitalize()} content available for any category. Showing all categories.',
-              ),
-              backgroundColor: AppColors.error,
-              duration: const Duration(seconds: 3),
-            ),
-          );
+        // Use a flag to show the warning only once
+        if (!_hasShownNoContentWarning && mounted && selectedType != null) {
+          _hasShownNoContentWarning = true;
+
         }
       } else {
         // Only include categories with matching content
@@ -665,6 +781,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
                 onChanged: (value) => setState(() {
                   selectedType = value;
                   selectedCategoryId = 'all'; // Reset category when type changes
+                  _hasShownNoContentWarning = false; // Reset warning flag
                 }),
               ),
               SizedBox(height: 16.h),
@@ -896,7 +1013,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
                 children: [
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: isSaving ? null : _saveReminder,
+                      onPressed: _saveReminder,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isDarkMode
                             ? AppColors.primary
@@ -909,16 +1026,7 @@ class _ReminderScreenState extends State<ReminderScreen> {
                         elevation: isDarkMode ? 2 : 2,
                         shadowColor: isDarkMode ? null : Colors.grey.shade300,
                       ),
-                      child: isSaving
-                          ? SizedBox(
-                        height: 24.h,
-                        width: 24.w,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2.w,
-                        ),
-                      )
-                          : Text(
+                      child: Text(
                         widget.reminder != null
                             ? 'Update'
                             : 'Save Reminder',

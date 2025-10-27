@@ -168,7 +168,11 @@ class _ImageViewerScreenState extends State<ImageViewerScreen> with SingleTicker
         tipId: currentTipId,
         userId: userId,
       );
-      favoritesProvider.addFavorite(favorite);
+      // Use the current tip from the imageTips array
+      final currentTip = widget.imageTips[_currentIndex];
+
+      // Pass both the favorite model and the tip model
+      favoritesProvider.addFavorite(favorite, currentTip);
     }
   }
 

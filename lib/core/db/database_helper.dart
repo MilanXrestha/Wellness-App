@@ -13,6 +13,7 @@ import '../../features/reminders/data/models/reminder_model.dart';
 import '../../features/subscription/data/models/subscription_model.dart';
 import '../../features/subscription/data/models/transaction_model.dart';
 import '../../features/tips/data/models/tips_model.dart';
+import '../../features/videoPlayer/data/models/comments_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
@@ -36,7 +37,7 @@ class DatabaseHelper {
     log('Database path: $path', name: 'DatabaseHelper');
     return await openDatabase(
       path,
-      version: 3, // Incremented version for cache table index fix
+      version: 4, // Incremented for comments and queued tables
       onCreate: _createDB,
       onUpgrade: _onUpgrade,
     );
@@ -155,6 +156,44 @@ class DatabaseHelper {
       'CREATE INDEX IF NOT EXISTS idx_cache_expiry ON cache(expiryDate)',
     );
 
+    // Comments table
+    await db.execute('''
+      CREATE TABLE comments (
+        id TEXT PRIMARY KEY,
+        tipsId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        userName TEXT NOT NULL,
+        userPhotoUrl TEXT,
+        text TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        likeCount INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    // Queued Comments table
+    await db.execute('''
+      CREATE TABLE queued_comments (
+        id TEXT PRIMARY KEY,
+        tipsId TEXT NOT NULL,
+        userId TEXT NOT NULL,
+        userName TEXT NOT NULL,
+        userPhotoUrl TEXT,
+        text TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    ''');
+
+    // Queued Interactions table
+    await db.execute('''
+      CREATE TABLE queued_interactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT NOT NULL,
+        tipsId TEXT NOT NULL,
+        type TEXT NOT NULL,
+        timestamp TEXT NOT NULL
+      )
+    ''');
+
     log(
       'Database created with all tables, version: $version',
       name: 'DatabaseHelper',
@@ -183,7 +222,6 @@ class DatabaseHelper {
       );
     }
     if (oldVersion < 3) {
-      // Drop old cache index and create new one on expiryDate
       try {
         await db.execute('DROP INDEX IF EXISTS idx_cache_key');
         await db.execute(
@@ -200,6 +238,44 @@ class DatabaseHelper {
           error: e,
         );
       }
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS comments (
+          id TEXT PRIMARY KEY,
+          tipsId TEXT NOT NULL,
+          userId TEXT NOT NULL,
+          userName TEXT NOT NULL,
+          userPhotoUrl TEXT,
+          text TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          likeCount INTEGER NOT NULL DEFAULT 0
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS queued_comments (
+          id TEXT PRIMARY KEY,
+          tipsId TEXT NOT NULL,
+          userId TEXT NOT NULL,
+          userName TEXT NOT NULL,
+          userPhotoUrl TEXT,
+          text TEXT NOT NULL,
+          createdAt TEXT NOT NULL
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS queued_interactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId TEXT NOT NULL,
+          tipsId TEXT NOT NULL,
+          type TEXT NOT NULL,
+          timestamp TEXT NOT NULL
+        )
+      ''');
+      log(
+        'Added comments and queued tables in migration to version 4',
+        name: 'DatabaseHelper',
+      );
     }
   }
 
@@ -219,6 +295,115 @@ class DatabaseHelper {
     final db = await database;
     await db.delete('cache');
     log('Cache table cleared', name: 'DatabaseHelper');
+  }
+
+  // CommentModel CRUD
+  Future<void> insertComment(CommentModel comment) async {
+    final db = await database;
+    await db.insert(
+      'comments',
+      comment.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    log('Inserted comment: ${comment.id}', name: 'DatabaseHelper');
+  }
+
+  Future<CommentModel?> getComment(String id) async {
+    final db = await database;
+    final maps = await db.query('comments', where: 'id = ?', whereArgs: [id]);
+    if (maps.isNotEmpty) {
+      log('Retrieved comment: $id', name: 'DatabaseHelper');
+      return CommentModel.fromMap(maps.first);
+    }
+    log('Comment not found: $id', name: 'DatabaseHelper');
+    return null;
+  }
+
+  Future<List<CommentModel>> getCommentsByTip(String tipsId) async {
+    final db = await database;
+    final maps = await db.query(
+      'comments',
+      where: 'tipsId = ? AND parentId IS NULL',
+      whereArgs: [tipsId],
+      orderBy: 'createdAt DESC',
+    );
+    final comments = maps.map((map) => CommentModel.fromMap(map)).toList();
+    log(
+      'Retrieved ${comments.length} comments for tip: $tipsId',
+      name: 'DatabaseHelper',
+    );
+    return comments;
+  }
+
+  Future<void> deleteComment(String id) async {
+    final db = await database;
+    final rows = await db.delete('comments', where: 'id = ?', whereArgs: [id]);
+    log('Deleted comment: $id, rows affected: $rows', name: 'DatabaseHelper');
+  }
+
+  // Queued Comments CRUD
+  Future<void> insertQueuedComment(Map<String, dynamic> comment) async {
+    final db = await database;
+    await db.insert(
+      'queued_comments',
+      comment,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    log('Inserted queued comment: ${comment['id']}', name: 'DatabaseHelper');
+  }
+
+  Future<List<Map<String, dynamic>>> getQueuedComments() async {
+    final db = await database;
+    final maps = await db.query('queued_comments');
+    log('Retrieved ${maps.length} queued comments', name: 'DatabaseHelper');
+    return maps;
+  }
+
+  Future<void> deleteQueuedComment(String id) async {
+    final db = await database;
+    final rows = await db.delete(
+      'queued_comments',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    log(
+      'Deleted queued comment: $id, rows affected: $rows',
+      name: 'DatabaseHelper',
+    );
+  }
+
+  // Queued Interactions CRUD
+  Future<void> insertQueuedInteraction(Map<String, dynamic> interaction) async {
+    final db = await database;
+    await db.insert(
+      'queued_interactions',
+      interaction,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    log(
+      'Inserted queued interaction for tip: ${interaction['tipsId']}',
+      name: 'DatabaseHelper',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getQueuedInteractions() async {
+    final db = await database;
+    final maps = await db.query('queued_interactions');
+    log('Retrieved ${maps.length} queued interactions', name: 'DatabaseHelper');
+    return maps;
+  }
+
+  Future<void> deleteQueuedInteraction(int id) async {
+    final db = await database;
+    final rows = await db.delete(
+      'queued_interactions',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    log(
+      'Deleted queued interaction: $id, rows affected: $rows',
+      name: 'DatabaseHelper',
+    );
   }
 
   // CategoryModel CRUD
@@ -928,8 +1113,65 @@ class DatabaseHelper {
     batch.delete('transactions');
     batch.delete('pending_operations');
     batch.delete('cache');
+    batch.delete('comments');
+    batch.delete('queued_comments');
+    batch.delete('queued_interactions');
     await batch.commit();
     log('Database cleared', name: 'DatabaseHelper');
+  }
+
+  Future<void> cleanupCorruptedFavorites() async {
+    final db = await database;
+    try {
+      log('Starting favorites database cleanup', name: 'DatabaseHelper');
+
+      // Get all favorites
+      final List<Map<String, dynamic>> maps = await db.query('favorites');
+      int fixed = 0;
+
+      for (var map in maps) {
+        try {
+          // Try to parse the data
+          FavoriteModel.fromProto(map['data'] as List<int>);
+        } catch (e) {
+          // If parsing fails, fix or delete the corrupted entry
+          log('Found corrupted favorite with id: ${map['id']}', name: 'DatabaseHelper');
+
+          try {
+            // Get basic info
+            final id = map['id'] as String;
+            final userId = map['userId'] as String;
+
+            // Create a new valid favorite
+            final fixedFavorite = FavoriteModel(
+              id: id,
+              userId: userId,
+              tipId: id.replaceAll('${userId}_', ''), // Extract tipId from ID format
+              createdAt: DateTime.now(),
+            );
+
+            // Replace corrupted data
+            await db.update(
+                'favorites',
+                {'data': fixedFavorite.toProto()},
+                where: 'id = ?',
+                whereArgs: [id]
+            );
+
+            fixed++;
+            log('Fixed corrupted favorite: $id', name: 'DatabaseHelper');
+          } catch (fixError) {
+            // If we can't fix it, delete it
+            await db.delete('favorites', where: 'id = ?', whereArgs: [map['id']]);
+            log('Deleted unfixable corrupted favorite: ${map['id']}', name: 'DatabaseHelper');
+          }
+        }
+      }
+
+      log('Completed favorites database cleanup. Fixed: $fixed entries', name: 'DatabaseHelper');
+    } catch (e) {
+      log('Error during favorites cleanup: $e', name: 'DatabaseHelper');
+    }
   }
 
   // Close database

@@ -66,16 +66,36 @@ class TipsService {
   ) async {
     try {
       if (!wasFavorite) {
+        // Create favorite model
         final favorite = FavoriteModel(
           id: const Uuid().v4(),
           userId: userId,
           tipId: tipId,
           createdAt: DateTime.now(),
         );
-        await provider.addFavorite(favorite);
+
+        // Fetch the tip model first - we need this for the updated provider
+        final tip = await _dataRepository.getTip(tipId);
+
+        if (tip == null) {
+          dev.log('Could not find tip with ID $tipId');
+          throw Exception('Tip not found');
+        }
+
+        // Pass both the favorite model and tip model to addFavorite
+        await provider.addFavorite(favorite, tip);
         dev.log('Added favorite: ${favorite.id} for user $userId, tip $tipId');
       } else {
-        final favorite = provider.favorites.firstWhere((f) => f.tipId == tipId);
+        final favorite = provider.favorites.firstWhere(
+          (f) => f.tipId == tipId && f.userId == userId,
+          orElse: () => FavoriteModel(id: '', tipId: tipId, userId: userId),
+        );
+
+        if (favorite.id.isEmpty) {
+          dev.log('Could not find favorite for tip $tipId');
+          return;
+        }
+
         await provider.deleteFavorite(favorite.id);
         dev.log(
           'Removed favorite: ${favorite.id} for user $userId, tip $tipId',

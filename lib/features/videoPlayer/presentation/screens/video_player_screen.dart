@@ -48,6 +48,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
   bool _isDescriptionExpanded = false;
   bool _isFullScreen = false;
   bool _autoplayEnabled = true;
+  bool _handlingBackPress = false; // Flag to prevent redundant back handling
 
   // Comment section expanded state
   bool _isCommentSectionExpanded = false;
@@ -108,16 +109,26 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
 
     _prepareRelatedVideos();
+
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
     _initializeVideoPlayer();
     _scrollController.addListener(_scrollListener);
 
-    // Lock to portrait on initialization
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeUser();
-      _loadViewCount();
-      _loadComments();
+      final userId = _authService.getCurrentUser()?.uid ?? '';
+      if (userId.isNotEmpty) {
+        Provider.of<FavoritesProvider>(context, listen: false).syncFavorites(userId).then((_) {
+          _initializeUser();
+          _loadViewCount();
+          _loadComments();
+        });
+      } else {
+        _initializeUser();
+        _loadViewCount();
+        _loadComments();
+      }
     });
   }
 
@@ -445,9 +456,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         looping: false,
         fullScreenByDefault: false,
         allowedScreenSleep: false,
-        // Let the player handle orientations itself during fullscreen
-        autoDetectFullscreenDeviceOrientation: false,
-        // This prevents the player from setting orientations internally
+        // Let the player handle orientation internally
+        autoDetectFullscreenDeviceOrientation: true,
+        // Prevent the player from changing orientation automatically
         deviceOrientationsOnFullScreen: [],
         deviceOrientationsAfterFullScreen: [],
         handleLifecycle: true,
@@ -529,36 +540,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
             });
           }
         } else if (event.betterPlayerEventType == BetterPlayerEventType.openFullscreen) {
-          _safeSetState(() {
-            _isFullScreen = true;
-            log('Entered fullscreen mode', name: 'VideoPlayerScreen');
-          });
-
-          // Force landscape orientation with a small delay to ensure it takes effect
-          Future.delayed(Duration(milliseconds: 50), () {
-            if (mounted) {
-              log('Setting landscape orientation', name: 'VideoPlayerScreen');
-              SystemChrome.setPreferredOrientations([
-                DeviceOrientation.landscapeLeft,
-                DeviceOrientation.landscapeRight,
-              ]);
-              SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-            }
-          });
+          _enterFullScreen();
         } else if (event.betterPlayerEventType == BetterPlayerEventType.hideFullscreen) {
-          _safeSetState(() {
-            _isFullScreen = false;
-            log('Exited fullscreen mode', name: 'VideoPlayerScreen');
-          });
-
-          // Restore portrait orientation with a small delay
-          Future.delayed(Duration(milliseconds: 50), () {
-            if (mounted) {
-              log('Setting portrait orientation', name: 'VideoPlayerScreen');
-              SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-              SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-            }
-          });
+          _exitFullScreen();
         }
       });
     } else {
@@ -568,6 +552,35 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         _isLoading = false;
       });
     }
+  }
+
+  // Improved fullscreen enter function with faster orientation change
+  void _enterFullScreen() {
+    log('Entering fullscreen mode', name: 'VideoPlayerScreen');
+
+    _safeSetState(() {
+      _isFullScreen = true;
+    });
+
+    // Set orientation change immediately without delay
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  // Improved fullscreen exit function with faster orientation change
+  void _exitFullScreen() {
+    log('Exiting fullscreen mode', name: 'VideoPlayerScreen');
+
+    _safeSetState(() {
+      _isFullScreen = false;
+    });
+
+    // Set orientation change immediately without delay
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
   void _playNextVideo() {
@@ -612,23 +625,58 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     final userId = _authService.getCurrentUser()?.uid ?? '';
     if (userId.isEmpty) {
       log('No user ID found, skipping favorite/like initialization', name: 'VideoPlayerScreen');
+      _safeSetState(() {
+        _isFavorite = false;
+        _isLiked = false;
+      });
       return;
     }
 
-    if (!mounted) return;
+    if (_currentTip.tipsId.isEmpty) {
+      log('Invalid tipId in _initializeUser: ${_currentTip.tipsId}', name: 'VideoPlayerScreen');
+      _safeSetState(() {
+        _isFavorite = false;
+        _isLiked = false;
+      });
+      return;
+    }
 
     final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
 
+    // Check synchronously first in case favorites are already loaded
+    _safeSetState(() {
+      _isFavorite = favoritesProvider.isFavorite(_currentTip.tipsId, userId);
+    });
+    log('Synchronous _isFavorite check: $_isFavorite for tip ${_currentTip.tipsId}', name: 'VideoPlayerScreen');
+
+    // Force reload favorites to ensure latest state
     favoritesProvider.loadFavorites(userId).then((_) {
       if (mounted) {
         _safeSetState(() {
           _isFavorite = favoritesProvider.isFavorite(_currentTip.tipsId, userId);
         });
+        log('Async _isFavorite check after loadFavorites: $_isFavorite for tip ${_currentTip.tipsId}', name: 'VideoPlayerScreen');
+        log('Favorites list length: ${favoritesProvider.favorites.length}', name: 'VideoPlayerScreen');
+        log('Favorites IDs: ${favoritesProvider.favorites.map((f) => f.id).toList()}', name: 'VideoPlayerScreen');
       }
     }).catchError((error) {
       log('Error loading favorites for tip ${_currentTip.tipsId}: $error', name: 'VideoPlayerScreen');
+      if (mounted) {
+        _safeSetState(() {
+          _isFavorite = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load favorites: $error'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     });
 
+    // Load like status
     _firestore
         .collection('likes')
         .doc('${userId}_${_currentTip.tipsId}')
@@ -638,9 +686,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         _safeSetState(() {
           _isLiked = doc.exists;
         });
+        log('Initialized _isLiked: $_isLiked for tip ${_currentTip.tipsId}', name: 'VideoPlayerScreen');
+      }
+    }).catchError((error) {
+      log('Error loading like status for tip ${_currentTip.tipsId}: $error', name: 'VideoPlayerScreen');
+      if (mounted) {
+        _safeSetState(() {
+          _isLiked = false;
+        });
       }
     });
   }
+
 
   void _toggleFavorite() {
     final userId = _authService.getCurrentUser()?.uid ?? '';
@@ -663,12 +720,30 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
 
+    // Construct a consistent favorite ID
+    final favoriteId = '${userId}_${_currentTip.tipsId}';
+
     if (_isFavorite) {
+      // For deletion, find the exact favorite with matching ID
       final favorite = favoritesProvider.favorites.firstWhere(
-            (f) => f.tipId == _currentTip.tipsId && f.userId == userId,
-        orElse: () => FavoriteModel(id: '', tipId: _currentTip.tipsId, userId: userId),
+            (f) => f.id == favoriteId,
+        orElse: () => FavoriteModel(
+            id: favoriteId,
+            tipId: _currentTip.tipsId,
+            userId: userId
+        ),
       );
-      favoritesProvider.deleteFavorite(favorite.id);
+
+      log('Deleting favorite with ID: ${favorite.id}', name: 'VideoPlayerScreen');
+
+      // Only attempt to delete if we have a valid ID
+      if (favorite.id.isNotEmpty) {
+        favoritesProvider.deleteFavorite(favorite.id).then((_) {
+          log('Successfully deleted favorite', name: 'VideoPlayerScreen');
+        }).catchError((error) {
+          log('Error deleting favorite: $error', name: 'VideoPlayerScreen');
+        });
+      }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -679,13 +754,21 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
     } else {
+      // Create a properly structured favorite model
       final favorite = FavoriteModel(
-        id: '${userId}_${_currentTip.tipsId}',
+        id: favoriteId,
         tipId: _currentTip.tipsId,
         userId: userId,
         createdAt: DateTime.now(),
       );
-      favoritesProvider.addFavorite(favorite);
+
+      log('Adding favorite with ID: ${favorite.id}', name: 'VideoPlayerScreen');
+
+      favoritesProvider.addFavorite(favorite, _currentTip).then((_) {
+        log('Successfully added favorite', name: 'VideoPlayerScreen');
+      }).catchError((error) {
+        log('Error adding favorite: $error', name: 'VideoPlayerScreen');
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -696,6 +779,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
         ),
       );
     }
+
+    // Update local state for immediate UI feedback
     _safeSetState(() {
       _isFavorite = !_isFavorite;
     });
@@ -1639,21 +1724,41 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
     );
   }
 
-  // Modified to correctly handle fullscreen exit
+  // Improved back button handling for fullscreen exit
   Future<bool> _handleBackPress() async {
-    log('Handling back press, isFullScreen: $_isFullScreen', name: 'VideoPlayerScreen');
-    if (_isFullScreen && _isControllerReady) {
-      log('Triggering fullscreen exit via back press', name: 'VideoPlayerScreen');
+    if (_handlingBackPress) return false; // Prevent multiple simultaneous calls
 
-      // Add a delay before calling exitFullScreen to ensure the orientation changes are processed
-      Future.delayed(Duration(milliseconds: 50), () {
-        if (_isControllerReady && mounted) {
+    log('Handling back press, isFullScreen: $_isFullScreen', name: 'VideoPlayerScreen');
+
+    if (_isFullScreen && _isControllerReady) {
+      _handlingBackPress = true;
+      log('Exiting fullscreen via back press', name: 'VideoPlayerScreen');
+
+      // First set state to update UI
+      _safeSetState(() {
+        _isFullScreen = false;
+      });
+
+      // Set orientation to portrait immediately
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+      // Then call the controller's exit fullscreen
+      try {
+        if (_controller != null) {
           _controller!.exitFullScreen();
         }
-      });
+      } catch (e) {
+        log('Error exiting fullscreen: $e', name: 'VideoPlayerScreen');
+      }
+
+      // Add slight delay before allowing more back presses
+      await Future.delayed(Duration(milliseconds: 300));
+      _handlingBackPress = false;
 
       return false; // Prevent default back behavior
     }
+
     return true; // Allow normal back navigation
   }
 
@@ -1663,214 +1768,257 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
     return WillPopScope(
       onWillPop: _handleBackPress,
-      child: Scaffold(
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        appBar: _isFullScreen
-            ? null
-            : AppBar(
+      child: GestureDetector(
+        // Add a gesture detector to catch Android swipe gestures
+        onHorizontalDragEnd: (details) {
+          // If it's a right-to-left swipe (negative velocity) in fullscreen mode
+          if (_isFullScreen && details.primaryVelocity != null && details.primaryVelocity! < -300) {
+            _handleBackPress();
+          }
+        },
+        child: Scaffold(
           backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios,
-              color: isDarkMode ? Colors.white : Colors.black,
-              size: 24.sp,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-          title: Text(
-            widget.categoryName,
-            style: TextStyle(
-              fontFamily: 'Poppins',
-              fontSize: 18.sp,
-              fontWeight: FontWeight.w600,
-              color: isDarkMode ? Colors.white : Colors.black,
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Icon(
-                    _isCasting ? Icons.cast_connected : Icons.cast,
-                    color: _isCasting
-                        ? AppColors.primary
-                        : (isDarkMode ? Colors.white : Colors.black),
-                    size: 24.sp,
-                  ),
-                  if (_isConnectingCast)
-                    SizedBox(
-                      width: 36.w,
-                      height: 36.h,
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                        strokeWidth: 2.w,
-                      ),
-                    ),
-                ],
+          appBar: _isFullScreen
+              ? null
+              : AppBar(
+            backgroundColor: isDarkMode ? Colors.black : Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios,
+                color: isDarkMode ? Colors.white : Colors.black,
+                size: 24.sp,
               ),
-              onPressed: _castVideo,
+              onPressed: () => Navigator.pop(context),
             ),
-            SizedBox(width: 8.w),
-          ],
-        ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
+            title: Text(
+              widget.categoryName,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    if (_isLoading)
-                      Container(
-                        color: Colors.black,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primary,
-                            strokeWidth: 3.w,
-                          ),
+                    Icon(
+                      _isCasting ? Icons.cast_connected : Icons.cast,
+                      color: _isCasting
+                          ? AppColors.primary
+                          : (isDarkMode ? Colors.white : Colors.black),
+                      size: 24.sp,
+                    ),
+                    if (_isConnectingCast)
+                      SizedBox(
+                        width: 36.w,
+                        height: 36.h,
+                        child: CircularProgressIndicator(
+                          color: AppColors.primary,
+                          strokeWidth: 2.w,
                         ),
-                      )
-                    else if (_videoError != null)
-                      _buildErrorWidget()
-                    else if (_isControllerReady)
-                        BetterPlayer(controller: _controller!)
-                      else
+                      ),
+                  ],
+                ),
+                onPressed: _castVideo,
+              ),
+              SizedBox(width: 8.w),
+            ],
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    children: [
+                      if (_isLoading)
                         Container(
                           color: Colors.black,
                           child: Center(
                             child: CircularProgressIndicator(
                               color: AppColors.primary,
+                              strokeWidth: 3.w,
+                            ),
+                          ),
+                        )
+                      else if (_videoError != null)
+                        _buildErrorWidget()
+                      else if (_isControllerReady)
+                          BetterPlayer(controller: _controller!)
+                        else
+                          Container(
+                            color: Colors.black,
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                      if (_isCasting)
+                        Container(
+                          color: Colors.black.withOpacity(0.8),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cast_connected,
+                                  color: Colors.white,
+                                  size: 48.sp,
+                                ),
+                                SizedBox(height: 16.h),
+                                Text(
+                                  'Casting to device',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16.sp,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(height: 12.h),
+                                ElevatedButton.icon(
+                                  onPressed: _stopCasting,
+                                  icon: Icon(Icons.stop),
+                                  label: Text('Stop Casting'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.error,
+                                    foregroundColor: Colors.white,
+                                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                    if (_isCasting)
-                      Container(
-                        color: Colors.black.withOpacity(0.8),
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: BouncingScrollPhysics(),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 12.h),
+                          Text(
+                            _currentTip.tipsTitle ?? 'No Title',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.w600,
+                              color: isDarkMode ? Colors.white : Colors.black,
+                            ),
+                          ),
+                          SizedBox(height: 8.h),
+                          Row(
                             children: [
-                              Icon(
-                                Icons.cast_connected,
-                                color: Colors.white,
-                                size: 48.sp,
-                              ),
-                              SizedBox(height: 16.h),
                               Text(
-                                'Casting to device',
+                                '${_formatViewCount(_viewCount)} views • ${_formatTimeAgo(_currentTip.createdAt)}',
                                 style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 12.h),
-                              ElevatedButton.icon(
-                                onPressed: _stopCasting,
-                                icon: Icon(Icons.stop),
-                                label: Text('Stop Casting'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.error,
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                  fontFamily: 'Poppins',
+                                  fontSize: 14.sp,
+                                  color: isDarkMode ? Colors.white70 : Colors.black54,
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: SingleChildScrollView(
-                  controller: _scrollController,
-                  physics: BouncingScrollPhysics(),
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SizedBox(height: 12.h),
-                        Text(
-                          _currentTip.tipsTitle ?? 'No Title',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w600,
-                            color: isDarkMode ? Colors.white : Colors.black,
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                        Row(
-                          children: [
-                            Text(
-                              '${_formatViewCount(_viewCount)} views • ${_formatTimeAgo(_currentTip.createdAt)}',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 14.sp,
-                                color: isDarkMode ? Colors.white70 : Colors.black54,
+                          SizedBox(height: 16.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              _buildActionButton(
+                                icon: _isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
+                                label: 'Like',
+                                onTap: _toggleLike,
+                                isActive: _isLiked,
                               ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _buildActionButton(
-                              icon: _isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                              label: 'Like',
-                              onTap: _toggleLike,
-                              isActive: _isLiked,
-                            ),
-                            _buildActionButton(
-                              icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
-                              label: 'Favorite',
-                              onTap: _toggleFavorite,
-                              isActive: _isFavorite,
-                            ),
-                            _buildActionButton(
-                              icon: Icons.share_outlined,
-                              label: 'Share',
-                              onTap: _shareVideo,
-                            ),
-                            _buildActionButton(
-                              icon: _isDownloading ? Icons.download_done : Icons.download_outlined,
-                              label: 'Download',
-                              onTap: _downloadVideo,
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 24.r,
-                              backgroundColor: AppColors.primary.withOpacity(0.2),
-                              child: Text(
-                                (_currentTip.tipsAuthor?.isNotEmpty ?? false)
-                                    ? _currentTip.tipsAuthor![0].toUpperCase()
-                                    : 'A',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 20.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primary,
+                              _buildActionButton(
+                                icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
+                                label: 'Favorite',
+                                onTap: _toggleFavorite,
+                                isActive: _isFavorite,
+                              ),
+                              _buildActionButton(
+                                icon: Icons.share_outlined,
+                                label: 'Share',
+                                onTap: _shareVideo,
+                              ),
+                              _buildActionButton(
+                                icon: _isDownloading ? Icons.download_done : Icons.download_outlined,
+                                label: 'Download',
+                                onTap: _downloadVideo,
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16.h),
+                          Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
+                          SizedBox(height: 16.h),
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                radius: 24.r,
+                                backgroundColor: AppColors.primary.withOpacity(0.2),
+                                child: Text(
+                                  (_currentTip.tipsAuthor?.isNotEmpty ?? false)
+                                      ? _currentTip.tipsAuthor![0].toUpperCase()
+                                      : 'A',
+                                  style: TextStyle(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 20.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primary,
+                                  ),
                                 ),
                               ),
-                            ),
-                            SizedBox(width: 12.w),
-                            Expanded(
+                              SizedBox(width: 12.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _currentTip.tipsAuthor ?? 'Unknown Author',
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 16.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Expert',
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 14.sp,
+                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 16.h),
+                          if (_currentTip.tipsDescription != null && _currentTip.tipsDescription!.isNotEmpty) ...[
+                            Container(
+                              decoration: BoxDecoration(
+                                color: isDarkMode
+                                    ? Colors.white.withOpacity(0.05)
+                                    : Colors.black.withOpacity(0.03),
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                              padding: EdgeInsets.all(12.w),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _currentTip.tipsAuthor ?? 'Unknown Author',
+                                    'Description',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 16.sp,
@@ -1878,277 +2026,243 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
                                       color: isDarkMode ? Colors.white : Colors.black,
                                     ),
                                   ),
+                                  SizedBox(height: 8.h),
+                                  AnimatedCrossFade(
+                                    firstChild: Text(
+                                      _currentTip.tipsDescription!,
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 14.sp,
+                                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                                      ),
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    secondChild: Text(
+                                      _currentTip.tipsDescription!,
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 14.sp,
+                                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                                      ),
+                                    ),
+                                    crossFadeState: _isDescriptionExpanded
+                                        ? CrossFadeState.showSecond
+                                        : CrossFadeState.showFirst,
+                                    duration: Duration(milliseconds: 300),
+                                  ),
+                                  if (_currentTip.tipsDescription!.length > 100)
+                                    TextButton(
+                                      onPressed: () {
+                                        _safeSetState(() {
+                                          _isDescriptionExpanded = !_isDescriptionExpanded;
+                                        });
+                                      },
+                                      child: Text(
+                                        _isDescriptionExpanded ? 'Show Less' : 'Show More',
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 14.sp,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                      style: TextButton.styleFrom(
+                                        padding: EdgeInsets.zero,
+                                        alignment: Alignment.centerLeft,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            SizedBox(height: 16.h),
+                          ],
+                          Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
+                          SizedBox(height: 16.h),
+                          _buildCommentsSection(),
+                          SizedBox(height: 16.h),
+                          Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
+                          SizedBox(height: 16.h),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'Up Next',
+                                style: TextStyle(
+                                  fontFamily: 'Poppins',
+                                  fontSize: 18.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDarkMode ? Colors.white : Colors.black,
+                                ),
+                              ),
+                              Row(
+                                children: [
                                   Text(
-                                    'Expert',
+                                    'Autoplay',
                                     style: TextStyle(
                                       fontFamily: 'Poppins',
                                       fontSize: 14.sp,
                                       color: isDarkMode ? Colors.white70 : Colors.black54,
                                     ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        if (_currentTip.tipsDescription != null && _currentTip.tipsDescription!.isNotEmpty) ...[
-                          Container(
-                            decoration: BoxDecoration(
-                              color: isDarkMode
-                                  ? Colors.white.withOpacity(0.05)
-                                  : Colors.black.withOpacity(0.03),
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            padding: EdgeInsets.all(12.w),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Description',
-                                  style: TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 16.sp,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDarkMode ? Colors.white : Colors.black,
-                                  ),
-                                ),
-                                SizedBox(height: 8.h),
-                                AnimatedCrossFade(
-                                  firstChild: Text(
-                                    _currentTip.tipsDescription!,
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 14.sp,
-                                      color: isDarkMode ? Colors.white70 : Colors.black87,
-                                    ),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  secondChild: Text(
-                                    _currentTip.tipsDescription!,
-                                    style: TextStyle(
-                                      fontFamily: 'Poppins',
-                                      fontSize: 14.sp,
-                                      color: isDarkMode ? Colors.white70 : Colors.black87,
-                                    ),
-                                  ),
-                                  crossFadeState: _isDescriptionExpanded
-                                      ? CrossFadeState.showSecond
-                                      : CrossFadeState.showFirst,
-                                  duration: Duration(milliseconds: 300),
-                                ),
-                                if (_currentTip.tipsDescription!.length > 100)
-                                  TextButton(
-                                    onPressed: () {
+                                  Switch(
+                                    value: _autoplayEnabled,
+                                    onChanged: (value) {
                                       _safeSetState(() {
-                                        _isDescriptionExpanded = !_isDescriptionExpanded;
+                                        _autoplayEnabled = value;
                                       });
                                     },
-                                    child: Text(
-                                      _isDescriptionExpanded ? 'Show Less' : 'Show More',
-                                      style: TextStyle(
-                                        fontFamily: 'Poppins',
-                                        fontSize: 14.sp,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                    style: TextButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      alignment: Alignment.centerLeft,
-                                    ),
+                                    activeColor: AppColors.primary,
                                   ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(height: 16.h),
-                        ],
-                        Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
-                        SizedBox(height: 16.h),
-                        _buildCommentsSection(),
-                        SizedBox(height: 16.h),
-                        Divider(color: isDarkMode ? Colors.white24 : Colors.black12),
-                        SizedBox(height: 16.h),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Up Next',
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 18.sp,
-                                fontWeight: FontWeight.w600,
-                                color: isDarkMode ? Colors.white : Colors.black,
+                                ],
                               ),
-                            ),
-                            Row(
-                              children: [
-                                Text(
-                                  'Autoplay',
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          if (_relatedVideos.isEmpty)
+                            Padding(
+                              padding: EdgeInsets.symmetric(vertical: 20.h),
+                              child: Center(
+                                child: Text(
+                                  'No related videos found',
                                   style: TextStyle(
                                     fontFamily: 'Poppins',
                                     fontSize: 14.sp,
                                     color: isDarkMode ? Colors.white70 : Colors.black54,
                                   ),
                                 ),
-                                Switch(
-                                  value: _autoplayEnabled,
-                                  onChanged: (value) {
-                                    _safeSetState(() {
-                                      _autoplayEnabled = value;
-                                    });
-                                  },
-                                  activeColor: AppColors.primary,
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 12.h),
-                        if (_relatedVideos.isEmpty)
-                          Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20.h),
-                            child: Center(
-                              child: Text(
-                                'No related videos found',
-                                style: TextStyle(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 14.sp,
-                                  color: isDarkMode ? Colors.white70 : Colors.black54,
-                                ),
                               ),
-                            ),
-                          )
-                        else
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: NeverScrollableScrollPhysics(),
-                            itemCount: _relatedVideos.length,
-                            itemBuilder: (context, index) {
-                              final video = _relatedVideos[index];
-                              return InkWell(
-                                onTap: () {
-                                  if (_isControllerReady) {
-                                    _controller!.pause();
-                                  }
-
-                                  var oldController = _controller;
-                                  _controller = null;
-
-                                  Future.delayed(Duration(milliseconds: 50), () {
-                                    if (oldController != null) {
-                                      try {
-                                        oldController.dispose();
-                                      } catch (e) {
-                                        log('Error disposing controller: $e');
-                                      }
+                            )
+                          else
+                            ListView.builder(
+                              shrinkWrap: true,
+                              physics: NeverScrollableScrollPhysics(),
+                              itemCount: _relatedVideos.length,
+                              itemBuilder: (context, index) {
+                                final video = _relatedVideos[index];
+                                return InkWell(
+                                  onTap: () {
+                                    if (_isControllerReady) {
+                                      _controller!.pause();
                                     }
-                                  });
 
-                                  _safeSetState(() {
-                                    final oldVideo = _currentTip;
-                                    _currentTip = video;
-                                    _relatedVideos[index] = oldVideo;
-                                    _isLoading = true;
-                                    _viewCounted = false;
-                                    _expandedCommentIds.clear();
-                                    _isCommentSectionExpanded = false;
-                                  });
+                                    var oldController = _controller;
+                                    _controller = null;
 
-                                  _initializeVideoPlayer();
-                                  _initializeUser();
-                                  _loadViewCount();
-                                  _loadComments();
-                                },
-                                child: Padding(
-                                  padding: EdgeInsets.only(bottom: 16.h),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Stack(
-                                        children: [
-                                          ClipRRect(
-                                            borderRadius: BorderRadius.circular(8.r),
-                                            child: Container(
-                                              width: 120.w,
-                                              height: 68.h,
-                                              decoration: BoxDecoration(
-                                                color: Colors.black,
-                                                image: video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
-                                                    ? DecorationImage(
-                                                  image: NetworkImage(video.thumbnailUrl!),
-                                                  fit: BoxFit.cover,
-                                                )
+                                    Future.delayed(Duration(milliseconds: 50), () {
+                                      if (oldController != null) {
+                                        try {
+                                          oldController.dispose();
+                                        } catch (e) {
+                                          log('Error disposing controller: $e');
+                                        }
+                                      }
+                                    });
+
+                                    _safeSetState(() {
+                                      final oldVideo = _currentTip;
+                                      _currentTip = video;
+                                      _relatedVideos[index] = oldVideo;
+                                      _isLoading = true;
+                                      _viewCounted = false;
+                                      _expandedCommentIds.clear();
+                                      _isCommentSectionExpanded = false;
+                                    });
+
+                                    _initializeVideoPlayer();
+                                    _initializeUser();
+                                    _loadViewCount();
+                                    _loadComments();
+                                  },
+                                  child: Padding(
+                                    padding: EdgeInsets.only(bottom: 16.h),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Stack(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8.r),
+                                              child: Container(
+                                                width: 120.w,
+                                                height: 68.h,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.black,
+                                                  image: video.thumbnailUrl != null && video.thumbnailUrl!.isNotEmpty
+                                                      ? DecorationImage(
+                                                    image: NetworkImage(video.thumbnailUrl!),
+                                                    fit: BoxFit.cover,
+                                                  )
+                                                      : null,
+                                                ),
+                                                child: video.thumbnailUrl == null || video.thumbnailUrl!.isEmpty
+                                                    ? Center(child: Icon(Icons.play_circle_outline, color: Colors.white, size: 30.sp))
                                                     : null,
                                               ),
-                                              child: video.thumbnailUrl == null || video.thumbnailUrl!.isEmpty
-                                                  ? Center(child: Icon(Icons.play_circle_outline, color: Colors.white, size: 30.sp))
-                                                  : null,
                                             ),
-                                          ),
-                                          if (video.mediaDuration != null)
-                                            Positioned(
-                                              right: 4.w,
-                                              bottom: 4.h,
-                                              child: Container(
-                                                padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.black.withOpacity(0.7),
-                                                  borderRadius: BorderRadius.circular(4.r),
-                                                ),
-                                                child: Text(
-                                                  video.mediaDuration!,
-                                                  style: TextStyle(
-                                                    fontFamily: 'Poppins',
-                                                    fontSize: 10.sp,
-                                                    color: Colors.white,
+                                            if (video.mediaDuration != null)
+                                              Positioned(
+                                                right: 4.w,
+                                                bottom: 4.h,
+                                                child: Container(
+                                                  padding: EdgeInsets.symmetric(horizontal: 4.w, vertical: 2.h),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withOpacity(0.7),
+                                                    borderRadius: BorderRadius.circular(4.r),
+                                                  ),
+                                                  child: Text(
+                                                    video.mediaDuration!,
+                                                    style: TextStyle(
+                                                      fontFamily: 'Poppins',
+                                                      fontSize: 10.sp,
+                                                      color: Colors.white,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                        ],
-                                      ),
-                                      SizedBox(width: 12.w),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              video.tipsTitle ?? 'No Title',
-                                              style: TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 14.sp,
-                                                fontWeight: FontWeight.w500,
-                                                color: isDarkMode ? Colors.white : Colors.black,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            SizedBox(height: 4.h),
-                                            Text(
-                                              video.tipsAuthor ?? 'Unknown Author',
-                                              style: TextStyle(
-                                                fontFamily: 'Poppins',
-                                                fontSize: 12.sp,
-                                                color: isDarkMode ? Colors.white70 : Colors.black54,
-                                              ),
-                                            ),
                                           ],
                                         ),
-                                      ),
-                                    ],
+                                        SizedBox(width: 12.w),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                video.tipsTitle ?? 'No Title',
+                                                style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 14.sp,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: isDarkMode ? Colors.white : Colors.black,
+                                                ),
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              SizedBox(height: 4.h),
+                                              Text(
+                                                video.tipsAuthor ?? 'Unknown Author',
+                                                style: TextStyle(
+                                                  fontFamily: 'Poppins',
+                                                  fontSize: 12.sp,
+                                                  color: isDarkMode ? Colors.white70 : Colors.black54,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                        SizedBox(height: 40.h),
-                      ],
+                                );
+                              },
+                            ),
+                          SizedBox(height: 40.h),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -2157,7 +2271,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
 
   @override
   void dispose() {
-    // Don't reset orientation here as it may interfere with fullscreen exit
+    _handlingBackPress = true; // Prevent any further back handling during dispose
+
     _animationController.dispose();
     _scrollController.dispose();
     _commentController.dispose();
@@ -2172,10 +2287,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen>
       }
     }
 
-    // Set orientation back to portrait after a delay to ensure proper cleanup
-    Future.delayed(Duration(milliseconds: 100), () {
-      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    });
+    // Make sure we restore orientation to portrait
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     super.dispose();
   }

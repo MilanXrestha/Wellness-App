@@ -1,17 +1,23 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/config/routes/route_name.dart';
 import 'package:wellness_app/features/subscription/presentation/providers/premium_status_provider.dart';
 import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 import 'package:wellness_app/features/videoPlayer/presentation/providers/shorts_provider.dart';
+import 'dart:developer';
 
 import '../../../main/presentation/screens/tab_switch_notification.dart';
+import '../../domain/useCases/video_router.dart';
 
-class ShortVideoCard extends StatelessWidget {
+class ShortVideoCard extends StatefulWidget {
   final TipModel tip;
   final String categoryName;
   final List<TipModel> relatedTips;
@@ -22,6 +28,113 @@ class ShortVideoCard extends StatelessWidget {
     required this.categoryName,
     required this.relatedTips,
   });
+
+  @override
+  State<ShortVideoCard> createState() => _ShortVideoCardState();
+}
+
+class _ShortVideoCardState extends State<ShortVideoCard> {
+  String? _thumbnailPath;
+  bool _isLoadingThumbnail = false;
+
+  // Thumbnail cache manager
+  static final CacheManager _thumbnailCacheManager = CacheManager(
+    Config(
+      'videoThumbnailCache',
+      stalePeriod: const Duration(days: 7),
+      maxNrOfCacheObjects: 100,
+      repo: JsonCacheInfoRepository(databaseName: 'thumbnailCache'),
+      fileService: HttpFileService(),
+    ),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _generateThumbnailIfNeeded();
+  }
+
+  Future<void> _generateThumbnailIfNeeded() async {
+    if (widget.tip.thumbnailUrl != null &&
+        widget.tip.thumbnailUrl!.isNotEmpty) {
+      // Use existing thumbnail if available
+      return;
+    }
+
+    if (widget.tip.videoUrl == null || widget.tip.videoUrl!.isEmpty) {
+      // No video URL to generate thumbnail from
+      return;
+    }
+
+    setState(() {
+      _isLoadingThumbnail = true;
+    });
+
+    try {
+      // Check if we have this thumbnail cached
+      final cacheKey = 'thumbnail_${widget.tip.tipsId}';
+
+      // Try to get from cache first
+      final cachedFile = await _thumbnailCacheManager.getFileFromCache(
+        cacheKey,
+      );
+      if (cachedFile != null) {
+        if (mounted) {
+          setState(() {
+            _thumbnailPath = cachedFile.file.path;
+            _isLoadingThumbnail = false;
+          });
+        }
+        log(
+          'Using cached thumbnail for ${widget.tip.tipsId}',
+          name: 'ShortVideoCard',
+        );
+        return;
+      }
+
+      log(
+        'Generating thumbnail for ${widget.tip.tipsId}',
+        name: 'ShortVideoCard',
+      );
+
+      // Generate new thumbnail
+      final thumbnailPath = await VideoThumbnail.thumbnailFile(
+        video: widget.tip.videoUrl!,
+        thumbnailPath: (await getTemporaryDirectory()).path,
+        imageFormat: ImageFormat.JPEG,
+        maxHeight: 400,
+        quality: 75,
+      );
+
+      if (thumbnailPath != null) {
+        // Cache the generated thumbnail
+        await _thumbnailCacheManager.putFile(
+          cacheKey,
+          File(thumbnailPath).readAsBytesSync(),
+          key: cacheKey,
+        );
+
+        log(
+          'Cached new thumbnail for ${widget.tip.tipsId}',
+          name: 'ShortVideoCard',
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          _thumbnailPath = thumbnailPath;
+          _isLoadingThumbnail = false;
+        });
+      }
+    } catch (e) {
+      log('Error generating thumbnail: $e', name: 'ShortVideoCard');
+      if (mounted) {
+        setState(() {
+          _isLoadingThumbnail = false;
+        });
+      }
+    }
+  }
 
   void _showPremiumDialog(BuildContext context) {
     // Premium dialog implementation remains unchanged
@@ -158,64 +271,96 @@ class ShortVideoCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        if (tip.isPremium && !canAccessPremium) {
+        if (widget.tip.isPremium && !canAccessPremium) {
           _showPremiumDialog(context);
         } else {
-          // Start with an empty list of shorts to add
-          final Set<String> alreadyAddedIds = {};
-          final List<TipModel> shortsToAdd = [];
+          final shortsProvider = Provider.of<ShortsProvider>(
+            context,
+            listen: false,
+          );
 
-          // First add the current tip if it's not already in the provider's list
-          if (!shortsProvider.shorts.any((s) => s.tipsId == tip.tipsId)) {
-            shortsToAdd.add(tip);
-            alreadyAddedIds.add(tip.tipsId);
-          }
+          // COMPLETELY REBUILT VIDEO LIST WITH SELECTED VIDEO FIRST
+          List<TipModel> newShortsList = [];
 
-          // Then filter and add related shorts
-          if (relatedTips.isNotEmpty) {
-            for (final relatedTip in relatedTips) {
-              // Only add if:
-              // 1. It's a short video
-              // 2. It's not the current tip
-              // 3. It's not already in our list to add
-              // 4. It's not already in the provider's list
-              if (relatedTip.isShort &&
-                  relatedTip.tipsId != tip.tipsId &&
-                  !alreadyAddedIds.contains(relatedTip.tipsId) &&
-                  !shortsProvider.shorts.any(
-                    (s) => s.tipsId == relatedTip.tipsId,
-                  )) {
-                shortsToAdd.add(relatedTip);
-                alreadyAddedIds.add(relatedTip.tipsId);
-              }
+          // 1. Add the clicked video first
+          newShortsList.add(widget.tip);
+          log('Added selected video ${widget.tip.tipsId} at position 0', name: 'ShortVideoCard');
+
+          // 2. Add related videos next (except the one we already added)
+          if (widget.relatedTips.isNotEmpty) {
+            final relatedShortsToAdd = widget.relatedTips
+                .where((tip) => tip.isShort && tip.tipsId != widget.tip.tipsId)
+                .toList();
+
+            if (relatedShortsToAdd.isNotEmpty) {
+              newShortsList.addAll(relatedShortsToAdd);
+              log('Added ${relatedShortsToAdd.length} related videos', name: 'ShortVideoCard');
             }
           }
 
-          // Only add shorts if we have any new ones
-          if (shortsToAdd.isNotEmpty) {
-            shortsProvider.addShorts(shortsToAdd);
+          // 3. Add all other existing shorts (except those we already added)
+          final existingShorts = shortsProvider.shorts.where((s) =>
+          s.tipsId != widget.tip.tipsId &&
+              !newShortsList.any((added) => added.tipsId == s.tipsId)
+          ).toList();
+
+          if (existingShorts.isNotEmpty) {
+            newShortsList.addAll(existingShorts);
+            log('Added ${existingShorts.length} existing shorts', name: 'ShortVideoCard');
           }
 
-          // Get back to main screen if needed
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          // Replace the entire shorts list
+          shortsProvider.shorts.clear();
+          shortsProvider.shorts.addAll(newShortsList);
 
-          // Set the selected short
-          shortsProvider.selectShortById(tip.tipsId);
+          // Reset index to 0 and notify
+          shortsProvider.changeCurrentIndex(0);
+          shortsProvider.notifyListeners();
 
-          // Send notification to switch tabs
-          TabSwitchNotification(
-            tabIndex: 2,
-            tipId: tip.tipsId,
-          ).dispatch(context);
+          log('Rebuilt shorts list with selected video first, total: ${newShortsList.length}',
+              name: 'ShortVideoCard');
+
+          // Check if we're in a nested route by checking if we can pop and if we're not on the root route
+          final canPopToRoot = Navigator.of(context).canPop();
+          final currentRoute = ModalRoute.of(context)?.settings.name;
+
+          if (canPopToRoot && currentRoute != '/' && currentRoute != '/dashboard') {
+            // We're in a nested route like category detail - use direct navigation
+            log('Using direct navigation for shorts from nested route: $currentRoute',
+                name: 'ShortVideoCard');
+
+            // Use VideoRouter for direct navigation
+            VideoRouter.navigateToVideoPlayer(
+                context,
+                widget.tip,
+                widget.categoryName,
+                widget.relatedTips,
+                isFromCardClick: true
+            );
+          } else {
+            // We're at the dashboard - use tab switching approach
+            log('Using tab switching for shorts from dashboard', name: 'ShortVideoCard');
+
+            // Important: Get back to main screen first
+            Navigator.of(context).popUntil((route) => route.isFirst);
+
+            // Send notification to switch tabs
+            TabSwitchNotification(
+              tabIndex: 2,
+              tipId: widget.tip.tipsId,
+            ).dispatch(context);
+          }
         }
       },
+
+
+
       child: Container(
         width: 150.w,
         margin: EdgeInsets.only(right: 10.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Rest of the UI code remains unchanged
             Stack(
               children: [
                 Container(
@@ -236,37 +381,10 @@ class ShortVideoCard extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12.r),
-                    child: tip.thumbnailUrl != null
-                        ? CachedNetworkImage(
-                            imageUrl: tip.thumbnailUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.w,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            errorWidget: (context, url, error) => Center(
-                              child: Icon(
-                                Icons.videocam_rounded,
-                                size: 30.sp,
-                                color: isDarkMode
-                                    ? AppColors.darkTextSecondary
-                                    : AppColors.lightTextSecondary,
-                              ),
-                            ),
-                          )
-                        : Center(
-                            child: Icon(
-                              Icons.videocam_rounded,
-                              size: 30.sp,
-                              color: isDarkMode
-                                  ? AppColors.darkTextSecondary
-                                  : AppColors.lightTextSecondary,
-                            ),
-                          ),
+                    child: _buildThumbnail(isDarkMode),
                   ),
                 ),
+                // Rest of the widget code remains unchanged
                 // Short label
                 Positioned(
                   top: 8.h,
@@ -309,7 +427,7 @@ class ShortVideoCard extends StatelessWidget {
                   ),
                 ),
                 // Duration chip
-                if (tip.mediaDuration != null)
+                if (widget.tip.mediaDuration != null)
                   Positioned(
                     bottom: 8.h,
                     right: 8.w,
@@ -323,7 +441,7 @@ class ShortVideoCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4.r),
                       ),
                       child: Text(
-                        tip.mediaDuration!,
+                        widget.tip.mediaDuration!,
                         style: TextStyle(
                           fontFamily: 'Poppins',
                           fontSize: 10.sp,
@@ -354,7 +472,7 @@ class ShortVideoCard extends StatelessWidget {
                         ),
                         SizedBox(width: 2.w),
                         Text(
-                          _formatViewCount(tip.viewCount),
+                          _formatViewCount(widget.tip.viewCount),
                           style: TextStyle(
                             fontFamily: 'Poppins',
                             fontSize: 10.sp,
@@ -366,7 +484,7 @@ class ShortVideoCard extends StatelessWidget {
                   ),
                 ),
                 // Premium indicator
-                if (tip.isPremium)
+                if (widget.tip.isPremium)
                   Positioned(
                     top: 8.h,
                     left: 8.w,
@@ -389,21 +507,74 @@ class ShortVideoCard extends StatelessWidget {
               ],
             ),
             SizedBox(height: 8.h),
-            // Title
-            // Text(
-            //   tip.tipsTitle ?? 'Untitled',
-            //   style: theme.textTheme.bodyLarge?.copyWith(
-            //     fontFamily: 'Poppins',
-            //     fontSize: 14.sp,
-            //     fontWeight: FontWeight.w600,
-            //     color: isDarkMode
-            //         ? AppColors.darkTextPrimary
-            //         : AppColors.lightTextPrimary,
-            //   ),
-            //   maxLines: 2,
-            //   overflow: TextOverflow.ellipsis,
-            // ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Rest of the methods remain unchanged
+  Widget _buildThumbnail(bool isDarkMode) {
+    // If we have a local generated thumbnail
+    if (_thumbnailPath != null) {
+      return Image.file(
+        File(_thumbnailPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          log(
+            'Error displaying generated thumbnail: $error',
+            name: 'ShortVideoCard',
+          );
+          return _buildFallbackThumbnail(isDarkMode);
+        },
+      );
+    }
+
+    // If we have a remote thumbnail URL
+    if (widget.tip.thumbnailUrl != null &&
+        widget.tip.thumbnailUrl!.isNotEmpty) {
+      return CachedNetworkImage(
+        imageUrl: widget.tip.thumbnailUrl!,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => _buildLoadingIndicator(),
+        errorWidget: (context, url, error) {
+          log(
+            'Error loading network thumbnail: $error',
+            name: 'ShortVideoCard',
+          );
+          return _buildFallbackThumbnail(isDarkMode);
+        },
+      );
+    }
+
+    // If we're still loading the thumbnail
+    if (_isLoadingThumbnail) {
+      return _buildLoadingIndicator();
+    }
+
+    // Fallback if no thumbnail is available
+    return _buildFallbackThumbnail(isDarkMode);
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: CircularProgressIndicator(
+        strokeWidth: 2.w,
+        color: AppColors.primary,
+      ),
+    );
+  }
+
+  Widget _buildFallbackThumbnail(bool isDarkMode) {
+    return Container(
+      color: isDarkMode ? Colors.grey[900] : Colors.grey[200],
+      child: Center(
+        child: Icon(
+          Icons.videocam_rounded,
+          size: 30.sp,
+          color: isDarkMode
+              ? AppColors.darkTextSecondary
+              : AppColors.lightTextSecondary,
         ),
       ),
     );
@@ -417,5 +588,11 @@ class ShortVideoCard extends StatelessWidget {
     } else {
       return count.toString();
     }
+  }
+
+  @override
+  void dispose() {
+    // Nothing to dispose specifically for this widget
+    super.dispose();
   }
 }

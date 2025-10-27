@@ -151,9 +151,7 @@ class RouteConfig {
       case RoutesName.userPrefsScreen:
         return MaterialPageRoute(
           builder: (_) =>
-              UserPreferenceScreen(
-                fromProfile: args as bool? ?? false,
-              ),
+              UserPreferenceScreen(fromProfile: args as bool? ?? false),
           settings: settings,
         );
 
@@ -169,14 +167,12 @@ class RouteConfig {
                     .whereType<TipModel>()
                     .toList();
                 log(
-                  'Warning: featuredTips was List<dynamic>, converted to List<TipModel>: ${featuredTips
-                      .map((t) => t.tipsTitle).toList()}',
+                  'Warning: featuredTips was List<dynamic>, converted to List<TipModel>: ${featuredTips.map((t) => t.tipsTitle).toList()}',
                   name: 'RouteConfig',
                 );
               } else {
                 log(
-                  'Error: featuredTips is invalid type: ${args['featuredTips']
-                      .runtimeType}',
+                  'Error: featuredTips is invalid type: ${args['featuredTips'].runtimeType}',
                   name: 'RouteConfig',
                 );
                 featuredTips = [];
@@ -184,15 +180,14 @@ class RouteConfig {
             }
 
             return MaterialPageRoute(
-              builder: (_) =>
-                  TipsDetailScreen(
-                    tip: args['tip'] as TipModel?,
-                    categoryName: args['categoryName']?.toString() ?? '',
-                    userId: args['userId']?.toString() ?? '',
-                    featuredTips: featuredTips,
-                    allHealthTips: args['allHealthTips'] as bool? ?? false,
-                    allQuotes: args['allQuotes'] as bool? ?? false,
-                  ),
+              builder: (_) => TipsDetailScreen(
+                tip: args['tip'] as TipModel?,
+                categoryName: args['categoryName']?.toString() ?? '',
+                userId: args['userId']?.toString() ?? '',
+                featuredTips: featuredTips,
+                allHealthTips: args['allHealthTips'] as bool? ?? false,
+                allQuotes: args['allQuotes'] as bool? ?? false,
+              ),
               settings: settings,
             );
           } catch (e, stackTrace) {
@@ -316,8 +311,14 @@ class RouteConfig {
 
       case RoutesName.shortVideoPlayerScreen:
         final args = settings.arguments as Map<String, dynamic>?;
-        if (args == null || !args.containsKey('tip') || !args.containsKey('categoryName') || !args.containsKey('featuredTips')) {
-          log('Invalid arguments for ${RoutesName.shortVideoPlayerScreen}', name: 'RouteGenerator');
+        if (args == null ||
+            !args.containsKey('tip') ||
+            !args.containsKey('categoryName') ||
+            !args.containsKey('featuredTips')) {
+          log(
+            'Invalid arguments for ${RoutesName.shortVideoPlayerScreen}',
+            name: 'RouteGenerator',
+          );
           return MaterialPageRoute(
             builder: (_) => Scaffold(
               body: Center(child: Text('Error: Invalid navigation arguments')),
@@ -325,17 +326,26 @@ class RouteConfig {
             settings: settings,
           );
         }
-        final TipModel? initialTip = args['tip'] is TipModel ? args['tip'] as TipModel : null;
-        final String categoryName = args['categoryName'] is String ? args['categoryName'] as String : 'Unknown';
+        final TipModel? initialTip = args['tip'] is TipModel
+            ? args['tip'] as TipModel
+            : null;
+        final String categoryName = args['categoryName'] is String
+            ? args['categoryName'] as String
+            : 'Unknown';
         final List<TipModel> relatedTips = args['featuredTips'] is List<dynamic>
-            ? (args['featuredTips'] as List<dynamic>).whereType<TipModel>().toList()
+            ? (args['featuredTips'] as List<dynamic>)
+                  .whereType<TipModel>()
+                  .toList()
             : [];
+        final bool showAllVideos = args['showAllVideos'] as bool? ?? false;
+
         return MaterialPageRoute(
           builder: (_) => ShortsPlayerScreen(
             initialTip: initialTip,
             categoryName: categoryName,
             relatedTips: relatedTips,
             tabActive: true,
+            showAllVideos: showAllVideos,
           ),
           settings: settings,
         );
@@ -351,7 +361,6 @@ class RouteConfig {
           settings: settings,
         );
 
-
       default:
         return _errorRoute('No route defined for $screenName');
     }
@@ -359,15 +368,14 @@ class RouteConfig {
 
   static Route<dynamic> _errorRoute(String message) {
     return MaterialPageRoute(
-      builder: (_) =>
-          Scaffold(
-            body: Center(
-              child: Text(
-                'Error: $message',
-                style: const TextStyle(fontSize: 18, color: Colors.red),
-              ),
-            ),
+      builder: (_) => Scaffold(
+        body: Center(
+          child: Text(
+            'Error: $message',
+            style: const TextStyle(fontSize: 18, color: Colors.red),
           ),
+        ),
+      ),
     );
   }
 }

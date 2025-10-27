@@ -6,13 +6,15 @@ class SettingsDialogWidget extends StatefulWidget {
   final int initialCountdown;
   final bool initialShowFullScreenIcon;
   final bool initialShowSwipeIndicator;
-  final Function(int, bool, bool) onSave;
+  final bool initialSlideshowEnabled;
+  final Function(int, bool, bool, bool) onSave;
 
   const SettingsDialogWidget({
     super.key,
     required this.initialCountdown,
     required this.initialShowFullScreenIcon,
     required this.initialShowSwipeIndicator,
+    required this.initialSlideshowEnabled,
     required this.onSave,
   });
 
@@ -24,7 +26,7 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
   late int _tempCountdown;
   late bool _tempShowFullScreenIcon;
   late bool _tempShowSwipeIndicator;
-  bool _showAdvancedSettings = false;
+  late bool _tempSlideshowEnabled;
 
   @override
   void initState() {
@@ -32,16 +34,17 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
     _tempCountdown = widget.initialCountdown;
     _tempShowFullScreenIcon = widget.initialShowFullScreenIcon;
     _tempShowSwipeIndicator = widget.initialShowSwipeIndicator;
+    _tempSlideshowEnabled = widget.initialSlideshowEnabled;
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title, IconData icon) {
+  Widget _buildSectionHeader(
+    BuildContext context,
+    String title,
+    IconData icon,
+  ) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20.sp,
-          color: Theme.of(context).colorScheme.primary,
-        ),
+        Icon(icon, size: 20.sp, color: Theme.of(context).colorScheme.primary),
         SizedBox(width: 12.w),
         Text(
           title,
@@ -55,7 +58,11 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
     );
   }
 
-  Widget _buildSliderSection(BuildContext context, int value, ValueChanged<int> onChanged) {
+  Widget _buildSliderSection(
+    BuildContext context,
+    int value,
+    ValueChanged<int> onChanged,
+  ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       decoration: BoxDecoration(
@@ -128,14 +135,18 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
                 '3s',
                 style: TextStyle(
                   fontSize: 12.sp,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
               Text(
                 '30s',
                 style: TextStyle(
                   fontSize: 12.sp,
-                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withOpacity(0.6),
                 ),
               ),
             ],
@@ -146,11 +157,11 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
   }
 
   Widget _buildToggleOption(
-      BuildContext context,
-      String title,
-      bool value,
-      ValueChanged<bool> onChanged,
-      ) {
+    BuildContext context,
+    String title,
+    bool value,
+    ValueChanged<bool> onChanged,
+  ) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       decoration: BoxDecoration(
@@ -174,9 +185,12 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
               onChanged: onChanged,
               activeColor: AppColors.primary,
               activeTrackColor: AppColors.primary.withOpacity(0.5),
-              inactiveThumbColor:
-              Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-              inactiveTrackColor: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+              inactiveThumbColor: Theme.of(
+                context,
+              ).colorScheme.onSurface.withOpacity(0.5),
+              inactiveTrackColor: Theme.of(
+                context,
+              ).colorScheme.surface.withOpacity(0.5),
             ),
           ),
         ],
@@ -188,14 +202,9 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(24.r),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24.r)),
       elevation: 8,
-      insetPadding: EdgeInsets.symmetric(
-        horizontal: 20.w,
-        vertical: 24.h,
-      ),
+      insetPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 24.h),
       child: SingleChildScrollView(
         child: Container(
           padding: EdgeInsets.all(24.w),
@@ -227,49 +236,31 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
               _buildSliderSection(
                 context,
                 _tempCountdown,
-                    (value) => setState(() => _tempCountdown = value),
+                (value) => setState(() => _tempCountdown = value),
               ),
               SizedBox(height: 24.h),
               _buildSectionHeader(context, 'Display Options', Icons.settings),
               SizedBox(height: 16.h),
               _buildToggleOption(
                 context,
+                'Enable Slideshow',
+                _tempSlideshowEnabled,
+                (value) => setState(() => _tempSlideshowEnabled = value),
+              ),
+              SizedBox(height: 8.h),
+              _buildToggleOption(
+                context,
                 'Show Full-Screen Icon',
                 _tempShowFullScreenIcon,
-                    (value) => setState(() => _tempShowFullScreenIcon = value),
+                (value) => setState(() => _tempShowFullScreenIcon = value),
               ),
               SizedBox(height: 8.h),
               _buildToggleOption(
                 context,
                 'Show Swipe Indicator',
                 _tempShowSwipeIndicator,
-                    (value) => setState(() => _tempShowSwipeIndicator = value),
+                (value) => setState(() => _tempShowSwipeIndicator = value),
               ),
-              SizedBox(height: 8.h),
-              _buildToggleOption(
-                context,
-                'Advanced Settings',
-                _showAdvancedSettings,
-                    (value) => setState(() => _showAdvancedSettings = value),
-              ),
-              if (_showAdvancedSettings) ...[
-                SizedBox(height: 24.h),
-                _buildSectionHeader(context, 'Advanced Settings', Icons.build),
-                SizedBox(height: 16.h),
-                _buildToggleOption(
-                  context,
-                  'Enable Animations',
-                  true,
-                      (value) {},
-                ),
-                SizedBox(height: 8.h),
-                _buildToggleOption(
-                  context,
-                  'Dark Mode',
-                  Theme.of(context).brightness == Brightness.dark,
-                      (value) {},
-                ),
-              ],
               SizedBox(height: 32.h),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -289,7 +280,9 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
                       'Cancel',
                       style: TextStyle(
                         fontSize: 16.sp,
-                        color: Theme.of(context).colorScheme.onSurface.withOpacity(0.7),
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withOpacity(0.7),
                       ),
                     ),
                   ),
@@ -300,6 +293,7 @@ class _SettingsDialogWidgetState extends State<SettingsDialogWidget> {
                         _tempCountdown,
                         _tempShowFullScreenIcon,
                         _tempShowSwipeIndicator,
+                        _tempSlideshowEnabled,
                       );
                       Navigator.pop(context);
                     },

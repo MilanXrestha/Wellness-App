@@ -26,6 +26,9 @@ class ShortsProvider with ChangeNotifier {
   Map<String, bool> _likedVideos = {};
   Map<String, bool> _viewedVideos = {};
 
+  // Add this property to track if selection is from a card click
+  bool _isFromCardClick = false;
+
   ShortsProvider({
     required GetVideosUseCase getVideosUseCase,
     required IncrementViewCountUseCase incrementViewCountUseCase,
@@ -33,10 +36,10 @@ class ShortsProvider with ChangeNotifier {
     required IsVideoLikedUseCase isVideoLikedUseCase,
     required AuthService authService,
   }) : _getVideosUseCase = getVideosUseCase,
-        _incrementViewCountUseCase = incrementViewCountUseCase,
-        _toggleLikeUseCase = toggleLikeUseCase,
-        _isVideoLikedUseCase = isVideoLikedUseCase,
-        _authService = authService;
+       _incrementViewCountUseCase = incrementViewCountUseCase,
+       _toggleLikeUseCase = toggleLikeUseCase,
+       _isVideoLikedUseCase = isVideoLikedUseCase,
+       _authService = authService;
 
   // Set context for accessing providers
   void setContext(BuildContext context) {
@@ -45,41 +48,70 @@ class ShortsProvider with ChangeNotifier {
 
   // Getters
   List<TipModel> get shorts => _shorts;
+
   int get currentIndex => _currentIndex;
+
   bool get isLoading => _isLoading;
+
   bool get isLoadingMore => _isLoadingMore;
+
   bool get hasMore => _hasMore;
+
   String? get error => _error;
+
+  // Add getter for isFromCardClick
+  bool get isFromCardClick => _isFromCardClick;
+
   TipModel? get currentShort =>
       _shorts.isNotEmpty && _currentIndex < _shorts.length
-          ? _shorts[_currentIndex]
-          : null;
+      ? _shorts[_currentIndex]
+      : null;
+
   bool isShortLiked(String tipsId) => _likedVideos[tipsId] ?? false;
 
+  // Add a method to set isFromCardClick
+  void setIsFromCardClick(bool value) {
+    _isFromCardClick = value;
+    log('Set isFromCardClick to $value', name: 'ShortsProvider');
+    notifyListeners();
+  }
+
   // Load initial shorts
+  // In your ShortsProvider class
   Future<void> loadShorts({String? categoryId}) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final shorts = await _getVideosUseCase.execute(
+      final newShorts = await _getVideosUseCase.execute(
         isShort: true,
         categoryId: categoryId,
         limit: 10,
       );
 
-      final uniqueShorts = _removeDuplicates(shorts);
+      log('API returned ${newShorts.length} shorts', name: 'ShortsProvider');
+
+      // IMPORTANT: Don't clear existing shorts if we get an empty list
+      if (newShorts.isEmpty && _shorts.isNotEmpty) {
+        log('API returned empty list but we have existing shorts, keeping them', name: 'ShortsProvider');
+        _isLoading = false;
+        notifyListeners();
+        return;
+      }
+
+      final uniqueShorts = _removeDuplicates(newShorts);
       log('Loaded shorts: ${uniqueShorts.map((s) => s.tipsId).toList()}', name: 'ShortsProvider');
 
       _shorts = uniqueShorts;
-      _hasMore = shorts.length >= 10;
+      _hasMore = newShorts.length >= 10;
       _currentIndex = 0;
       _isLoading = false;
 
       _checkLikeStatus();
       notifyListeners();
     } catch (e) {
+      log('Error loading shorts: $e', name: 'ShortsProvider');
       _error = 'Failed to load shorts: $e';
       _isLoading = false;
       notifyListeners();
@@ -101,10 +133,16 @@ class ShortsProvider with ChangeNotifier {
       );
 
       final uniqueMoreShorts = _removeDuplicates(moreShorts)
-          .where((newShort) => !_shorts.any((existing) => existing.tipsId == newShort.tipsId))
+          .where(
+            (newShort) =>
+                !_shorts.any((existing) => existing.tipsId == newShort.tipsId),
+          )
           .toList();
 
-      log('Loaded more shorts: ${uniqueMoreShorts.map((s) => s.tipsId).toList()}', name: 'ShortsProvider');
+      log(
+        'Loaded more shorts: ${uniqueMoreShorts.map((s) => s.tipsId).toList()}',
+        name: 'ShortsProvider',
+      );
 
       if (uniqueMoreShorts.isEmpty) {
         _hasMore = false;
@@ -137,7 +175,10 @@ class ShortsProvider with ChangeNotifier {
     if (index < 0 || index >= _shorts.length) return;
 
     _currentIndex = index;
-    log('Changed to index: $index, tipsId: ${_shorts[index].tipsId}', name: 'ShortsProvider');
+    log(
+      'Changed to index: $index, tipsId: ${_shorts[index].tipsId}',
+      name: 'ShortsProvider',
+    );
     _incrementViewCount();
     notifyListeners();
 
@@ -212,7 +253,10 @@ class ShortsProvider with ChangeNotifier {
       await _toggleLikeUseCase.execute(tipsId, userId);
 
       // Update favorites
-      final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+      final favoritesProvider = Provider.of<FavoritesProvider>(
+        context,
+        listen: false,
+      );
 
       if (newLikeState) {
         // Add to favorites
@@ -225,19 +269,22 @@ class ShortsProvider with ChangeNotifier {
 
         // Check if it's already a favorite to avoid duplicates
         if (!favoritesProvider.isFavorite(tipsId, userId)) {
-          await favoritesProvider.addFavorite(favorite);
+          // Pass both the favorite model and the tip model
+          await favoritesProvider.addFavorite(favorite, video);
           log('Added video $tipsId to favorites', name: 'ShortsProvider');
         }
       } else {
         // Remove from favorites
         if (favoritesProvider.isFavorite(tipsId, userId)) {
           final favorite = favoritesProvider.favorites.firstWhere(
-                (f) => f.tipId == tipsId && f.userId == userId,
-            orElse: () => FavoriteModel(id: '${userId}_$tipsId', tipId: tipsId, userId: userId),
+            (f) => f.tipId == tipsId && f.userId == userId,
+            orElse: () => FavoriteModel(id: '', tipId: tipsId, userId: userId),
           );
 
-          await favoritesProvider.deleteFavorite(favorite.id);
-          log('Removed video $tipsId from favorites', name: 'ShortsProvider');
+          if (favorite.id.isNotEmpty) {
+            await favoritesProvider.deleteFavorite(favorite.id);
+            log('Removed video $tipsId from favorites', name: 'ShortsProvider');
+          }
         }
       }
     } catch (e) {
@@ -265,7 +312,7 @@ class ShortsProvider with ChangeNotifier {
       _viewedVideos[currentShort.tipsId] = true;
 
       final videoIndex = _shorts.indexWhere(
-            (v) => v.tipsId == currentShort.tipsId,
+        (v) => v.tipsId == currentShort.tipsId,
       );
       if (videoIndex != -1) {
         _shorts[videoIndex] = currentShort.copyWith(
@@ -283,10 +330,16 @@ class ShortsProvider with ChangeNotifier {
     if (newShorts.isEmpty) return;
 
     final uniqueNewShorts = _removeDuplicates(newShorts)
-        .where((newShort) => !_shorts.any((existing) => existing.tipsId == newShort.tipsId))
+        .where(
+          (newShort) =>
+              !_shorts.any((existing) => existing.tipsId == newShort.tipsId),
+        )
         .toList();
 
-    log('Adding new shorts: ${uniqueNewShorts.map((s) => s.tipsId).toList()}', name: 'ShortsProvider');
+    log(
+      'Adding new shorts: ${uniqueNewShorts.map((s) => s.tipsId).toList()}',
+      name: 'ShortsProvider',
+    );
 
     if (uniqueNewShorts.isNotEmpty) {
       _shorts.insertAll(0, uniqueNewShorts);
@@ -297,8 +350,36 @@ class ShortsProvider with ChangeNotifier {
   // Select a short by ID
   void selectShortById(String tipsId) {
     final index = _shorts.indexWhere((s) => s.tipsId == tipsId);
+
+    log(
+      'Selecting short by ID: $tipsId, found at index: $index',
+      name: 'ShortsProvider',
+    );
+
     if (index != -1) {
-      changeCurrentIndex(index);
+      if (_currentIndex != index) {
+        log(
+          'Changing current index from $_currentIndex to $index',
+          name: 'ShortsProvider',
+        );
+        changeCurrentIndex(index);
+      } else {
+        log(
+          'Short is already selected at index $index',
+          name: 'ShortsProvider',
+        );
+      }
+    } else {
+      log(
+        'ERROR: Could not find short with ID $tipsId',
+        name: 'ShortsProvider',
+      );
+
+      // Debug info
+      log(
+        'Available shorts: ${_shorts.map((s) => s.tipsId).join(", ")}',
+        name: 'ShortsProvider',
+      );
     }
   }
 
@@ -308,7 +389,10 @@ class ShortsProvider with ChangeNotifier {
     if (userId == null) return;
 
     try {
-      final favoritesProvider = Provider.of<FavoritesProvider>(context, listen: false);
+      final favoritesProvider = Provider.of<FavoritesProvider>(
+        context,
+        listen: false,
+      );
 
       // Force reload favorites to ensure we have the latest data
       await favoritesProvider.loadFavorites(userId);
@@ -323,7 +407,9 @@ class ShortsProvider with ChangeNotifier {
           updated = true;
 
           // Also update like counts if necessary
-          final videoIndex = _shorts.indexWhere((v) => v.tipsId == short.tipsId);
+          final videoIndex = _shorts.indexWhere(
+            (v) => v.tipsId == short.tipsId,
+          );
           if (videoIndex != -1) {
             // Only update if the count doesn't match the like status
             final currentVideo = _shorts[videoIndex];
@@ -331,14 +417,19 @@ class ShortsProvider with ChangeNotifier {
 
             // Simple heuristic: if liked, count should be at least 1
             if (expectedLikeState && currentVideo.likeCount < 1) {
-              _shorts[videoIndex] = currentVideo.copyWith(likeCount: Math.max(1, currentVideo.likeCount));
+              _shorts[videoIndex] = currentVideo.copyWith(
+                likeCount: Math.max(1, currentVideo.likeCount),
+              );
             }
           }
         }
       }
 
       if (updated) {
-        log('Updated like status for ${_shorts.length} videos based on favorites', name: 'ShortsProvider');
+        log(
+          'Updated like status for ${_shorts.length} videos based on favorites',
+          name: 'ShortsProvider',
+        );
         notifyListeners();
       }
     } catch (e) {

@@ -19,7 +19,8 @@ import 'package:wellness_app/features/tips/data/models/tips_model.dart';
 import 'package:wellness_app/features/favorites/presentation/providers/favorites_provider.dart';
 import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/generated/app_localizations.dart';
-import 'package:wellness_app/features/favorites/data/models/favorite_model.dart' show FavoriteModel;
+import 'package:wellness_app/features/favorites/data/models/favorite_model.dart'
+    show FavoriteModel;
 import 'package:wellness_app/features/subscription/presentation/providers/premium_status_provider.dart';
 import '../widgets/playlist_bottom_sheet.dart';
 
@@ -39,7 +40,8 @@ class MediaPlayerScreen extends StatefulWidget {
   MediaPlayerScreenState createState() => MediaPlayerScreenState();
 }
 
-class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProviderStateMixin {
+class MediaPlayerScreenState extends State<MediaPlayerScreen>
+    with TickerProviderStateMixin {
   late AudioPlayer _audioPlayer;
   late AnimationController _shakeController;
   late AnimationController _rotationController;
@@ -71,15 +73,23 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
 
     // Safety check: if featuredTips is empty, add the current tip
     if (widget.featuredTips.isEmpty) {
-      log('Warning: featuredTips was empty, adding current tip', name: 'MediaPlayerScreen');
+      log(
+        'Warning: featuredTips was empty, adding current tip',
+        name: 'MediaPlayerScreen',
+      );
       widget.featuredTips.add(widget.tip);
     }
 
     // Find the current tip in the featuredTips list, default to 0 if not found
-    int initialIndex = widget.featuredTips.indexWhere((t) => t.tipsId == widget.tip.tipsId);
+    int initialIndex = widget.featuredTips.indexWhere(
+      (t) => t.tipsId == widget.tip.tipsId,
+    );
     if (initialIndex < 0) {
       initialIndex = 0;
-      log('Warning: current tip not found in featuredTips, defaulting to index 0', name: 'MediaPlayerScreen');
+      log(
+        'Warning: current tip not found in featuredTips, defaulting to index 0',
+        name: 'MediaPlayerScreen',
+      );
     }
 
     _currentTrackIndex = ValueNotifier<int>(initialIndex);
@@ -90,7 +100,10 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     );
     _shakeAnimation = TweenSequence([
       TweenSequenceItem(tween: Tween<double>(begin: 0, end: -0.05), weight: 25),
-      TweenSequenceItem(tween: Tween<double>(begin: -0.05, end: 0.05), weight: 50),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.05, end: 0.05),
+        weight: 50,
+      ),
       TweenSequenceItem(tween: Tween<double>(begin: 0.05, end: 0), weight: 25),
     ]).animate(_shakeController);
 
@@ -119,7 +132,7 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     _checkConnectivity();
     _setupAudioStreams(); // Setup streams first
     _initializeAudio(); // Then initialize audio
-    _precacheNextTrack(); // Pre-cache the next track
+    _precacheNextTracks(); // Pre-cache multiple tracks
   }
 
   void _safeSetState(VoidCallback fn) {
@@ -180,6 +193,32 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
         }
       }),
     );
+
+    // Add buffering state listener to show loading state appropriately
+    _subscriptions.add(
+      _audioPlayer.bufferedPositionStream.listen((bufferedPosition) {
+        if (_position != null &&
+            _duration != null &&
+            bufferedPosition > _position! &&
+            _isLoading) {
+          // We have some buffer ahead of current position, can mark as not loading
+          _safeSetState(() {
+            _isLoading = false;
+          });
+        }
+      }),
+    );
+
+    // Listen for buffering state
+    _subscriptions.add(
+      _audioPlayer.processingStateStream.listen((state) {
+        if (state == ProcessingState.buffering) {
+          _safeSetState(() {
+            _isLoading = true;
+          });
+        }
+      }),
+    );
   }
 
   Future<void> _checkConnectivity() async {
@@ -188,6 +227,20 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
       _isConnected = connectivityResult != ConnectivityResult.none;
     });
     log('Connectivity status: $_isConnected', name: 'MediaPlayerScreen');
+
+    // Listen for connectivity changes
+    Connectivity().onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
+      final hasConnection =
+          results.isNotEmpty && results.first != ConnectivityResult.none;
+
+      _safeSetState(() {
+        _isConnected = hasConnection;
+      });
+
+      log('Connectivity changed: $_isConnected', name: 'MediaPlayerScreen');
+    });
   }
 
   Future<void> _initializeUser() async {
@@ -196,7 +249,10 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     if (user != null) {
       _userId = user.uid;
       log('Authenticated user found: $_userId', name: 'MediaPlayerScreen');
-      await Provider.of<FavoritesProvider>(context, listen: false).loadFavorites(_userId!);
+      await Provider.of<FavoritesProvider>(
+        context,
+        listen: false,
+      ).loadFavorites(_userId!);
     } else {
       log('No authenticated user found', name: 'MediaPlayerScreen');
     }
@@ -206,7 +262,10 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     try {
       // Safety check to prevent index out of bounds
       if (_currentTrackIndex.value >= widget.featuredTips.length) {
-        log('Warning: _currentTrackIndex out of bounds, resetting to 0', name: 'MediaPlayerScreen');
+        log(
+          'Warning: _currentTrackIndex out of bounds, resetting to 0',
+          name: 'MediaPlayerScreen',
+        );
         _currentTrackIndex.value = 0;
       }
 
@@ -219,32 +278,30 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
           _hasError = true;
           _errorMessage = 'No audio URL provided';
         });
-        log('No audio URL provided for ${currentTip.tipsTitle}', name: 'MediaPlayerScreen');
+        log(
+          'No audio URL provided for ${currentTip.tipsTitle}',
+          name: 'MediaPlayerScreen',
+        );
         return;
       }
 
-      // Check if we already know this file is cached
-      if (_cachedAudioFiles[currentTip.audioUrl!] == true) {
-        final fileInfo = await _cacheManager.getFileFromCache(currentTip.audioUrl!);
-        if (fileInfo != null && fileInfo.file.existsSync()) {
-          await _audioPlayer.setFilePath(fileInfo.file.path);
-          log('Playing from cached file (fast path): ${fileInfo.file.path}', name: 'MediaPlayerScreen');
-          _safeSetState(() {
-            _isLoading = false;
-            _isInitializing = false;
-            _downloadProgress = 1.0;
-          });
-          return;
-        }
-      }
+      // Start loading indicator
+      _safeSetState(() {
+        _isLoading = true;
+        _downloadProgress = 0.0;
+      });
 
-      // Check if the file is cached
-      final fileInfo = await _cacheManager.getFileFromCache(currentTip.audioUrl!);
-
+      // Check if file is cached first
+      final fileInfo = await _cacheManager.getFileFromCache(
+        currentTip.audioUrl!,
+      );
       if (fileInfo != null && fileInfo.file.existsSync()) {
         // Use cached file
         await _audioPlayer.setFilePath(fileInfo.file.path);
-        log('Playing from cached file: ${fileInfo.file.path}', name: 'MediaPlayerScreen');
+        log(
+          'Playing from cached file: ${fileInfo.file.path}',
+          name: 'MediaPlayerScreen',
+        );
         _cachedAudioFiles[currentTip.audioUrl!] = true;
         _safeSetState(() {
           _isLoading = false;
@@ -252,39 +309,58 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
           _downloadProgress = 1.0;
         });
       } else if (_isConnected) {
-        // Download with progress tracking
-        _safeSetState(() {
-          _isLoading = true;
-          _downloadProgress = 0.0;
-        });
-
+        // Not cached and online - use direct streaming for instant playback
         try {
-          final stream = _cacheManager.getFileStream(currentTip.audioUrl!, withProgress: true);
-          await for (final result in stream) {
-            if (result is DownloadProgress) {
-              _safeSetState(() {
-                _downloadProgress = result.progress ?? 0.0;
-              });
-              log('Download progress: ${_downloadProgress * 100}%', name: 'MediaPlayerScreen');
-            } else if (result is FileInfo) {
-              _cachedAudioFiles[currentTip.audioUrl!] = true;
-              await _audioPlayer.setFilePath(result.file.path);
-              log('Downloaded and cached file: ${result.file.path}', name: 'MediaPlayerScreen');
-              _safeSetState(() {
-                _isLoading = false;
-                _isInitializing = false;
-                _downloadProgress = 1.0;
-              });
-              break;
-            }
-          }
+          // Stream directly from URL - this allows immediate playback
+          await _audioPlayer.setUrl(currentTip.audioUrl!);
+          log(
+            'Streaming audio from: ${currentTip.audioUrl!}',
+            name: 'MediaPlayerScreen',
+          );
+
+          // Cache in background while streaming
+          final fileStream = _cacheManager.getFileStream(
+            currentTip.audioUrl!,
+            withProgress: true,
+          );
+
+          fileStream.listen(
+            (result) {
+              if (result is DownloadProgress) {
+                _safeSetState(() {
+                  _downloadProgress = result.progress ?? 0.0;
+                });
+              } else if (result is FileInfo) {
+                _cachedAudioFiles[currentTip.audioUrl!] = true;
+                log(
+                  'Background caching completed: ${result.file.path}',
+                  name: 'MediaPlayerScreen',
+                );
+                _safeSetState(() {
+                  _downloadProgress = 1.0;
+                });
+              }
+            },
+            onError: (e) {
+              log(
+                'Background caching error (streaming continues): $e',
+                name: 'MediaPlayerScreen',
+              );
+              // Don't set error state here since streaming is still working
+            },
+          );
+
+          _safeSetState(() {
+            _isLoading = false;
+            _isInitializing = false;
+          });
         } catch (e) {
-          log('Error during file download: $e', name: 'MediaPlayerScreen');
+          log('Error during streaming setup: $e', name: 'MediaPlayerScreen');
           _safeSetState(() {
             _isLoading = false;
             _isInitializing = false;
             _hasError = true;
-            _errorMessage = 'Failed to download audio file';
+            _errorMessage = 'Failed to stream audio';
           });
         }
       } else {
@@ -295,10 +371,16 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
           _hasError = true;
           _errorMessage = 'No internet connection and audio not cached';
         });
-        log('Offline and no cached file for ${currentTip.tipsTitle}', name: 'MediaPlayerScreen');
+        log(
+          'Offline and no cached file for ${currentTip.tipsTitle}',
+          name: 'MediaPlayerScreen',
+        );
       }
 
-      log('Audio initialized for ${currentTip.tipsTitle}', name: 'MediaPlayerScreen');
+      log(
+        'Audio initialized for ${currentTip.tipsTitle}',
+        name: 'MediaPlayerScreen',
+      );
     } catch (e) {
       _safeSetState(() {
         _isLoading = false;
@@ -312,27 +394,53 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     }
   }
 
-  Future<void> _precacheNextTrack() async {
-    if (_currentTrackIndex.value + 1 < widget.featuredTips.length) {
-      final nextTip = widget.featuredTips[_currentTrackIndex.value + 1];
-      if (nextTip.audioUrl != null && nextTip.audioUrl!.isNotEmpty && _isConnected) {
-        // Check if we already know this file is cached
-        if (_cachedAudioFiles[nextTip.audioUrl!] == true) {
-          return; // Already cached, no need to check again
-        }
+  Future<void> _precacheNextTracks() async {
+    if (!_isConnected) return; // Don't precache if offline
 
-        final fileInfo = await _cacheManager.getFileFromCache(nextTip.audioUrl!);
-        if (fileInfo != null && fileInfo.file.existsSync()) {
-          _cachedAudioFiles[nextTip.audioUrl!] = true;
-          log('Next track already cached: ${nextTip.tipsTitle}', name: 'MediaPlayerScreen');
-        } else {
-          log('Precaching next track: ${nextTip.tipsTitle}', name: 'MediaPlayerScreen');
-          _cacheManager.downloadFile(nextTip.audioUrl!).then((_) {
+    // Pre-cache the next 2 tracks
+    final maxPrecacheCount = 2;
+    for (int i = 1; i <= maxPrecacheCount; i++) {
+      final nextIndex = _currentTrackIndex.value + i;
+      if (nextIndex < widget.featuredTips.length) {
+        final nextTip = widget.featuredTips[nextIndex];
+        if (nextTip.audioUrl != null && nextTip.audioUrl!.isNotEmpty) {
+          // Check if already in cache
+          if (_cachedAudioFiles[nextTip.audioUrl!] == true) {
+            continue; // Already cached, skip
+          }
+
+          final fileInfo = await _cacheManager.getFileFromCache(
+            nextTip.audioUrl!,
+          );
+          if (fileInfo != null && fileInfo.file.existsSync()) {
             _cachedAudioFiles[nextTip.audioUrl!] = true;
-            log('Next track cached successfully: ${nextTip.tipsTitle}', name: 'MediaPlayerScreen');
-          }).catchError((e) {
-            log('Failed to cache next track: $e', name: 'MediaPlayerScreen');
-          });
+            log(
+              'Next track already cached: ${nextTip.tipsTitle}',
+              name: 'MediaPlayerScreen',
+            );
+          } else {
+            log(
+              'Precaching next track: ${nextTip.tipsTitle}',
+              name: 'MediaPlayerScreen',
+            );
+
+            // Download in background with proper Future handling
+            _cacheManager
+                .downloadFile(nextTip.audioUrl!)
+                .then((fileInfo) {
+                  _cachedAudioFiles[nextTip.audioUrl!] = true;
+                  log(
+                    'Next track cached successfully: ${nextTip.tipsTitle}',
+                    name: 'MediaPlayerScreen',
+                  );
+                })
+                .catchError((e) {
+                  log(
+                    'Failed to cache next track: $e',
+                    name: 'MediaPlayerScreen',
+                  );
+                });
+          }
         }
       }
     }
@@ -349,8 +457,12 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
       });
       await _audioPlayer.stop();
       await _initializeAudio();
-      final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
-      if (widget.featuredTips[_currentTrackIndex.value].isPremium && !canAccessPremium) {
+      final canAccessPremium = Provider.of<PremiumStatusProvider>(
+        context,
+        listen: false,
+      ).canAccessPremium;
+      if (widget.featuredTips[_currentTrackIndex.value].isPremium &&
+          !canAccessPremium) {
         _shakeController.repeat();
       } else {
         _shakeController.stop();
@@ -358,7 +470,7 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
           await _audioPlayer.play();
         }
       }
-      _precacheNextTrack(); // Pre-cache the next track
+      _precacheNextTracks(); // Pre-cache multiple tracks
     }
   }
 
@@ -373,8 +485,12 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
       });
       await _audioPlayer.stop();
       await _initializeAudio();
-      final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
-      if (widget.featuredTips[_currentTrackIndex.value].isPremium && !canAccessPremium) {
+      final canAccessPremium = Provider.of<PremiumStatusProvider>(
+        context,
+        listen: false,
+      ).canAccessPremium;
+      if (widget.featuredTips[_currentTrackIndex.value].isPremium &&
+          !canAccessPremium) {
         _shakeController.repeat();
       } else {
         _shakeController.stop();
@@ -382,14 +498,17 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
           await _audioPlayer.play();
         }
       }
-      _precacheNextTrack(); // Pre-cache the next track
+      _precacheNextTracks(); // Pre-cache multiple tracks
     }
   }
 
   void _shareTrack() {
-    if (_currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length) {
-      final trackUrl = widget.featuredTips[_currentTrackIndex.value].audioUrl ?? '';
-      final trackTitle = widget.featuredTips[_currentTrackIndex.value].tipsTitle;
+    if (_currentTrackIndex.value >= 0 &&
+        _currentTrackIndex.value < widget.featuredTips.length) {
+      final trackUrl =
+          widget.featuredTips[_currentTrackIndex.value].audioUrl ?? '';
+      final trackTitle =
+          widget.featuredTips[_currentTrackIndex.value].tipsTitle;
       Share.share(
         'Check out this track: $trackTitle\n$trackUrl',
         subject: 'Share $trackTitle',
@@ -398,13 +517,21 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
   }
 
   void _checkPremiumAccess(BuildContext context) {
-    if (_currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
-      log('Invalid track index: ${_currentTrackIndex.value}', name: 'MediaPlayerScreen');
+    if (_currentTrackIndex.value < 0 ||
+        _currentTrackIndex.value >= widget.featuredTips.length) {
+      log(
+        'Invalid track index: ${_currentTrackIndex.value}',
+        name: 'MediaPlayerScreen',
+      );
       return;
     }
 
-    final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
-    if (widget.featuredTips[_currentTrackIndex.value].isPremium && !canAccessPremium) {
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(
+      context,
+      listen: false,
+    ).canAccessPremium;
+    if (widget.featuredTips[_currentTrackIndex.value].isPremium &&
+        !canAccessPremium) {
       _showPremiumDialog(context);
       _audioPlayer.pause();
     } else {
@@ -442,7 +569,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
             child: Container(
               padding: EdgeInsets.all(24.r),
               decoration: BoxDecoration(
-                color: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface,
+                color: isDarkMode
+                    ? AppColors.darkSurface
+                    : AppColors.lightSurface,
                 borderRadius: BorderRadius.circular(24.r),
                 boxShadow: [
                   BoxShadow(
@@ -467,7 +596,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                       fontSize: 22.sp,
                       fontWeight: FontWeight.w700,
                       fontFamily: 'Poppins',
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                   ),
                   SizedBox(height: 12.h),
@@ -477,7 +608,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                       fontSize: 16.sp,
                       fontFamily: 'Poppins',
                       fontWeight: FontWeight.w500,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                      color: isDarkMode
+                          ? AppColors.darkTextPrimary
+                          : AppColors.lightTextPrimary,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -520,7 +653,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12.r),
                               side: BorderSide(
-                                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                color: isDarkMode
+                                    ? AppColors.darkTextSecondary
+                                    : AppColors.lightTextSecondary,
                                 width: 1.w,
                               ),
                             ),
@@ -531,7 +666,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                               fontSize: 14.sp,
                               fontWeight: FontWeight.w600,
                               fontFamily: 'Poppins',
-                              color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                              color: isDarkMode
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.lightTextPrimary,
                             ),
                           ),
                         ),
@@ -541,7 +678,10 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                         child: ElevatedButton(
                           onPressed: () {
                             Navigator.of(context).pop();
-                            Navigator.pushNamed(context, RoutesName.subscriptionScreen);
+                            Navigator.pushNamed(
+                              context,
+                              RoutesName.subscriptionScreen,
+                            );
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
@@ -574,14 +714,15 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     );
   }
 
-  Widget _buildBenefitRow(BuildContext context, IconData icon, String text, bool isDarkMode) {
+  Widget _buildBenefitRow(
+    BuildContext context,
+    IconData icon,
+    String text,
+    bool isDarkMode,
+  ) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20.sp,
-          color: AppColors.primary,
-        ),
+        Icon(icon, size: 20.sp, color: AppColors.primary),
         SizedBox(width: 8.w),
         Expanded(
           child: Text(
@@ -589,7 +730,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               fontSize: 14.sp,
               fontFamily: 'Poppins',
-              color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              color: isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
             ),
           ),
         ),
@@ -598,13 +741,21 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
   }
 
   Future<void> _toggleFavorite(FavoritesProvider provider) async {
-    if (_currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
-      log('Invalid track index for favorites: ${_currentTrackIndex.value}', name: 'MediaPlayerScreen');
+    if (_currentTrackIndex.value < 0 ||
+        _currentTrackIndex.value >= widget.featuredTips.length) {
+      log(
+        'Invalid track index for favorites: ${_currentTrackIndex.value}',
+        name: 'MediaPlayerScreen',
+      );
       return;
     }
 
-    final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
-    if (widget.featuredTips[_currentTrackIndex.value].isPremium && !canAccessPremium) {
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(
+      context,
+      listen: false,
+    ).canAccessPremium;
+    if (widget.featuredTips[_currentTrackIndex.value].isPremium &&
+        !canAccessPremium) {
       _showPremiumDialog(context);
       return;
     }
@@ -621,12 +772,13 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     }
 
     final isFavorite = provider.favorites.any(
-          (f) => f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
+      (f) => f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
     );
     try {
       if (isFavorite) {
         final favorite = provider.favorites.firstWhere(
-              (f) => f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
+          (f) =>
+              f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
         );
         await provider.deleteFavorite(favorite.id);
       } else {
@@ -636,7 +788,7 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
           tipId: widget.featuredTips[_currentTrackIndex.value].tipsId,
           createdAt: DateTime.now(),
         );
-        await provider.addFavorite(favorite);
+        await provider.addFavorite(favorite, widget.tip);
       }
       _heartController.forward().then((_) => _heartController.reverse());
     } catch (e) {
@@ -658,8 +810,12 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
   }
 
   Widget _buildAlbumArt(bool isDarkMode) {
-    if (_currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
-      log('Invalid track index for album art: ${_currentTrackIndex.value}', name: 'MediaPlayerScreen');
+    if (_currentTrackIndex.value < 0 ||
+        _currentTrackIndex.value >= widget.featuredTips.length) {
+      log(
+        'Invalid track index for album art: ${_currentTrackIndex.value}',
+        name: 'MediaPlayerScreen',
+      );
       return Container();
     }
 
@@ -688,7 +844,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                      color: isDarkMode
+                          ? AppColors.darkTextSecondary
+                          : AppColors.lightTextSecondary,
                       width: 3.w,
                     ),
                     gradient: LinearGradient(
@@ -701,53 +859,68 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                     ),
                   ),
                   child: ClipOval(
-                    child: widget.featuredTips[_currentTrackIndex.value].thumbnailUrl != null &&
-                        widget.featuredTips[_currentTrackIndex.value].thumbnailUrl!.isNotEmpty
+                    child:
+                        widget
+                                    .featuredTips[_currentTrackIndex.value]
+                                    .thumbnailUrl !=
+                                null &&
+                            widget
+                                .featuredTips[_currentTrackIndex.value]
+                                .thumbnailUrl!
+                                .isNotEmpty
                         ? CachedNetworkImage(
-                      imageUrl: widget.featuredTips[_currentTrackIndex.value].thumbnailUrl!,
-                      fit: BoxFit.cover,
-                      width: 280.w,
-                      height: 280.w,
-                      alignment: Alignment.center,
-                      placeholder: (context, url) => Container(
-                        color: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface,
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.w,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      errorWidget: (context, url, error) => Container(
-                        color: isDarkMode ? AppColors.darkSurface : AppColors.lightSurface,
-                        child: Icon(
-                          Icons.music_note_rounded,
-                          color: AppColors.primary,
-                          size: 80.sp,
-                        ),
-                      ),
-                    )
+                            imageUrl: widget
+                                .featuredTips[_currentTrackIndex.value]
+                                .thumbnailUrl!,
+                            fit: BoxFit.cover,
+                            width: 280.w,
+                            height: 280.w,
+                            alignment: Alignment.center,
+                            placeholder: (context, url) => Container(
+                              color: isDarkMode
+                                  ? AppColors.darkSurface
+                                  : AppColors.lightSurface,
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.w,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              color: isDarkMode
+                                  ? AppColors.darkSurface
+                                  : AppColors.lightSurface,
+                              child: Icon(
+                                Icons.music_note_rounded,
+                                color: AppColors.primary,
+                                size: 80.sp,
+                              ),
+                            ),
+                          )
                         : Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.primary.withOpacity(0.8),
-                            AppColors.primary.withOpacity(0.4),
-                          ],
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.music_note_rounded,
-                        color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                        size: 80.sp,
-                      ),
-                    ),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.primary.withOpacity(0.8),
+                                  AppColors.primary.withOpacity(0.4),
+                                ],
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.music_note_rounded,
+                              color: isDarkMode
+                                  ? AppColors.darkTextPrimary
+                                  : AppColors.lightTextPrimary,
+                              size: 80.sp,
+                            ),
+                          ),
                   ),
                 ),
-                // Loading overlay only when loading
-                if (_isLoading)
+                // Loading overlay only when loading and not playing yet
+                if (_isLoading && !_isPlaying)
                   Positioned.fill(
                     child: ClipOval(
                       child: BackdropFilter(
@@ -761,7 +934,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                                 CircularProgressIndicator(
                                   strokeWidth: 3.w,
                                   color: Colors.white,
-                                  value: _downloadProgress > 0 ? _downloadProgress : null,
+                                  value: _downloadProgress > 0
+                                      ? _downloadProgress
+                                      : null,
                                 ),
                                 if (_downloadProgress > 0) ...[
                                   SizedBox(height: 8.h),
@@ -781,6 +956,27 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                       ),
                     ),
                   ),
+                // Small buffering indicator while playing
+                if (_isLoading && _isPlaying)
+                  Positioned(
+                    bottom: 10.h,
+                    right: 10.w,
+                    child: Container(
+                      padding: EdgeInsets.all(8.r),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.6),
+                        shape: BoxShape.circle,
+                      ),
+                      child: SizedBox(
+                        width: 20.w,
+                        height: 20.w,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.w,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           );
@@ -793,9 +989,11 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
     return Consumer<FavoritesProvider>(
       builder: (context, favoritesProvider, child) {
         bool isFavorite = false;
-        if (_currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length) {
+        if (_currentTrackIndex.value >= 0 &&
+            _currentTrackIndex.value < widget.featuredTips.length) {
           isFavorite = favoritesProvider.favorites.any(
-                (f) => f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
+            (f) =>
+                f.tipId == widget.featuredTips[_currentTrackIndex.value].tipsId,
           );
         }
 
@@ -804,9 +1002,11 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
             CustomAudioSlider(
               duration: _duration ?? Duration.zero,
               position: _position ?? Duration.zero,
-              onChanged: (_hasError || _isInitializing) ? null : (value) {
-                _audioPlayer.seek(Duration(seconds: value.toInt()));
-              },
+              onChanged: (_hasError || _isInitializing)
+                  ? null
+                  : (value) {
+                      _audioPlayer.seek(Duration(seconds: value.toInt()));
+                    },
               isDarkMode: isDarkMode,
               isActive: !_hasError && !_isInitializing,
             ),
@@ -819,45 +1019,57 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                     'assets/icons/svg/ic_playlist.svg',
                     width: 28.sp,
                     height: 28.sp,
-                    color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                    color: isDarkMode
+                        ? AppColors.darkTextPrimary
+                        : AppColors.lightTextPrimary,
                   ),
-                  onPressed: _hasError ? null : () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => PlaylistBottomSheet(
-                        featuredTips: widget.featuredTips,
-                        categoryName: widget.categoryName,
-                        currentTrackIndex: _currentTrackIndex,
-                        onTrackSelected: (index) async {
-                          if (index != _currentTrackIndex.value) {
-                            _safeSetState(() {
-                              _currentTrackIndex.value = index;
-                              _isLoading = true;
-                              _isInitializing = true;
-                              _downloadProgress = 0.0;
-                              _hasError = false;
-                            });
-                            await _audioPlayer.stop();
-                            await _initializeAudio();
-                            final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
-                            if (widget.featuredTips[_currentTrackIndex.value].isPremium && !canAccessPremium) {
-                              _showPremiumDialog(context);
-                              _shakeController.repeat();
-                            } else {
-                              _shakeController.stop();
-                              if (!_hasError) {
-                                await _audioPlayer.play();
-                              }
-                            }
-                            _precacheNextTrack();
-                          }
-                          Navigator.pop(context);
+                  onPressed: _hasError
+                      ? null
+                      : () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => PlaylistBottomSheet(
+                              featuredTips: widget.featuredTips,
+                              categoryName: widget.categoryName,
+                              currentTrackIndex: _currentTrackIndex,
+                              onTrackSelected: (index) async {
+                                if (index != _currentTrackIndex.value) {
+                                  _safeSetState(() {
+                                    _currentTrackIndex.value = index;
+                                    _isLoading = true;
+                                    _isInitializing = true;
+                                    _downloadProgress = 0.0;
+                                    _hasError = false;
+                                  });
+                                  await _audioPlayer.stop();
+                                  await _initializeAudio();
+                                  final canAccessPremium =
+                                      Provider.of<PremiumStatusProvider>(
+                                        context,
+                                        listen: false,
+                                      ).canAccessPremium;
+                                  if (widget
+                                          .featuredTips[_currentTrackIndex
+                                              .value]
+                                          .isPremium &&
+                                      !canAccessPremium) {
+                                    _showPremiumDialog(context);
+                                    _shakeController.repeat();
+                                  } else {
+                                    _shakeController.stop();
+                                    if (!_hasError) {
+                                      await _audioPlayer.play();
+                                    }
+                                  }
+                                  _precacheNextTracks();
+                                }
+                                Navigator.pop(context);
+                              },
+                            ),
+                          );
                         },
-                      ),
-                    );
-                  },
                 ),
                 SizedBox(width: 8.w),
                 IconButton(
@@ -865,11 +1077,18 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                     'assets/icons/svg/ic_previous.svg',
                     width: 32.sp,
                     height: 32.sp,
-                    color: (_currentTrackIndex.value > 0 && !_hasError && !_isLoading)
-                        ? (isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)
-                        : (isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary).withOpacity(0.5),
+                    color: (_currentTrackIndex.value > 0 && !_hasError)
+                        ? (isDarkMode
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary)
+                        : (isDarkMode
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary)
+                              .withOpacity(0.5),
                   ),
-                  onPressed: (_currentTrackIndex.value > 0 && !_hasError && !_isLoading) ? _playPreviousTrack : null,
+                  onPressed: (_currentTrackIndex.value > 0 && !_hasError)
+                      ? _playPreviousTrack
+                      : null,
                 ),
                 SizedBox(width: 16.w),
                 AnimatedBuilder(
@@ -887,12 +1106,16 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                             end: Alignment.bottomRight,
                             colors: [
                               _hasError ? Colors.grey : AppColors.primary,
-                              _hasError ? Colors.grey.withOpacity(0.8) : AppColors.primary.withOpacity(0.8),
+                              _hasError
+                                  ? Colors.grey.withOpacity(0.8)
+                                  : AppColors.primary.withOpacity(0.8),
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: (_hasError ? Colors.grey : AppColors.primary).withOpacity(0.4),
+                              color:
+                                  (_hasError ? Colors.grey : AppColors.primary)
+                                      .withOpacity(0.4),
                               blurRadius: 16.r,
                               offset: const Offset(0, 6),
                             ),
@@ -900,22 +1123,26 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                         ),
                         child: IconButton(
                           icon: Icon(
-                            _hasError ? Icons.refresh : (_isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                            _hasError
+                                ? Icons.refresh
+                                : (_isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded),
                             size: 36.sp,
                             color: Colors.white,
                           ),
                           onPressed: _hasError
                               ? () {
-                            _safeSetState(() {
-                              _hasError = false;
-                              _isLoading = true;
-                            });
-                            _initializeAudio().then((_) {
-                              if (!_hasError) {
-                                _audioPlayer.play();
-                              }
-                            });
-                          }
+                                  _safeSetState(() {
+                                    _hasError = false;
+                                    _isLoading = true;
+                                  });
+                                  _initializeAudio().then((_) {
+                                    if (!_hasError) {
+                                      _audioPlayer.play();
+                                    }
+                                  });
+                                }
                               : () => _checkPremiumAccess(context),
                         ),
                       ),
@@ -928,11 +1155,24 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                     'assets/icons/svg/ic_next.svg',
                     width: 32.sp,
                     height: 32.sp,
-                    color: (_currentTrackIndex.value < widget.featuredTips.length - 1 && !_hasError && !_isLoading)
-                        ? (isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary)
-                        : (isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary).withOpacity(0.5),
+                    color:
+                        (_currentTrackIndex.value <
+                                widget.featuredTips.length - 1 &&
+                            !_hasError)
+                        ? (isDarkMode
+                              ? AppColors.darkTextPrimary
+                              : AppColors.lightTextPrimary)
+                        : (isDarkMode
+                                  ? AppColors.darkTextSecondary
+                                  : AppColors.lightTextSecondary)
+                              .withOpacity(0.5),
                   ),
-                  onPressed: (_currentTrackIndex.value < widget.featuredTips.length - 1 && !_hasError && !_isLoading) ? _playNextTrack : null,
+                  onPressed:
+                      (_currentTrackIndex.value <
+                              widget.featuredTips.length - 1 &&
+                          !_hasError)
+                      ? _playNextTrack
+                      : null,
                 ),
                 SizedBox(width: 8.w),
                 AnimatedBuilder(
@@ -945,7 +1185,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                           isFavorite ? Icons.favorite : Icons.favorite_border,
                           color: isFavorite
                               ? Colors.green
-                              : (isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary),
+                              : (isDarkMode
+                                    ? AppColors.darkTextPrimary
+                                    : AppColors.lightTextPrimary),
                           size: 28.sp,
                         ),
                         onPressed: () => _toggleFavorite(favoritesProvider),
@@ -967,13 +1209,21 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (widget.featuredTips.isEmpty || _currentTrackIndex.value < 0 || _currentTrackIndex.value >= widget.featuredTips.length) {
-      log('Error: Invalid featuredTips or index in didChangeDependencies', name: 'MediaPlayerScreen');
+    if (widget.featuredTips.isEmpty ||
+        _currentTrackIndex.value < 0 ||
+        _currentTrackIndex.value >= widget.featuredTips.length) {
+      log(
+        'Error: Invalid featuredTips or index in didChangeDependencies',
+        name: 'MediaPlayerScreen',
+      );
       return;
     }
 
-    final canAccessPremium = Provider.of<PremiumStatusProvider>(context).canAccessPremium;
-    if (widget.featuredTips[_currentTrackIndex.value].isPremium && !canAccessPremium) {
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(
+      context,
+    ).canAccessPremium;
+    if (widget.featuredTips[_currentTrackIndex.value].isPremium &&
+        !canAccessPremium) {
       _shakeController.repeat();
     } else {
       _shakeController.stop();
@@ -1003,16 +1253,24 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
 
     if (widget.featuredTips.isEmpty) {
       widget.featuredTips.add(widget.tip);
-      log('Added current tip to empty featuredTips in build method', name: 'MediaPlayerScreen');
+      log(
+        'Added current tip to empty featuredTips in build method',
+        name: 'MediaPlayerScreen',
+      );
       _currentTrackIndex.value = 0;
     }
 
-    final canAccessPremium = Provider.of<PremiumStatusProvider>(context, listen: false).canAccessPremium;
+    final canAccessPremium = Provider.of<PremiumStatusProvider>(
+      context,
+      listen: false,
+    ).canAccessPremium;
 
     return Consumer2<PremiumStatusProvider, FavoritesProvider>(
       builder: (context, premiumStatus, favoritesProvider, child) {
         return Scaffold(
-          backgroundColor: isDarkMode ? AppColors.darkBackground : AppColors.lightBackground,
+          backgroundColor: isDarkMode
+              ? AppColors.darkBackground
+              : AppColors.lightBackground,
           body: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -1034,7 +1292,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                           icon: Icon(
                             Icons.arrow_back_ios_rounded,
                             size: 20.sp,
-                            color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            color: isDarkMode
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
                           ),
                           onPressed: () => Navigator.pop(context),
                         ),
@@ -1042,12 +1302,15 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                           child: Center(
                             child: Text(
                               widget.categoryName,
-                              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                                fontFamily: 'Poppins',
-                                fontSize: 18.sp,
-                                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                                fontWeight: FontWeight.w700,
-                              ),
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    fontFamily: 'Poppins',
+                                    fontSize: 18.sp,
+                                    color: isDarkMode
+                                        ? AppColors.darkTextPrimary
+                                        : AppColors.lightTextPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -1057,7 +1320,9 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                             'assets/icons/svg/ic_share.svg',
                             width: 20.sp,
                             height: 20.sp,
-                            color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
+                            color: isDarkMode
+                                ? AppColors.darkTextPrimary
+                                : AppColors.lightTextPrimary,
                           ),
                           onPressed: _shareTrack,
                         ),
@@ -1073,23 +1338,34 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                           children: [
                             Flexible(
                               child: Text(
-                                _currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length
-                                    ? widget.featuredTips[_currentTrackIndex.value].tipsTitle
+                                _currentTrackIndex.value >= 0 &&
+                                        _currentTrackIndex.value <
+                                            widget.featuredTips.length
+                                    ? widget
+                                          .featuredTips[_currentTrackIndex
+                                              .value]
+                                          .tipsTitle
                                     : "Audio Track",
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                  fontFamily: 'Poppins',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 22.sp,
-                                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.lightTextPrimary,
-                                ),
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      fontFamily: 'Poppins',
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 22.sp,
+                                      color: isDarkMode
+                                          ? AppColors.darkTextPrimary
+                                          : AppColors.lightTextPrimary,
+                                    ),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 textAlign: TextAlign.center,
                               ),
                             ),
                             if (_currentTrackIndex.value >= 0 &&
-                                _currentTrackIndex.value < widget.featuredTips.length &&
-                                widget.featuredTips[_currentTrackIndex.value].isPremium &&
+                                _currentTrackIndex.value <
+                                    widget.featuredTips.length &&
+                                widget
+                                    .featuredTips[_currentTrackIndex.value]
+                                    .isPremium &&
                                 !canAccessPremium)
                               Padding(
                                 padding: EdgeInsets.only(left: 8.w),
@@ -1103,15 +1379,20 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                         ),
                         SizedBox(height: 8.h),
                         Text(
-                          _currentTrackIndex.value >= 0 && _currentTrackIndex.value < widget.featuredTips.length
-                              ? widget.featuredTips[_currentTrackIndex.value].tipsAuthor
+                          _currentTrackIndex.value >= 0 &&
+                                  _currentTrackIndex.value <
+                                      widget.featuredTips.length
+                              ? widget
+                                    .featuredTips[_currentTrackIndex.value]
+                                    .tipsAuthor
                               : "Unknown Artist",
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontFamily: 'Poppins',
-                            fontSize: 15.sp,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                fontFamily: 'Poppins',
+                                fontSize: 15.sp,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w500,
+                              ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1145,12 +1426,16 @@ class MediaPlayerScreenState extends State<MediaPlayerScreen> with TickerProvide
                             SizedBox(width: 8.w),
                             Expanded(
                               child: Text(
-                                _errorMessage ?? AppLocalizations.of(context)!.errorLoadingAudio,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontFamily: 'Poppins',
-                                  fontSize: 13.sp,
-                                  color: AppColors.error,
-                                ),
+                                _errorMessage ??
+                                    AppLocalizations.of(
+                                      context,
+                                    )!.errorLoadingAudio,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 13.sp,
+                                      color: AppColors.error,
+                                    ),
                               ),
                             ),
                             IconButton(
@@ -1183,13 +1468,15 @@ class WaveAnimation extends StatefulWidget {
   final bool isPlaying;
   final Color color;
 
-  const WaveAnimation({Key? key, required this.isPlaying, required this.color}) : super(key: key);
+  const WaveAnimation({Key? key, required this.isPlaying, required this.color})
+    : super(key: key);
 
   @override
   _WaveAnimationState createState() => _WaveAnimationState();
 }
 
-class _WaveAnimationState extends State<WaveAnimation> with TickerProviderStateMixin {
+class _WaveAnimationState extends State<WaveAnimation>
+    with TickerProviderStateMixin {
   late List<AnimationController> _controllers;
   late List<Animation<double>> _animations;
 
@@ -1198,16 +1485,17 @@ class _WaveAnimationState extends State<WaveAnimation> with TickerProviderStateM
     super.initState();
     _controllers = List.generate(
       5,
-          (index) => AnimationController(
+      (index) => AnimationController(
         vsync: this,
         duration: Duration(milliseconds: 300 + (index * 100)),
       ),
     );
 
     _animations = _controllers.map((controller) {
-      return Tween<double>(begin: 0.2, end: 1.0).animate(
-        CurvedAnimation(parent: controller, curve: Curves.easeInOut),
-      );
+      return Tween<double>(
+        begin: 0.2,
+        end: 1.0,
+      ).animate(CurvedAnimation(parent: controller, curve: Curves.easeInOut));
     }).toList();
 
     if (widget.isPlaying) {
@@ -1302,24 +1590,37 @@ class CustomAudioSlider extends StatelessWidget {
           Positioned.fill(
             child: CustomPaint(
               painter: WaveformPainter(
-                progress: (position.inMilliseconds / (duration.inMilliseconds > 0 ? duration.inMilliseconds : 1)).clamp(0.0, 1.0),
+                progress:
+                    (position.inMilliseconds /
+                            (duration.inMilliseconds > 0
+                                ? duration.inMilliseconds
+                                : 1))
+                        .clamp(0.0, 1.0),
                 waveColor: AppColors.primary.withOpacity(0.1),
-                progressColor: isActive ? AppColors.primary.withOpacity(0.3) : Colors.grey.withOpacity(0.3),
+                progressColor: isActive
+                    ? AppColors.primary.withOpacity(0.3)
+                    : Colors.grey.withOpacity(0.3),
               ),
             ),
           ),
           SliderTheme(
             data: SliderThemeData(
               activeTrackColor: isActive ? AppColors.primary : Colors.grey,
-              inactiveTrackColor: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+              inactiveTrackColor: isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.lightTextSecondary,
               thumbColor: isActive ? AppColors.primary : Colors.grey,
               thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8.r),
               trackHeight: 4.h,
-              overlayColor: (isActive ? AppColors.primary : Colors.grey).withOpacity(0.2),
+              overlayColor: (isActive ? AppColors.primary : Colors.grey)
+                  .withOpacity(0.2),
               overlayShape: RoundSliderOverlayShape(overlayRadius: 20.r),
             ),
             child: Slider(
-              value: position.inSeconds.toDouble().clamp(0, duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1),
+              value: position.inSeconds.toDouble().clamp(
+                0,
+                duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1,
+              ),
               max: duration.inSeconds > 0 ? duration.inSeconds.toDouble() : 1,
               onChanged: isActive ? onChanged : null,
             ),
@@ -1331,7 +1632,9 @@ class CustomAudioSlider extends StatelessWidget {
               _formatDuration(position),
               style: TextStyle(
                 fontSize: 12.sp,
-                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                color: isDarkMode
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
                 fontFamily: 'Poppins',
               ),
             ),
@@ -1343,7 +1646,9 @@ class CustomAudioSlider extends StatelessWidget {
               _formatDuration(duration),
               style: TextStyle(
                 fontSize: 12.sp,
-                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                color: isDarkMode
+                    ? AppColors.darkTextSecondary
+                    : AppColors.lightTextSecondary,
                 fontFamily: 'Poppins',
               ),
             ),
@@ -1389,7 +1694,9 @@ class WaveformPainter extends CustomPainter {
       final x = i * totalWidth + waveWidth / 2;
       // Generate height based on position (taller in middle, shorter at ends)
       final normalizedPos = (i / waveCount) * 2; // 0 to 2
-      final position = normalizedPos <= 1 ? normalizedPos : 2 - normalizedPos; // 0 to 1 to 0
+      final position = normalizedPos <= 1
+          ? normalizedPos
+          : 2 - normalizedPos; // 0 to 1 to 0
       final randomOffset = random.nextDouble() * 0.4 - 0.2; // -0.2 to 0.2
       final heightFactor = 0.3 + 0.7 * position + randomOffset;
 

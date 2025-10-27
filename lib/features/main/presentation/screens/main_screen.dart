@@ -87,7 +87,7 @@ class _MainScreenState extends State<MainScreen>
 
   void _onItemTapped(int index) {
     if (_selectedIndex == 2 && index != 2) {
-      _shortsPlayerKey.currentState?.pauseVideo();
+      _shortsPlayerKey.currentState?.pauseCurrentVideo();
       log('Paused video when switching from Shorts tab', name: 'MainScreen');
     }
 
@@ -115,7 +115,7 @@ class _MainScreenState extends State<MainScreen>
 
   void _onViewAllCategories() {
     if (_selectedIndex == 2) {
-      _shortsPlayerKey.currentState?.pauseVideo();
+      _shortsPlayerKey.currentState?.pauseCurrentVideo();
       log('Paused video when navigating to Category tab via View All', name: 'MainScreen');
     }
 
@@ -150,7 +150,7 @@ class _MainScreenState extends State<MainScreen>
     // Case 1: Not on dashboard → navigate to dashboard
     if (_selectedIndex != 0) {
       if (_selectedIndex == 2) {
-        _shortsPlayerKey.currentState?.pauseVideo();
+        _shortsPlayerKey.currentState?.pauseCurrentVideo();
         log('Paused video when navigating back to Dashboard', name: 'MainScreen');
       }
       setState(() {

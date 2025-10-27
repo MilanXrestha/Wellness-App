@@ -255,7 +255,10 @@ class TipCardState extends State<TipCard> with SingleTickerProviderStateMixin {
                           decoration: BoxDecoration(
                             border: Border(
                               bottom: BorderSide(
-                                color: AppColors.darkSecondary.withOpacity(0.1),
+                                color: widget.isDarkMode
+                                    ? AppColors.darkTextPrimary.withOpacity(0.3)  // dark mode line
+                                    : AppColors.darkSecondary.withOpacity(0.3),      // light mode line
+
                                 width: 1.w,
                               ),
                             ),

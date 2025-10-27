@@ -6,7 +6,6 @@ import 'package:wellness_app/core/resources/colors.dart';
 import 'package:wellness_app/core/resources/strings.dart';
 import '../../domain/app_initializer.dart';
 
-/// Visual splash screen that displays branding without animations
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -16,8 +15,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool _isNavigating = false;
-
-  // Minimum display time to prevent flashing (milliseconds)
   final int _minimumDisplayTime = 1500;
   late DateTime _startTime;
 
@@ -25,32 +22,31 @@ class _SplashScreenState extends State<SplashScreen> {
   void initState() {
     super.initState();
     _startTime = DateTime.now();
-
-    // Start navigation logic in parallel
     _prepareNavigation();
   }
 
   Future<void> _prepareNavigation() async {
     try {
-      // Determine where to navigate
       final route = await AppInitializer.instance.determineInitialRoute();
+      final isOffline = AppInitializer.instance.isOffline;
 
-      // Calculate elapsed time and ensure minimum display
       final elapsedMs = DateTime.now().difference(_startTime).inMilliseconds;
       final remainingMs = _minimumDisplayTime - elapsedMs;
 
       if (remainingMs > 0) {
-        // Wait for minimum display time
         await Future.delayed(Duration(milliseconds: remainingMs));
       }
 
       if (!mounted) return;
 
-      // Navigate to the determined route
       setState(() => _isNavigating = true);
-      Navigator.pushReplacementNamed(context, route);
+      Navigator.pushReplacementNamed(
+        context,
+        route,
+        arguments: {'isOffline': isOffline},
+      );
     } catch (e) {
-      log('Error in navigation preparation: $e');
+      log('Error in navigation preparation: $e', name: 'SplashScreen');
     }
   }
 
@@ -67,13 +63,13 @@ class _SplashScreenState extends State<SplashScreen> {
           color: isDarkMode ? null : AppColors.lightBackground,
           gradient: isDarkMode
               ? LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.surface,
-              theme.scaffoldBackgroundColor,
-            ],
-          )
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    theme.colorScheme.surface,
+                    theme.scaffoldBackgroundColor,
+                  ],
+                )
               : null,
         ),
         child: SafeArea(
@@ -82,17 +78,12 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               children: [
                 SizedBox(height: 80.h),
-
-                // Logo
                 Image.asset(
                   'assets/icons/png/wellness_logo.png',
                   height: 120.h,
                   fit: BoxFit.contain,
                 ),
-
                 SizedBox(height: 5.h),
-
-                // App title
                 Text(
                   AppStrings.appName,
                   style: TextStyle(
@@ -105,20 +96,17 @@ class _SplashScreenState extends State<SplashScreen> {
                         : AppColors.lightTextPrimary,
                     shadows: isDarkMode
                         ? [
-                      Shadow(
-                        offset: const Offset(1, 2),
-                        blurRadius: 6,
-                        color: Colors.black.withAlpha(38),
-                      ),
-                    ]
+                            Shadow(
+                              offset: const Offset(1, 2),
+                              blurRadius: 6,
+                              color: Colors.black.withAlpha(38),
+                            ),
+                          ]
                         : [],
                   ),
                   textAlign: TextAlign.center,
                 ),
-
                 SizedBox(height: 3.h),
-
-                // App subtitle
                 Text(
                   AppStrings.appSubtitle,
                   style: TextStyle(
@@ -131,12 +119,8 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-
                 SizedBox(height: 50.h),
-
                 SizedBox(height: 120.h),
-
-                // App version info
                 Text(
                   AppStrings.appVersion,
                   style: TextStyle(
@@ -148,10 +132,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-
                 const Spacer(),
-
-                // Copyright footer
                 Column(
                   children: [
                     Text(

@@ -725,77 +725,78 @@ class DataRepository {
       log('getFavorites: Invalid userId (empty)');
       return [];
     }
+
+    // First clean up any corrupted favorites
+    await _dbHelper.cleanupCorruptedFavorites();
+
+    // Get local favorites to preserve them
+    final localFavorites = await _dbHelper.getFavoritesByUser(userId);
+    final localFavoriteIds = {for (var f in localFavorites) f.id: true};
+
     final isOnline = await _isOnline();
-    final cacheData = await _cacheService.getCacheData(
-      endpoint: 'favorites',
-      param: userId,
-      hasInternet: isOnline,
-    );
-    if (!cacheData.hasCacheExpired) {
-      log('Favorites fetched from cache for userId: $userId');
-      return (cacheData.data['favorites'] as List<dynamic>)
-          .map(
-            (e) =>
-                FavoriteModel.fromJson(_sanitizeMap(e as Map<String, dynamic>)),
-          )
-          .toList();
-    }
+    // Cache check code here...
+
     if (isOnline) {
       try {
         final snapshot = await _firestore
             .collection(AppConstants.favoriteCollection)
             .where('userId', isEqualTo: userId)
             .get();
-        final firestoreFavorites = snapshot.docs
-            .map(
-              (doc) =>
-                  FavoriteModel.fromFirestore(_sanitizeMap(doc.data()), doc.id),
-            )
-            .toList();
+
+        final List<FavoriteModel> firestoreFavorites = [];
+        final List<FavoriteModel> allFavorites = List.from(localFavorites);
+
+        // Process Firestore favorites
+        for (var doc in snapshot.docs) {
+          try {
+            final favorite = FavoriteModel.fromFirestore(
+              _sanitizeMap(doc.data()),
+              doc.id,
+            );
+            firestoreFavorites.add(favorite);
+
+            // Only add to allFavorites if not already in local database
+            if (!localFavoriteIds.containsKey(favorite.id)) {
+              allFavorites.add(favorite);
+            }
+          } catch (e) {
+            log('Error processing Firestore favorite: ${doc.id}, error: $e');
+          }
+        }
+
+        // Save all favorites to local database
         final db = await _dbHelper.database;
         final batch = db.batch();
+
         for (var favorite in firestoreFavorites) {
-          if (favorite.userId.isEmpty) {
-            log('Skipping invalid favorite ${favorite.id} with empty userId');
-            continue;
-          }
           batch.insert('favorites', {
             'id': favorite.id,
             'userId': favorite.userId,
             'data': favorite.toProto(),
           }, conflictAlgorithm: ConflictAlgorithm.replace);
         }
+
         await batch.commit();
+
+        // Update cache
         await _cacheService.saveDataToCache(
           endpoint: 'favorites',
           param: userId,
-          data: {
-            'favorites': firestoreFavorites.map((e) => e.toJson()).toList(),
-          },
+          data: {'favorites': allFavorites.map((e) => e.toJson()).toList()},
           cacheDuration: const Duration(minutes: 10),
           isToRefresh: false,
         );
+
         log(
-          'Synced ${firestoreFavorites.length} favorites from Firestore for userId: $userId',
+          'Merged ${firestoreFavorites.length} Firestore favorites with ${localFavorites.length} local favorites for userId: $userId',
         );
-        return firestoreFavorites;
+        return allFavorites;
       } catch (e) {
-        log(
-          'Error fetching favorites from Firestore for userId: $userId, error: $e',
-        );
+        log('Error fetching favorites from Firestore: $e');
       }
     }
-    final localFavorites = await _dbHelper.getFavoritesByUser(userId);
-    await _cacheService.saveDataToCache(
-      endpoint: 'favorites',
-      param: userId,
-      data: {'favorites': localFavorites.map((e) => e.toJson()).toList()},
-      cacheDuration: const Duration(minutes: 10),
-      isToRefresh: false,
-    );
-    log(
-      'Fetched ${localFavorites.length} favorites from local database for userId: $userId',
-    );
+
+    // Return local favorites
     return localFavorites;
   }
 
@@ -804,7 +805,21 @@ class DataRepository {
       log('addFavorite: Invalid userId (empty)');
       throw Exception('Cannot add favorite with empty userId');
     }
-    await _dbHelper.insertFavorite(favorite);
+
+    // Make sure we have a createdAt value
+    final favoriteWithDate = favorite.createdAt == null
+        ? FavoriteModel(
+            id: favorite.id,
+            userId: favorite.userId,
+            tipId: favorite.tipId,
+            createdAt: DateTime.now(),
+          )
+        : favorite;
+
+    // Always store in local database
+    await _dbHelper.insertFavorite(favoriteWithDate);
+
+    // Clear cache to force refresh
     await _cacheService.saveDataToCache(
       endpoint: 'favorites',
       param: favorite.userId,
@@ -812,25 +827,32 @@ class DataRepository {
       cacheDuration: const Duration(minutes: 10),
       isToRefresh: true,
     );
+
     log('Favorite added to local database: ${favorite.id}');
+
     if (await _isOnline()) {
       try {
-        final sanitizedData = _sanitizeMap(favorite.toFirestore());
+        final sanitizedData = _sanitizeMap(favoriteWithDate.toFirestore());
         await _firestore
             .collection(AppConstants.favoriteCollection)
-            .doc(favorite.id)
+            .doc(favoriteWithDate.id)
             .set(sanitizedData);
-        log('Favorite added to Firestore: ${favorite.id}');
+        log('Favorite added to Firestore: ${favoriteWithDate.id}');
       } catch (e) {
         log('Error adding favorite to Firestore: $e');
-        await _dbHelper.insertPendingFavorite(favorite);
-        log('Favorite stored in pending_operations: ${favorite.id}');
+        // Always add to pending operations for retry
+        await _dbHelper.insertPendingFavorite(favoriteWithDate);
+        log('Favorite stored in pending_operations: ${favoriteWithDate.id}');
       }
     } else {
-      await _dbHelper.insertPendingFavorite(favorite);
-      log('Offline: Favorite stored in pending_operations: ${favorite.id}');
+      // Store for later sync
+      await _dbHelper.insertPendingFavorite(favoriteWithDate);
+      log(
+        'Offline: Favorite stored in pending_operations: ${favoriteWithDate.id}',
+      );
     }
-    return favorite;
+
+    return favoriteWithDate;
   }
 
   Future<void> deleteFavorite(String id) async {

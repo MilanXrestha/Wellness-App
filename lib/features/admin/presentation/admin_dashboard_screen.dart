@@ -16,8 +16,10 @@ import 'package:wellness_app/features/auth/data/services/auth_service.dart';
 import 'package:wellness_app/common/widgets/custom_alert_dialog.dart';
 import 'package:wellness_app/common/widgets/custom_bottom_sheet.dart';
 import '../../../core/providers/theme_provider.dart';
+import '../../games/achievements/data/models/achievement_model.dart';
 import 'manage_users_screen.dart';
 import 'manage_categories_screen.dart';
+import 'achievement_admin_screen.dart'; // Import the Achievement Admin Screen
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -38,6 +40,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     'Total Tips': '0',
     'Tips by Type': 'Quotes: 0, Tips: 0, Health Tips: 0',
     'Total Earnings': '0.00',
+    'Total Achievements': '0', // Added new stat for achievements
   };
   List<String> _allUserIds = [];
   List<Map<String, dynamic>> _transactions = [];
@@ -49,6 +52,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     super.initState();
     _fetchStats();
   }
+
 
   Future<void> _fetchStats() async {
     setState(() => _isLoading = true);
@@ -63,6 +67,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _firestore.collection('tips').where('tipsType', isEqualTo: 'tip').get(),
         _firestore.collection('tips').where('tipsType', isEqualTo: 'healthTips').get(),
         _firestore.collection('transactions').where('status', isEqualTo: 'completed').get(),
+        _firestore.collection('achievements').get(), // Added achievements query
       ]);
 
       double totalEarnings = 0.0;
@@ -91,6 +96,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             'Total Tips': results[4].size.toString(),
             'Tips by Type': 'Quotes: ${results[5].size}, Tips: ${results[6].size}, Health Tips: ${results[7].size}',
             'Total Earnings': totalEarnings.toStringAsFixed(2),
+            'Total Achievements': results[9].size.toString(), // Add achievements count
           };
           _transactions = transactions;
         });
@@ -109,6 +115,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
     }
   }
+
 
   Future<void> _handleSignOut() async {
     setState(() => _isLoading = true);
@@ -904,11 +911,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                                     shape: BoxShape.circle,
                                     gradient: LinearGradient(
                                       colors:  isDarkMode
-                                      ?[
+                                          ?[
                                         AppColors.primary,
                                         AppColors.primary.withOpacity(0.7),
                                       ]
-                                      :[
+                                          :[
                                         AppColors.lightSurface,
                                         AppColors.lightSurface,
                                       ],
@@ -1042,9 +1049,34 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                           index: 5,
                           isDarkMode: isDarkMode,
                         ),
+                        // New Achievement card
+                        statCard(
+                          title: 'Achievements',
+                          value: _stats['Total Achievements']!,
+                          icon: FontAwesomeIcons.trophy,
+                          accentColor: Colors.amber,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              PageRouteBuilder(
+                                pageBuilder: (context, animation, secondaryAnimation) => const AchievementAdminScreen(),
+                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                  return FadeTransition(
+                                    opacity: animation,
+                                    child: child,
+                                  );
+                                },
+                                transitionDuration: const Duration(milliseconds: 400),
+                              ),
+                            );
+                          },
+                          index: 6,
+                          isDarkMode: isDarkMode,
+                        ),
                       ],
                     ),
                     SizedBox(height: 32.h),
+
                     FadeInLeft(
                       duration: const Duration(milliseconds: 700),
                       child: Text(

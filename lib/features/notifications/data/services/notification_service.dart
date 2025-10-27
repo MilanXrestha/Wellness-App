@@ -23,7 +23,9 @@ import '../../../../core/db/database_helper.dart';
 class NotificationService {
   NotificationService._privateConstructor();
 
-  static final NotificationService _instance = NotificationService._privateConstructor();
+  static final NotificationService _instance =
+      NotificationService._privateConstructor();
+
   static NotificationService get instance => _instance;
 
   static const String _vercelDomain = 'https://wellness-functions.vercel.app';
@@ -31,9 +33,19 @@ class NotificationService {
   static const String _pendingRemindersKey = 'pending_reminders';
   static const String _hasRequestedExactAlarmKey = 'has_requested_exact_alarm';
 
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
   FirebaseFirestore? _firestore;
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  // Replace the existing navigatorKey with this:
+  GlobalKey<NavigatorState>? _navigatorKey;
+
+  // Add this method to set the navigator key from outside
+  void setNavigatorKey(GlobalKey<NavigatorState> key) {
+    _navigatorKey = key;
+    log('NavigatorKey set in NotificationService');
+  }
+
   bool _isInitialized = false;
   bool _isFirestoreInitialized = false;
 
@@ -46,8 +58,12 @@ class NotificationService {
     try {
       // Ensure Firebase is initialized
       if (Firebase.apps.isEmpty) {
-        log('Firebase not initialized in NotificationService, initializing now');
-        await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+        log(
+          'Firebase not initialized in NotificationService, initializing now',
+        );
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
       }
 
       _firestore = FirebaseFirestore.instance;
@@ -71,34 +87,44 @@ class NotificationService {
       tz.setLocalLocation(tz.getLocation('Asia/Kathmandu'));
       log('Local time zone set to: ${tz.local.name}');
 
-      const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('ic_notification');
-      const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
-      const InitializationSettings initializationSettings = InitializationSettings(
-        android: initializationSettingsAndroid,
-        iOS: initializationSettingsIOS,
-      );
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('ic_notification');
+      const DarwinInitializationSettings initializationSettingsIOS =
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
+      const InitializationSettings initializationSettings =
+          InitializationSettings(
+            android: initializationSettingsAndroid,
+            iOS: initializationSettingsIOS,
+          );
 
       await flutterLocalNotificationsPlugin.initialize(
         initializationSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse notificationResponse) async {
-          final String? payload = notificationResponse.payload;
-          if (payload != null) {
-            log('Notification clicked from local notifications: $payload');
-            await onClickToNotification(payload);
-          } else {
-            log('Notification clicked but payload is null');
-          }
-        },
+        onDidReceiveNotificationResponse:
+            (NotificationResponse notificationResponse) async {
+              final String? payload = notificationResponse.payload;
+              if (payload != null) {
+                log('Notification clicked from local notifications: $payload');
+                await onClickToNotification(payload);
+              } else {
+                log('Notification clicked but payload is null');
+              }
+            },
       );
 
       // Register background/terminated state handler
-      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails().then((details) async {
-        if (details != null && details.didNotificationLaunchApp && details.notificationResponse?.payload != null) {
-          log('App launched from notification: ${details.notificationResponse?.payload}');
+      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails().then((
+        details,
+      ) async {
+        if (details != null &&
+            details.didNotificationLaunchApp &&
+            details.notificationResponse?.payload != null) {
+          log(
+            'App launched from notification: ${details.notificationResponse?.payload}',
+          );
           await onClickToNotification(details.notificationResponse!.payload!);
         }
       });
@@ -123,7 +149,10 @@ class NotificationService {
       enableLights: true,
     );
 
-    final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    final androidPlugin = flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
     if (androidPlugin != null) {
       await androidPlugin.createNotificationChannel(channel);
       log('Notification channel wellness_channel created');
@@ -134,28 +163,39 @@ class NotificationService {
 
   Future<void> _requestNotificationPermission() async {
     try {
-      final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidPlugin == null) {
         log('Android platform implementation not found');
         return;
       }
-      final bool granted = await androidPlugin.requestNotificationsPermission() ?? false;
+      final bool granted =
+          await androidPlugin.requestNotificationsPermission() ?? false;
       log('Notification permission requested: $granted');
     } catch (e, stackTrace) {
-      log('Error requesting notification permission: $e', stackTrace: stackTrace);
+      log(
+        'Error requesting notification permission: $e',
+        stackTrace: stackTrace,
+      );
     }
   }
 
   Future<bool> requestExactAlarmPermission() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final hasRequestedExactAlarm = prefs.getBool(_hasRequestedExactAlarmKey) ?? false;
+      final hasRequestedExactAlarm =
+          prefs.getBool(_hasRequestedExactAlarmKey) ?? false;
       if (hasRequestedExactAlarm) {
         log('SCHEDULE_EXACT_ALARM permission already requested, skipping');
         return true;
       }
 
-      final androidPlugin = flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+      final androidPlugin = flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
       if (androidPlugin == null) {
         log('Android platform implementation not found');
         return false;
@@ -171,7 +211,10 @@ class NotificationService {
         return false;
       }
     } catch (e, stackTrace) {
-      log('Error requesting SCHEDULE_EXACT_ALARM permission: $e', stackTrace: stackTrace);
+      log(
+        'Error requesting SCHEDULE_EXACT_ALARM permission: $e',
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }
@@ -181,7 +224,9 @@ class NotificationService {
       final currentUserId = AuthService().getCurrentUser()?.uid;
       final targetUserId = message.data['userId'] ?? 'unknown';
       if (currentUserId != null && targetUserId != currentUserId) {
-        log('Skipping notification for user $targetUserId (current user: $currentUserId)');
+        log(
+          'Skipping notification for user $targetUserId (current user: $currentUserId)',
+        );
         return;
       }
 
@@ -191,8 +236,10 @@ class NotificationService {
       const String channelName = 'Wellness Notifications';
       const String channelDesc = 'Notifications for wellness updates';
 
-      final int notificationId = DateTime.now().millisecondsSinceEpoch % 2147483647;
+      final int notificationId =
+          DateTime.now().millisecondsSinceEpoch % 2147483647;
 
+      // Enhance notification details for better click handling
       final NotificationDetails platformChannelSpecifics = NotificationDetails(
         android: AndroidNotificationDetails(
           channelId,
@@ -204,8 +251,10 @@ class NotificationService {
           enableVibration: true,
           showWhen: true,
           icon: 'ic_notification',
-          fullScreenIntent: true, // Make notification clickable even when screen is locked
-          category: AndroidNotificationCategory.message, // Ensure high priority
+          fullScreenIntent: true,
+          actions: <AndroidNotificationAction>[],
+          autoCancel: true,
+          category: AndroidNotificationCategory.message,
         ),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
@@ -241,7 +290,9 @@ class NotificationService {
       await initLocalNotifications();
       final currentUserId = AuthService().getCurrentUser()?.uid;
       if (currentUserId == null || currentUserId != reminder.userId) {
-        log('No authenticated user or userId mismatch for reminder ${reminder.id}, skipping');
+        log(
+          'No authenticated user or userId mismatch for reminder ${reminder.id}, skipping',
+        );
         return;
       }
 
@@ -252,14 +303,18 @@ class NotificationService {
 
       if (await DataRepository.instance.isOnline()) {
         // Get tips matching this reminder's criteria
-        final tips = await DataRepository.instance.getTipsByCategory(
-          reminder.categoryId,
-          includePremium: false,
-        ).timeout(Duration(seconds: 2), onTimeout: () {
-          log('Timeout fetching tips for reminder ${reminder.id}');
-          return [];
-        });
-        log('Fetched ${tips.length} tips for category ${reminder.categoryId}, type: ${reminder.type}');
+        final tips = await DataRepository.instance
+            .getTipsByCategory(reminder.categoryId, includePremium: false)
+            .timeout(
+              Duration(seconds: 2),
+              onTimeout: () {
+                log('Timeout fetching tips for reminder ${reminder.id}');
+                return [];
+              },
+            );
+        log(
+          'Fetched ${tips.length} tips for category ${reminder.categoryId}, type: ${reminder.type}',
+        );
 
         // Filter tips based on reminder type
         final filteredTips = tips.where((tip) {
@@ -269,16 +324,24 @@ class NotificationService {
 
         if (filteredTips.isNotEmpty) {
           // Select a random tip to show
-          final tip = filteredTips[DateTime.now().millisecondsSinceEpoch % filteredTips.length];
-          log('Selected tip: ${tip.tipsId}, title: ${tip.tipsTitle}, type: ${tip.tipsType}');
+          final tip =
+              filteredTips[DateTime.now().millisecondsSinceEpoch %
+                  filteredTips.length];
+          log(
+            'Selected tip: ${tip.tipsId}, title: ${tip.tipsTitle}, type: ${tip.tipsType}',
+          );
           body = tip.tipsTitle;
           tipId = tip.tipsId;
           contentType = tip.tipsType; // Set actual content type from tip
         } else {
-          log('No tips found for reminder ${reminder.id}, using default message');
+          log(
+            'No tips found for reminder ${reminder.id}, using default message',
+          );
         }
       } else {
-        log('Offline: Using default notification message for reminder ${reminder.id}');
+        log(
+          'Offline: Using default notification message for reminder ${reminder.id}',
+        );
       }
 
       // Create a unique ID for this notification
@@ -301,7 +364,9 @@ class NotificationService {
       );
 
       final timeDiff = scheduledDate.difference(now).inSeconds;
-      log('Current time (local): $now, Scheduled date (local): $scheduledDate, time difference: $timeDiff seconds');
+      log(
+        'Current time (local): $now, Scheduled date (local): $scheduledDate, time difference: $timeDiff seconds',
+      );
 
       // If time has already passed today, schedule for tomorrow
       if (timeDiff < 0) {
@@ -309,7 +374,7 @@ class NotificationService {
         log('Scheduled date moved to next day: $scheduledDate');
       }
 
-      // Create notification details
+      // Create notification details with improved click handling
       const androidDetails = AndroidNotificationDetails(
         'wellness_channel',
         'Wellness Reminders',
@@ -319,6 +384,8 @@ class NotificationService {
         playSound: true,
         enableVibration: true,
         fullScreenIntent: true,
+        actions: <AndroidNotificationAction>[],
+        autoCancel: true,
         category: AndroidNotificationCategory.reminder,
       );
       const iosDetails = DarwinNotificationDetails(
@@ -326,7 +393,10 @@ class NotificationService {
         presentBadge: true,
         presentSound: true,
       );
-      final notificationDetails = NotificationDetails(android: androidDetails, iOS: iosDetails);
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
 
       // Create payload with content type information
       final payload = {
@@ -334,7 +404,8 @@ class NotificationService {
         'type': reminder.type,
         'userId': reminder.userId,
         'isFromReminder': true,
-        'contentType': contentType, // Include content type for proper navigation
+        'contentType': contentType,
+        // Include content type for proper navigation
       };
       final payloadJson = json.encode(payload);
 
@@ -347,16 +418,18 @@ class NotificationService {
       // Schedule the notification based on frequency
       if (reminder.frequency == 'daily') {
         await flutterLocalNotificationsPlugin.zonedSchedule(
-            notificationId,
-            title,
-            body,
-            scheduledDate,
-            notificationDetails,
-            androidScheduleMode: scheduleMode,
-            matchDateTimeComponents: DateTimeComponents.time,
-            payload: payloadJson
+          notificationId,
+          title,
+          body,
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: scheduleMode,
+          matchDateTimeComponents: DateTimeComponents.time,
+          payload: payloadJson,
         );
-        log('Scheduled daily notification $notificationId for reminder ${reminder.id} at ${reminder.time} with mode $scheduleMode');
+        log(
+          'Scheduled daily notification $notificationId for reminder ${reminder.id} at ${reminder.time} with mode $scheduleMode',
+        );
       } else if (reminder.frequency == 'weekly' && reminder.dayOfWeek != null) {
         // Adjust date to next occurrence of the specified day of week
         while (scheduledDate.weekday != reminder.dayOfWeek) {
@@ -365,16 +438,18 @@ class NotificationService {
         log('Adjusted weekly scheduled date: $scheduledDate');
 
         await flutterLocalNotificationsPlugin.zonedSchedule(
-            notificationId,
-            title,
-            body,
-            scheduledDate,
-            notificationDetails,
-            androidScheduleMode: scheduleMode,
-            matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-            payload: payloadJson
+          notificationId,
+          title,
+          body,
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: scheduleMode,
+          matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+          payload: payloadJson,
         );
-        log('Scheduled weekly notification $notificationId for reminder ${reminder.id} on day ${reminder.dayOfWeek} at ${reminder.time} with mode $scheduleMode');
+        log(
+          'Scheduled weekly notification $notificationId for reminder ${reminder.id} on day ${reminder.dayOfWeek} at ${reminder.time} with mode $scheduleMode',
+        );
       }
 
       // Update reminder with notification ID
@@ -390,28 +465,129 @@ class NotificationService {
         notificationId: notificationId,
       );
       await DataRepository.instance.updateReminder(updatedReminder);
-      log('Updated reminder ${reminder.id} with notificationId $notificationId');
+      log(
+        'Updated reminder ${reminder.id} with notificationId $notificationId',
+      );
     } catch (e, stackTrace) {
-      log('Error scheduling notification for reminder ${reminder.id}: $e', stackTrace: stackTrace);
+      log(
+        'Error scheduling notification for reminder ${reminder.id}: $e',
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }
 
   Future<void> queueNotification(ReminderModel reminder) async {
     try {
+      // Store in pending queue for syncing later
       final prefs = await SharedPreferences.getInstance();
       final pendingReminders = prefs.getStringList(_pendingRemindersKey) ?? [];
       pendingReminders.add(jsonEncode(reminder.toJson()));
       await prefs.setStringList(_pendingRemindersKey, pendingReminders);
       log('Notification queued for reminder: ${reminder.id}');
 
-      // Even if we're offline, try to schedule the local notification
-      // since this doesn't require network
+      // IMPORTANT: Schedule a basic local notification that will work offline
+      // Don't try to fetch online content - use fixed content
       try {
-        await scheduleReminderNotification(reminder);
-        log('Successfully scheduled local notification for offline reminder: ${reminder.id}');
+        await initLocalNotifications();
+
+        // Generate notification ID
+        final notificationId = const Uuid().v4().hashCode.abs();
+
+        // Parse the time
+        final timeParts = reminder.time.split(':');
+        final hour = int.parse(timeParts[0]);
+        final minute = int.parse(timeParts[1]);
+
+        // Calculate scheduled date
+        final now = tz.TZDateTime.now(tz.local);
+        var scheduledDate = tz.TZDateTime(
+          tz.local,
+          now.year,
+          now.month,
+          now.day,
+          hour,
+          minute,
+        );
+
+        // If time has already passed today, schedule for tomorrow
+        if (scheduledDate.isBefore(now)) {
+          scheduledDate = scheduledDate.add(const Duration(days: 1));
+        }
+
+        // For weekly, adjust to the next occurrence of that day
+        if (reminder.frequency == 'weekly' && reminder.dayOfWeek != null) {
+          while (scheduledDate.weekday != reminder.dayOfWeek) {
+            scheduledDate = scheduledDate.add(const Duration(days: 1));
+          }
+        }
+
+        // Create a basic notification payload
+        final payload = {
+          'userId': reminder.userId,
+          'type': reminder.type,
+          'isFromReminder': true,
+          'contentType': reminder.type,
+        };
+
+        // Create notification details with improved click handling
+        const androidDetails = AndroidNotificationDetails(
+          'wellness_channel',
+          'Wellness Reminders',
+          channelDescription: 'Notifications for wellness reminders',
+          importance: Importance.max,
+          priority: Priority.high,
+          actions: <AndroidNotificationAction>[],
+          autoCancel: true,
+          fullScreenIntent: true,
+        );
+        const iosDetails = DarwinNotificationDetails();
+        const notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: iosDetails,
+        );
+
+        // Schedule the notification based on frequency
+        final matchDateTimeComponents = reminder.frequency == 'daily'
+            ? DateTimeComponents.time
+            : DateTimeComponents.dayOfWeekAndTime;
+
+        // Actually schedule the notification
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          notificationId,
+          'Your ${reminder.type.capitalize()} Reminder',
+          'Check out your wellness content for today',
+          scheduledDate,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          matchDateTimeComponents: matchDateTimeComponents,
+          payload: jsonEncode(payload),
+        );
+
+        // Update the reminder with notification ID in local database
+        final updatedReminder = ReminderModel(
+          id: reminder.id,
+          userId: reminder.userId,
+          type: reminder.type,
+          categoryId: reminder.categoryId,
+          frequency: reminder.frequency,
+          time: reminder.time,
+          dayOfWeek: reminder.dayOfWeek,
+          createdAt: reminder.createdAt,
+          notificationId: notificationId,
+        );
+
+        await DatabaseHelper.instance.insertReminder(updatedReminder);
+        log(
+          'Successfully scheduled offline notification for reminder: ${reminder.id}',
+        );
       } catch (e, stackTrace) {
-        log('Failed to schedule local notification for offline reminder: $e', error: e, stackTrace: stackTrace);
+        log(
+          'Error scheduling offline notification: $e',
+          error: e,
+          stackTrace: stackTrace,
+        );
+        // Continue anyway - we've already queued the reminder
       }
     } catch (e, stackTrace) {
       log('Failed to queue notification: $e', error: e, stackTrace: stackTrace);
@@ -435,28 +611,43 @@ class NotificationService {
         try {
           await scheduleReminderNotification(reminder);
         } catch (e, stackTrace) {
-          log('Failed to schedule queued notification for ${reminder.id}: $e', error: e, stackTrace: stackTrace);
+          log(
+            'Failed to schedule queued notification for ${reminder.id}: $e',
+            error: e,
+            stackTrace: stackTrace,
+          );
           continue;
         }
       }
       await prefs.setStringList(_pendingRemindersKey, []);
       log('Cleared queued notifications');
     } catch (e, stackTrace) {
-      log('Error syncing pending notifications: $e', error: e, stackTrace: stackTrace);
+      log(
+        'Error syncing pending notifications: $e',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
   Future<void> cancelReminderNotification(String reminderId) async {
     try {
-      final reminder = await DataRepository.instance.getReminderById(reminderId);
+      final reminder = await DataRepository.instance.getReminderById(
+        reminderId,
+      );
       if (reminder != null && reminder.notificationId != null) {
         await flutterLocalNotificationsPlugin.cancel(reminder.notificationId!);
-        log('Cancelled notification ${reminder.notificationId} for reminder $reminderId');
+        log(
+          'Cancelled notification ${reminder.notificationId} for reminder $reminderId',
+        );
       } else {
         log('No notificationId found for reminder $reminderId');
       }
     } catch (e, stackTrace) {
-      log('Error cancelling notification for reminder $reminderId: $e', stackTrace: stackTrace);
+      log(
+        'Error cancelling notification for reminder $reminderId: $e',
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -467,7 +658,9 @@ class NotificationService {
 
       final tipId = data['tipId'] as String?;
       final type = data['type'] as String? ?? 'tip';
-      final contentType = data['contentType'] as String? ?? type; // Default to type if contentType not specified
+      final contentType =
+          data['contentType'] as String? ??
+          type; // Default to type if contentType not specified
       final isFromReminder = data['isFromReminder'] as bool? ?? false;
       final userId = data['userId'] as String? ?? '';
 
@@ -480,7 +673,10 @@ class NotificationService {
           return;
         }
 
-        final tip = TipModel.fromFirestore(tipDoc.data()! as Map<String, dynamic>, tipId);
+        final tip = TipModel.fromFirestore(
+          tipDoc.data()! as Map<String, dynamic>,
+          tipId,
+        );
         log('Fetched tip: ${tip.tipsId}, type: ${tip.tipsType}');
 
         // Save notification click to database to mark as read
@@ -494,7 +690,8 @@ class NotificationService {
                   ? '${tip.tipsDescription.substring(0, 100)}...'
                   : tip.tipsDescription,
               type: tip.tipsType,
-              isRead: true, // Mark as read since user clicked it
+              isRead: true,
+              // Mark as read since user clicked it
               payload: data,
               timestamp: DateTime.now(),
             );
@@ -505,14 +702,16 @@ class NotificationService {
                 .collection('notifications')
                 .doc(notificationModel.id)
                 .set(notificationModel.toFirestore());
-            log('Created read notification record for reminder click: ${notificationModel.id}');
+            log(
+              'Created read notification record for reminder click: ${notificationModel.id}',
+            );
           } catch (e) {
             log('Error creating notification record: $e');
           }
         }
 
-        // Get the navigator instance
-        final navigator = navigatorKey.currentState;
+        // Get the navigator instance - CHANGED TO USE EXTERNAL NAVIGATOR KEY
+        final navigator = _navigatorKey?.currentState;
         if (navigator != null) {
           // Navigate based on content type
           switch (tip.tipsType) {
@@ -522,7 +721,8 @@ class NotificationService {
                 arguments: {
                   'tip': tip,
                   'categoryName': isFromReminder ? 'Video Content' : 'Videos',
-                  'featuredTips': <TipModel>[], // Optional: fetch related videos
+                  'featuredTips': <TipModel>[],
+                  // Optional: fetch related videos
                 },
               );
               log('Navigated to VideoPlayerScreen with tipId: ${tip.tipsId}');
@@ -545,7 +745,8 @@ class NotificationService {
                 RoutesName.imageViewerScreen,
                 arguments: {
                   'tip': tip,
-                  'imageTips': <TipModel>[tip], // Optional: fetch related images
+                  'imageTips': <TipModel>[tip],
+                  // Optional: fetch related images
                   'initialIndex': 0,
                 },
               );
@@ -553,14 +754,16 @@ class NotificationService {
               break;
 
             default:
-            // Default for tips, quotes, etc.
+              // Default for tips, quotes, etc.
               navigator.pushNamed(
                 RoutesName.tipsDetailScreen,
                 arguments: {
                   'tip': tip,
                   'categoryName': isFromReminder
                       ? 'Recently Added'
-                      : (tip.tipsType == 'tip' ? 'Health Tips' : 'Latest Quotes'),
+                      : (tip.tipsType == 'tip'
+                            ? 'Health Tips'
+                            : 'Latest Quotes'),
                   'userId': userId,
                   'featuredTips': <TipModel>[],
                   'allHealthTips': false,
@@ -575,7 +778,9 @@ class NotificationService {
           final prefs = await SharedPreferences.getInstance();
           await prefs.remove(_pendingNotificationKey);
         } else {
-          log('NavigatorState is null, cannot navigate');
+          log(
+            'NavigatorState is null, cannot navigate. Make sure setNavigatorKey was called.',
+          );
         }
       } else {
         log('No valid tipId in payload, cannot navigate');
@@ -587,7 +792,8 @@ class NotificationService {
 
   Future<void> handleInitialNotification() async {
     try {
-      final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
       if (initialMessage != null) {
         log('Handling initial FCM message: ${initialMessage.data}');
         await showNotification(message: initialMessage);
@@ -604,7 +810,8 @@ class NotificationService {
 
       // Check for app launch from notification
       final NotificationAppLaunchDetails? launchDetails =
-      await flutterLocalNotificationsPlugin.getNotificationAppLaunchDetails();
+          await flutterLocalNotificationsPlugin
+              .getNotificationAppLaunchDetails();
       if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
         final payload = launchDetails.notificationResponse?.payload;
         if (payload != null) {

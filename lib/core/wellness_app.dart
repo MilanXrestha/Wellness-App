@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +19,7 @@ import '../features/dashboard/presentation/providers/notification_count_provider
 import '../features/notifications/data/services/fcm_service.dart';
 import '../features/preferences/presentation/provider/user_preference_provider.dart';
 import '../features/profile/providers/user_provider.dart';
+import '../features/tips/presentation/providers/settings_provider.dart';
 import '../features/videoPlayer/data/services/video_service.dart';
 import '../features/videoPlayer/domain/useCases/video_usecase.dart';
 import '../features/videoPlayer/presentation/providers/shorts_provider.dart';
@@ -33,7 +35,7 @@ class WellnessApp extends StatefulWidget {
   State<WellnessApp> createState() => _WellnessAppState();
 }
 
-class _WellnessAppState extends State<WellnessApp> {
+class _WellnessAppState extends State<WellnessApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late Future<void> _initFuture;
   bool _isOffline = false;
@@ -41,7 +43,48 @@ class _WellnessAppState extends State<WellnessApp> {
   @override
   void initState() {
     super.initState();
+    // Add observer for app lifecycle changes
+    WidgetsBinding.instance.addObserver(this);
+
+    // Set the navigator key in the notification service
+    NotificationService.instance.setNavigatorKey(_navigatorKey);
+
     _initFuture = _initializeServices();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Check for notifications when app is resumed
+      _checkForNotifications();
+    }
+  }
+
+  Future<void> _checkForNotifications() async {
+    try {
+      final NotificationAppLaunchDetails? launchDetails =
+          await NotificationService.instance.flutterLocalNotificationsPlugin
+              .getNotificationAppLaunchDetails();
+
+      if (launchDetails != null &&
+          launchDetails.didNotificationLaunchApp &&
+          launchDetails.notificationResponse?.payload != null) {
+        log(
+          'App resumed by notification: ${launchDetails.notificationResponse?.payload}',
+        );
+        await NotificationService.instance.onClickToNotification(
+          launchDetails.notificationResponse!.payload!,
+        );
+      }
+    } catch (e) {
+      log('Error checking for notifications on resume: $e');
+    }
   }
 
   Future<void> _initializeServices() async {
@@ -77,13 +120,17 @@ class _WellnessAppState extends State<WellnessApp> {
         });
 
         // Foreground message handler
-        FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+        FirebaseMessaging.onMessageOpenedApp.listen((
+          RemoteMessage message,
+        ) async {
           final data = Map<String, dynamic>.from(message.data);
           if (!data.containsKey('contentType') && data.containsKey('type')) {
             data['contentType'] = data['type'];
           }
           await NotificationService.instance.showNotification(message: message);
-          await NotificationService.instance.onClickToNotification(json.encode(data));
+          await NotificationService.instance.onClickToNotification(
+            json.encode(data),
+          );
         });
 
         fcmServices.listenFCMMessage(null);
@@ -95,7 +142,6 @@ class _WellnessAppState extends State<WellnessApp> {
       // Handle pending local notifications
       await NotificationService.instance.handleInitialNotification();
       await NotificationService.instance.syncPendingNotifications();
-
     } catch (e) {
       log('Error initializing services: $e');
       _isOffline = true;
@@ -126,10 +172,14 @@ class _WellnessAppState extends State<WellnessApp> {
             Provider<AuthService>(create: (_) => authService),
             Provider<DataRepository>(create: (_) => DataRepository.instance),
             Provider<DatabaseHelper>(create: (_) => DatabaseHelper.instance),
+
+            ChangeNotifierProvider(create: (_) => SettingsProvider()),
             ChangeNotifierProvider<FavoritesProvider>(
               create: (_) => FavoritesProvider(),
             ),
-            ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
+            ChangeNotifierProvider<ThemeProvider>(
+              create: (_) => ThemeProvider(),
+            ),
             ChangeNotifierProvider<UserProvider>(create: (_) => UserProvider()),
             ChangeNotifierProvider<PremiumStatusProvider>(
               create: (_) => PremiumStatusProvider(),
@@ -141,7 +191,9 @@ class _WellnessAppState extends State<WellnessApp> {
             ChangeNotifierProvider(
               create: (_) => ShortsProvider(
                 getVideosUseCase: GetVideosUseCase(videoService),
-                incrementViewCountUseCase: IncrementViewCountUseCase(videoService),
+                incrementViewCountUseCase: IncrementViewCountUseCase(
+                  videoService,
+                ),
                 toggleLikeUseCase: ToggleLikeUseCase(videoService),
                 isVideoLikedUseCase: IsVideoLikedUseCase(videoService),
                 authService: authService,
@@ -162,6 +214,7 @@ class _WellnessAppState extends State<WellnessApp> {
                     initialRoute: RoutesName.splashScreen,
                     onGenerateRoute: RouteConfig.generateRoute,
                     navigatorKey: _navigatorKey,
+                    // This is important!
                     localizationsDelegates: const [
                       AppLocalizations.delegate,
                       GlobalMaterialLocalizations.delegate,

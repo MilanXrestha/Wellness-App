@@ -4,11 +4,13 @@ import 'package:wellness_app/core/config/routes/route_name.dart';
 
 class VideoRouter {
   static void navigateToVideoPlayer(
-    BuildContext context,
-    TipModel video,
-    String categoryName,
-    List<TipModel> relatedVideos,
-  ) {
+      BuildContext context,
+      TipModel video,
+      String categoryName,
+      List<TipModel> relatedVideos, {
+        bool showAllVideos = false,
+        bool isFromCardClick = true, // Add this parameter with default true
+      }) {
     // Check if this is a short video (under 60 seconds)
     if (video.isShort || video.durationInSeconds < 60) {
       // Navigate to shorts player
@@ -19,6 +21,8 @@ class VideoRouter {
           'tip': video,
           'categoryName': categoryName,
           'featuredTips': relatedVideos,
+          'showAllVideos': showAllVideos,
+          'isFromCardClick': isFromCardClick, // Add this parameter
         },
       );
     } else {
@@ -48,11 +52,13 @@ class VideoRouter {
 
   // Navigate directly to shorts with a specific starting index
   static void navigateToShortsAtIndex(
-    BuildContext context,
-    List<TipModel> shorts,
-    int startIndex,
-    String categoryName,
-  ) {
+      BuildContext context,
+      List<TipModel> shorts,
+      int startIndex,
+      String categoryName, {
+        bool showAllVideos = false,
+        bool isFromCardClick = true, // Add this parameter with default true
+      }) {
     if (startIndex < 0 || startIndex >= shorts.length) {
       return;
     }
@@ -64,6 +70,8 @@ class VideoRouter {
         'tip': shorts[startIndex],
         'categoryName': categoryName,
         'featuredTips': shorts,
+        'showAllVideos': showAllVideos,
+        'isFromCardClick': isFromCardClick, // Add this parameter
       },
     );
   }

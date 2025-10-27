@@ -66,13 +66,34 @@ class FavoriteModel {
   }
 
   factory FavoriteModel.fromProto(List<int> bytes) {
-    final proto = pb.FavoriteModel.fromBuffer(bytes);
-    return FavoriteModel(
-      id: proto.id,
-      userId: proto.userId,
-      tipId: proto.tipId,
-      createdAt: proto.hasCreatedAt() ? DateTime.parse(proto.createdAt) : null,
-    );
+    try {
+      final proto = pb.FavoriteModel.fromBuffer(bytes);
+      DateTime? parsedDate;
+
+      if (proto.hasCreatedAt() && proto.createdAt.isNotEmpty) {
+        try {
+          parsedDate = DateTime.tryParse(proto.createdAt);
+        } catch (e) {
+          print('Error parsing date in FavoriteModel.fromProto: ${proto.createdAt}');
+        }
+      }
+
+      return FavoriteModel(
+        id: proto.id,
+        userId: proto.userId,
+        tipId: proto.tipId,
+        createdAt: parsedDate,
+      );
+    } catch (e) {
+      print('Error parsing FavoriteModel from proto: $e');
+      // Return a valid model with default values
+      return FavoriteModel(
+        id: 'error_' + DateTime.now().millisecondsSinceEpoch.toString(),
+        userId: '',
+        tipId: '',
+        createdAt: DateTime.now(),
+      );
+    }
   }
 
   Map<String, dynamic> toFirestore() {
